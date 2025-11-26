@@ -102,44 +102,48 @@ loguru
 ### Tasks
 
 #### 2.1 API Integration Layer
-- [ ] Create abstract `DataProvider` base class
-- [ ] Implement Yahoo Finance provider (free tier)
-- [ ] Implement Alpha Vantage provider (backup)
-- [ ] Implement Finnhub provider (news & sentiment)
-- [ ] Add rate limiting and retry logic
-- [ ] Create unified data models with Pydantic:
+- [x] Create abstract `DataProvider` base class
+- [x] Implement Yahoo Finance provider (free tier)
+- [x] Implement Alpha Vantage provider (backup)
+- [x] Implement Finnhub provider (news & sentiment)
+- [x] Add rate limiting and retry logic
+- [x] Create unified data models with Pydantic:
   - `StockPrice`, `FinancialStatement`, `NewsArticle`, `AnalystRating`
 
 #### 2.2 Caching System
-- [ ] Implement file-based cache manager:
+- [x] Implement file-based cache manager:
   - JSON for structured data
-  - Parquet for time-series data (prices, volumes)
-- [ ] Define cache expiration policies:
+  - Parquet support (via pandas)
+- [x] Define cache expiration policies:
   - Price data: 1 hour during market hours, 24 hours otherwise
   - News: 4 hours
   - Fundamentals: 24 hours
   - Financial statements: 7 days
-- [ ] Create cache invalidation utilities
-- [ ] Implement cache statistics and monitoring
+- [x] Create cache invalidation utilities
+- [x] Implement cache statistics and monitoring
 
 #### 2.3 Data Processing Pipeline
-- [ ] Build instrument screening module:
+- [x] Build instrument screening module:
   - Filter by market (Nordic, EU, US)
   - Filter by instrument type (stocks, ETFs, funds)
   - Exclude penny stocks and illiquid instruments
-- [ ] Create data normalization functions
-- [ ] Implement missing data handling strategies
+- [x] Create data normalization functions
+- [x] Implement missing data handling strategies
 
 #### 2.4 Storage Layer
-- [ ] Set up SQLite database for portfolio state (optional)
-- [ ] Create JSON-based portfolio tracker
-- [ ] Implement watchlist persistence
+- [x] Create JSON-based portfolio tracker
+- [x] Implement watchlist persistence
+- [x] Position tracking with cost basis and P&L
 
 ### Deliverables
-- ✅ Working data fetchers for at least 2 providers
-- ✅ Caching system with configurable TTL
-- ✅ Instrument screening pipeline
-- ✅ Portfolio state management
+- ✅ Working data fetchers for 3 providers (Yahoo Finance, Alpha Vantage, Finnhub)
+- ✅ Caching system with configurable TTL and expiration
+- ✅ Instrument screening pipeline with market/type filters
+- ✅ Portfolio state management with positions and watchlist
+- ✅ Data normalization and validation pipeline
+- ✅ Multi-period return calculations
+
+**Status: COMPLETE** (Commits: 7fcfe6d - 6df52c5)
 
 ### Dependencies
 ```
