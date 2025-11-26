@@ -2,7 +2,7 @@
 
 AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes Nordic and European markets to generate daily investment signals with confidence scores.
 
-**Status:** Phase 2 complete (Data Layer & Caching). Phase 3 in progress (CrewAI Agents).
+**Status:** Phase 3 complete (CrewAI Agents Development). Phase 4 ready (Signal Synthesis & Reporting).
 
 ## Quick Start
 
@@ -169,9 +169,18 @@ nordinvest/
 │   │   └── portfolio.py     # Portfolio state
 │   ├── cache/               # Caching layer
 │   │   └── manager.py       # Cache management
-│   ├── agents/              # CrewAI agents (Phase 3)
-│   ├── tools/               # Agent tools (Phase 3)
-│   ├── analysis/            # Analysis modules (Phase 3)
+│   ├── agents/              # CrewAI agents
+│   │   ├── base.py          # BaseAgent and AgentConfig
+│   │   ├── crew.py          # AnalysisCrew orchestrator
+│   │   ├── scanner.py       # MarketScannerAgent
+│   │   ├── analysis.py      # Technical & Fundamental agents
+│   │   └── sentiment.py     # Sentiment & Signal Synthesis agents
+│   ├── tools/               # Agent tools
+│   │   ├── base.py          # BaseTool and ToolRegistry
+│   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
+│   │   ├── analysis.py      # Technical & Sentiment tools
+│   │   └── reporting.py     # ReportGeneratorTool
+│   ├── analysis/            # Analysis modules
 │   ├── reports/             # Report generation (Phase 4)
 │   └── utils/
 │       └── logging.py       # Logging setup
@@ -214,13 +223,13 @@ nordinvest/
   - P&L calculations
   - Watchlist management
 
-### Phase 3: CrewAI Agents (In Progress)
-- Market Scanner agent
-- Fundamental Analysis agent
-- Technical Analysis agent
-- News & Sentiment agent
-- Signal Synthesis agent
-- Report Generation agent
+### Phase 3: CrewAI Agents ✅
+- **Market Scanner Agent**: Identifies instruments with price/volume anomalies
+- **Fundamental Analysis Agent**: Evaluates financial health and valuation
+- **Technical Analysis Agent**: Analyzes technical indicators (SMA, RSI, MACD, ATR)
+- **Sentiment Agent**: Analyzes news sentiment (positive/negative/neutral)
+- **Signal Synthesis Agent**: Combines signals with weighted scoring (35% technical, 35% fundamental, 30% sentiment)
+- **Analysis Crew**: Orchestrates parallel analysis with sequential synthesis
 
 ### Phase 4: Signal Synthesis & Reporting
 - Multi-factor signal generation
