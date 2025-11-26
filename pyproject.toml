@@ -18,6 +18,22 @@ dependencies = [
 dev = [
     "black>=25.11.0",
     "notebook>=7.5.0",
+    "poethepoet>=0.38.0",
     "pytest>=9.0.1",
     "ruff>=0.14.6",
 ]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Ignore logging f-string interpolation warning (G004)
+ignore = ["G004"]
+
+# Poethepoet task definitions
+# Usage: uv run poe <task>
+[tool.poe.tasks]
+lint = "sh -c 'ruff check --select I --fix && ruff format && black .'"
