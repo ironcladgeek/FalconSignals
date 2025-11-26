@@ -2,7 +2,7 @@
 
 AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes Nordic and European markets to generate daily investment signals with confidence scores.
 
-**Status:** Phase 3 complete (CrewAI Agents Development). Phase 4 ready (Signal Synthesis & Reporting).
+**Status:** Phase 4 complete (Signal Synthesis & Reporting). Phase 5 ready (Integration, Testing & Polish).
 
 ## Quick Start
 
@@ -231,17 +231,20 @@ nordinvest/
 - **Signal Synthesis Agent**: Combines signals with weighted scoring (35% technical, 35% fundamental, 30% sentiment)
 - **Analysis Crew**: Orchestrates parallel analysis with sequential synthesis
 
-### Phase 4: Signal Synthesis & Reporting
-- Multi-factor signal generation
-- Portfolio allocation engine
-- Risk assessment
-- Daily report generation
+### Phase 4: Signal Synthesis & Reporting ✅
+- **InvestmentSignal Model**: Comprehensive signal with component scores, confidence, recommendations
+- **AllocationEngine**: Position sizing using modified Kelly criterion with constraint enforcement
+- **RiskAssessor**: Multi-factor risk evaluation (volatility, liquidity, sector, concentration)
+- **ReportGenerator**: Daily report generation in Markdown and JSON formats
+- **PortfolioAllocation**: Allocation suggestions with diversification tracking (Herfindahl index)
+- **RiskAssessment**: Risk levels, flags, and warnings for each position
 
-### Phase 5: Testing & Deployment
-- Integration tests
+### Phase 5: Integration, Testing & Polish
+- End-to-end pipeline integration
 - Performance optimization
-- Deployment scripts
-- Cost monitoring
+- Error handling and resilience
+- Deployment automation
+- Documentation and API reference
 
 ## Cost Target
 
