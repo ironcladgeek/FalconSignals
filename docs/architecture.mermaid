@@ -36,7 +36,7 @@ flowchart TB
 
     subgraph CREWAI["🤖 CrewAI Agent System"]
         direction TB
-        
+
         subgraph COLLECTION_AGENTS["Data Collection"]
             SCANNER["🔍 Market Scanner Agent<br/>• Fetch daily data<br/>• Screen instruments<br/>• Detect anomalies"]
         end
@@ -84,24 +84,24 @@ flowchart TB
     CONFIG --> CREWAI
     DATA_SOURCES --> CACHE_LAYER
     CACHE_LAYER --> SCANNER
-    
+
     SCANNER --> FUNDAMENTAL
     SCANNER --> TECHNICAL
     SCANNER --> SENTIMENT
-    
+
     FUNDAMENTAL --> SIGNAL
     TECHNICAL --> SIGNAL
     SENTIMENT --> SIGNAL
-    
+
     SIGNAL --> REPORT
-    
+
     TOOLS -.-> COLLECTION_AGENTS
     TOOLS -.-> ANALYSIS_AGENTS
     TOOLS -.-> SYNTHESIS_AGENTS
-    
+
     REPORT --> OUTPUT
     OUTPUT --> USER
-    
+
     %% Feedback loop
     PORTFOLIO_DB -.-> SIGNAL
 
