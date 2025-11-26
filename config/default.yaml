@@ -1,0 +1,94 @@
+# NordInvest Configuration Template
+# Copy this file to config/local.yaml and customize for your preferences
+
+# Capital Settings
+capital:
+  starting_capital_eur: 2000
+  monthly_deposit_eur: 500
+
+# Risk Tolerance (conservative, moderate, aggressive)
+risk:
+  tolerance: moderate
+  max_position_size_percent: 10
+  max_sector_concentration_percent: 20
+
+# Market Preferences
+markets:
+  included: [nordic, eu]  # Options: nordic, eu, us
+  excluded_markets: []
+
+  # Instrument type preferences
+  included_instruments: [stocks, etfs]  # Options: stocks, etfs, funds
+  exclude_penny_stocks: true
+  min_liquidity_usd: 1000000  # Minimum daily trading volume
+
+# Analysis Preferences
+analysis:
+  # Signal synthesis weights
+  weight_fundamental: 0.35
+  weight_technical: 0.35
+  weight_sentiment: 0.30
+
+  # Signal thresholds
+  buy_threshold: 70
+  buy_confidence_threshold: 0.60
+  hold_lower_threshold: 40
+  hold_upper_threshold: 70
+
+  # Time horizon for predictions
+  time_horizon_months: 3
+
+# Output Preferences
+output:
+  max_recommendations: 10
+  report_format: markdown  # Options: markdown, html, json
+  include_confidence_scores: true
+  include_risk_assessment: true
+
+# Data & Caching
+data:
+  # Cache expiration times (in hours)
+  cache_ttl:
+    price_data_market_hours: 1
+    price_data_overnight: 24
+    news: 4
+    fundamentals: 24
+    financial_statements: 168  # 7 days
+
+  # API providers (in priority order)
+  primary_provider: yahoo_finance
+  backup_providers:
+    - alpha_vantage
+    - finnhub
+
+# API Credentials (use environment variables in production)
+# Export these as environment variables:
+# export ANTHROPIC_API_KEY=your_key
+# export FINNHUB_API_KEY=your_key
+# export OPENAI_API_KEY=your_key (optional, if using OpenAI instead of Anthropic)
+
+api:
+  # Set these via environment variables
+  # anthropic_api_key: ${ANTHROPIC_API_KEY}
+  # finnhub_api_key: ${FINNHUB_API_KEY}
+  # openai_api_key: ${OPENAI_API_KEY}
+
+  # API rate limits and retry settings
+  max_retries: 3
+  retry_backoff_factor: 2
+  timeout_seconds: 30
+
+# Logging
+logging:
+  level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: json  # Options: json, text
+  log_file: logs/nordinvest.log
+  max_log_size_mb: 10
+  backup_count: 5
+
+# Deployment & Scheduling
+deployment:
+  run_time: "08:00"  # UTC, daily run time
+  timezone: Europe/Stockholm
+  cost_limit_eur_per_month: 100
+  cost_check_interval: daily
