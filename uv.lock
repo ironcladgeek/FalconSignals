@@ -2256,6 +2256,7 @@ dev = [
     { name = "black" },
     { name = "notebook" },
     { name = "poethepoet" },
+    { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -2276,6 +2277,7 @@ dev = [
     { name = "black", specifier = ">=25.11.0" },
     { name = "notebook", specifier = ">=7.5.0" },
     { name = "poethepoet", specifier = ">=0.38.0" },
+    { name = "pre-commit", specifier = ">=4.5.0" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "ruff", specifier = ">=0.14.6" },
 ]
