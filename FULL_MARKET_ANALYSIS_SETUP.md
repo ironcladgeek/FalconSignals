@@ -27,7 +27,6 @@ tickers = get_tickers_for_markets(["us"], limit=50)  # 50 US stocks
 
 ### 2. Run analysis
 ```bash
-cd /Users/s0001860/Academy/Projects/NordInvest
 uv run python -m src.main run
 ```
 
