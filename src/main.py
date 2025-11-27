@@ -58,7 +58,6 @@ def analyze(
     start_time = time.time()
     run_log = None
     signals_count = 0
-    error_occurred = False
 
     try:
         # Load configuration
@@ -125,7 +124,7 @@ def analyze(
             )
 
             # Display summary
-            typer.echo(f"\n📈 Report Summary:")
+            typer.echo("\n📈 Report Summary:")
             typer.echo(f"  Strong signals: {report.strong_signals_count}")
             typer.echo(f"  Moderate signals: {report.moderate_signals_count}")
             typer.echo(f"  Total analyzed: {report.total_signals_generated}")
@@ -173,7 +172,6 @@ def analyze(
             )
 
     except FileNotFoundError as e:
-        error_occurred = True
         logger.error(f"Configuration error: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
         if run_log:
@@ -186,7 +184,6 @@ def analyze(
             )
         raise typer.Exit(code=1)
     except ValueError as e:
-        error_occurred = True
         logger.error(f"Configuration validation error: {e}")
         typer.echo(f"❌ Configuration error: {e}", err=True)
         if run_log:
@@ -199,7 +196,6 @@ def analyze(
             )
         raise typer.Exit(code=1)
     except Exception as e:
-        error_occurred = True
         logger.exception(f"Unexpected error during analysis run: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
         if run_log:
@@ -243,7 +239,7 @@ def report(
 
         logger.info(f"Generating report for date: {date}")
 
-        typer.echo(f"✓ Report configuration loaded")
+        typer.echo("✓ Report configuration loaded")
         if date:
             typer.echo(f"  Date: {date}")
         typer.echo(f"  Format: {config_obj.output.report_format}")
