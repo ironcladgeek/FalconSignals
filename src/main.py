@@ -6,9 +6,12 @@ from pathlib import Path
 
 import typer
 
+from src.analysis import InvestmentSignal
 from src.cache.manager import CacheManager
 from src.config import load_config
 from src.data.portfolio import PortfolioState
+from src.llm.integration import LLMAnalysisOrchestrator
+from src.llm.token_tracker import TokenTracker
 from src.MARKET_TICKERS import get_tickers_for_markets
 from src.pipeline import AnalysisPipeline
 from src.utils.llm_check import get_fallback_warning_message, log_llm_status
@@ -22,6 +25,143 @@ app = typer.Typer(
 )
 
 logger = get_logger(__name__)
+
+
+def _run_llm_analysis(
+    tickers: list[str],
+    config_obj,
+    typer_instance,
+) -> tuple[list[InvestmentSignal], None]:
+    """Run analysis using LLM-powered orchestrator.
+
+    Args:
+        tickers: List of tickers to analyze
+        config_obj: Loaded configuration object
+        typer_instance: Typer instance for output
+
+    Returns:
+        Tuple of (signals, portfolio_manager)
+    """
+    try:
+        # Initialize LLM orchestrator with token tracking
+        data_dir = Path("data")
+        tracker = TokenTracker(
+            config_obj.token_tracker,
+            storage_dir=data_dir / "tracking",
+        )
+
+        orchestrator = LLMAnalysisOrchestrator(
+            llm_config=config_obj.llm,
+            token_tracker=tracker,
+            enable_fallback=config_obj.llm.enable_fallback,
+        )
+
+        typer_instance.echo(f"  LLM Provider: {config_obj.llm.provider}")
+        typer_instance.echo(f"  Model: {config_obj.llm.model}")
+        typer_instance.echo(f"  Temperature: {config_obj.llm.temperature}")
+        typer_instance.echo(f"  Token tracking: enabled")
+
+        # Analyze each ticker with LLM
+        signals = []
+        with typer_instance.progressbar(
+            tickers, label="Analyzing instruments", show_pos=True, show_percent=True
+        ) as progress:
+            for ticker in progress:
+                try:
+                    result = orchestrator.analyze_instrument(ticker)
+
+                    # Extract signal from result if successful
+                    if result.get("status") == "complete":
+                        # Use the synthesis result if available
+                        synthesis_result = result.get("results", {}).get("synthesis", {})
+                        if synthesis_result.get("status") == "success":
+                            signal_data = synthesis_result.get("result", {})
+                            # Create InvestmentSignal from LLM result
+                            signal = _create_signal_from_llm_result(ticker, signal_data)
+                            if signal:
+                                signals.append(signal)
+                        else:
+                            logger.warning(f"Synthesis failed for {ticker}, skipping")
+
+                except Exception as e:
+                    logger.error(f"Error analyzing {ticker} with LLM: {e}")
+                    typer_instance.echo(f"  ⚠️  Error analyzing {ticker}: {e}")
+
+        # Log token usage summary
+        daily_stats = tracker.get_daily_stats()
+        if daily_stats:
+            typer_instance.echo(f"\n💰 Token Usage Summary:")
+            typer_instance.echo(f"  Input tokens: {daily_stats.total_input_tokens:,}")
+            typer_instance.echo(f"  Output tokens: {daily_stats.total_output_tokens:,}")
+            typer_instance.echo(f"  Cost: €{daily_stats.total_cost_eur:.2f}")
+            typer_instance.echo(f"  Requests: {daily_stats.requests}")
+
+        return signals, None
+
+    except Exception as e:
+        logger.error(f"Error in LLM analysis: {e}", exc_info=True)
+        typer_instance.echo(f"❌ LLM Analysis Error: {e}", err=True)
+        return [], None
+
+
+def _create_signal_from_llm_result(
+    ticker: str,
+    llm_result: dict,
+) -> InvestmentSignal | None:
+    """Convert LLM analysis result to InvestmentSignal.
+
+    Args:
+        ticker: Stock ticker
+        llm_result: LLM analysis result dict
+
+    Returns:
+        InvestmentSignal or None if conversion fails
+    """
+    try:
+        # Parse LLM result (assumes JSON structure from prompt)
+        if isinstance(llm_result, str):
+            import json
+
+            llm_result = json.loads(llm_result)
+
+        # Extract key fields
+        recommendation = llm_result.get("recommendation", "Hold").upper()
+        if recommendation not in ["BUY", "HOLD", "AVOID"]:
+            recommendation = "HOLD"
+
+        combined_score = llm_result.get("combined_score", 50)
+        confidence = llm_result.get("confidence", 50)
+        thesis = llm_result.get("thesis", "")
+
+        # Create signal
+        signal = InvestmentSignal(
+            ticker=ticker,
+            name=ticker,  # Use ticker as name since we may not have company name
+            market="Global",
+            sector="Unknown",
+            recommendation=recommendation,
+            time_horizon="3M",
+            expected_return={"min": 5, "max": 15},
+            confidence=confidence,
+            scores={
+                "fundamental": llm_result.get("fundamental_score", 50),
+                "technical": llm_result.get("technical_score", 50),
+                "sentiment": llm_result.get("sentiment_score", 50),
+            },
+            key_reasons=llm_result.get("catalysts", []),
+            risk_assessment={
+                "level": "Medium",
+                "volatility": "Normal",
+                "flags": llm_result.get("risks", []),
+            },
+            allocation={"eur": 0, "percentage": 0},
+        )
+
+        return signal
+
+    except Exception as e:
+        logger.error(f"Error creating signal from LLM result: {e}")
+        return None
 
 
 @app.command()
@@ -66,6 +206,11 @@ def analyze(
         True,
         "--save-report/--no-save-report",
         help="Save report to disk",
+    ),
+    use_llm: bool = typer.Option(
+        False,
+        "--llm",
+        help="Use LLM-powered analysis (CrewAI with Claude/GPT) instead of rule-based",
     ),
 ) -> None:
     """Analyze markets and generate investment signals.
@@ -185,7 +330,12 @@ def analyze(
                 typer.echo(f"  Limit: {limit} instruments per market")
             typer.echo(f"  Total instruments to analyze: {len(ticker_list)}")
 
-        signals, portfolio_manager = pipeline.run_analysis(ticker_list)
+        # Run analysis (LLM or rule-based)
+        if use_llm:
+            typer.echo("\n🤖 Using LLM-powered analysis (CrewAI with intelligent agents)")
+            signals, portfolio_manager = _run_llm_analysis(ticker_list, config_obj, typer)
+        else:
+            signals, portfolio_manager = pipeline.run_analysis(ticker_list)
         signals_count = len(signals)
 
         if signals:
