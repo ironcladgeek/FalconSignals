@@ -7,7 +7,7 @@ import typer
 
 from src.cache.manager import CacheManager
 from src.config import load_config
-from src.data.portfolio import PortfolioManager
+from src.data.portfolio import PortfolioState
 from src.pipeline import AnalysisPipeline
 from src.utils.logging import get_logger, setup_logging
 from src.utils.scheduler import RunLog
@@ -85,7 +85,7 @@ def run(
         # Initialize pipeline
         typer.echo("\n⏳ Initializing analysis pipeline...")
         cache_manager = CacheManager(str(data_dir / "cache"))
-        portfolio_manager = PortfolioManager(data_dir / "portfolio.json")
+        portfolio_manager = PortfolioState(data_dir / "portfolio_state.json")
 
         pipeline_config = {
             "capital_starting": config_obj.capital.starting_capital_eur,

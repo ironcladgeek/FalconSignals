@@ -12,7 +12,7 @@ from src.analysis import (
     RiskAssessor,
 )
 from src.cache.manager import CacheManager
-from src.data.portfolio import PortfolioManager
+from src.data.portfolio import PortfolioState
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,14 +25,14 @@ class AnalysisPipeline:
         self,
         config: dict[str, Any],
         cache_manager: CacheManager,
-        portfolio_manager: PortfolioManager | None = None,
+        portfolio_manager: PortfolioState | None = None,
     ):
         """Initialize analysis pipeline.
 
         Args:
             config: Configuration dictionary with analysis parameters
             cache_manager: Cache manager for data caching
-            portfolio_manager: Optional portfolio manager for position tracking
+            portfolio_manager: Optional portfolio state manager for position tracking
         """
         self.config = config
         self.cache_manager = cache_manager
