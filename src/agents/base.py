@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.utils.logging import get_logger
 
@@ -21,10 +21,7 @@ class AgentConfig(BaseModel):
     memory: bool = Field(default=True, description="Keep memory of interactions")
     verbose: bool = Field(default=False, description="Enable verbose output")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class BaseAgent(ABC):

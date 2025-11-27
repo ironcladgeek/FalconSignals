@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Market(str, Enum):
@@ -38,10 +38,7 @@ class StockPrice(BaseModel):
     adjusted_close: float | None = Field(default=None, ge=0, description="Adjusted closing price")
     currency: str = Field(default="EUR", description="Price currency (EUR, USD, etc.)")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class FinancialStatement(BaseModel):
@@ -59,10 +56,7 @@ class FinancialStatement(BaseModel):
     value: float = Field(description="Metric value")
     unit: str = Field(default="USD", description="Value unit (USD, millions, etc.)")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class NewsArticle(BaseModel):
@@ -82,10 +76,7 @@ class NewsArticle(BaseModel):
     )
     importance: int | None = Field(default=None, ge=0, le=100, description="Importance score 0-100")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class AnalystRating(BaseModel):
@@ -99,10 +90,7 @@ class AnalystRating(BaseModel):
     num_analysts: int | None = Field(default=None, ge=1, description="Number of analysts")
     consensus: str | None = Field(default=None, description="Consensus rating from aggregates")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class InstrumentMetadata(BaseModel):
@@ -117,7 +105,4 @@ class InstrumentMetadata(BaseModel):
     currency: str = Field(default="EUR", description="Trading currency")
     last_updated: datetime = Field(description="Last data update time")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
