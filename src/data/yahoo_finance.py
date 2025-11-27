@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+import pandas as pd
 import yfinance as yf
 
 from src.data.models import InstrumentType, Market, StockPrice
@@ -53,6 +54,7 @@ class YahooFinanceProvider(DataProvider):
                 start=start_date,
                 end=end_date,
                 progress=False,
+                auto_adjust=False,  # Keep original and adjusted close prices
             )
 
             if data.empty:
@@ -60,18 +62,52 @@ class YahooFinanceProvider(DataProvider):
 
             prices = []
             for index, row in data.iterrows():
+                # Handle MultiIndex columns from yfinance
+                # When downloading a single ticker, columns are (PriceLevel, Ticker)
+                # When columns are flat, they're just price levels
+                def get_price_value(row, key):
+                    """Extract scalar price value, handling both flat and MultiIndex columns."""
+                    try:
+                        # Try MultiIndex first (single ticker download)
+                        val = row[(key, ticker.upper())]
+                    except (KeyError, TypeError):
+                        try:
+                            # Fall back to flat column names
+                            val = row[key]
+                        except (KeyError, TypeError):
+                            return None
+                    return float(val) if pd.notna(val) else None
+
+                # Extract price values
+                adjusted_close = get_price_value(row, "Adj Close")
+                if adjusted_close is None:
+                    adjusted_close = get_price_value(row, "Close")
+                if adjusted_close is None:
+                    logger.warning(f"No valid close price for {ticker} on {index}")
+                    continue
+
+                open_price = get_price_value(row, "Open")
+                high_price = get_price_value(row, "High")
+                low_price = get_price_value(row, "Low")
+                close_price = get_price_value(row, "Close")
+                volume = get_price_value(row, "Volume")
+
+                if any(v is None for v in [open_price, high_price, low_price, close_price, volume]):
+                    logger.warning(f"Missing price data for {ticker} on {index}")
+                    continue
+
                 price = StockPrice(
                     ticker=ticker.upper(),
                     name=self._get_ticker_name(ticker),
                     market=self._infer_market(ticker),
                     instrument_type=InstrumentType.STOCK,
-                    date=index.to_pydantic(),
-                    open_price=float(row["Open"]),
-                    high_price=float(row["High"]),
-                    low_price=float(row["Low"]),
-                    close_price=float(row["Close"]),
-                    volume=int(row["Volume"]),
-                    adjusted_close=float(row["Adj Close"]),
+                    date=index.to_pydatetime() if hasattr(index, "to_pydatetime") else index,
+                    open_price=open_price,
+                    high_price=high_price,
+                    low_price=low_price,
+                    close_price=close_price,
+                    volume=int(volume),
+                    adjusted_close=adjusted_close,
                     currency="USD",
                 )
                 prices.append(price)

@@ -12,6 +12,7 @@ from src.tools import (
     SentimentAnalyzerTool,
     TechnicalIndicatorTool,
 )
+from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,7 +29,16 @@ class AnalysisCrew:
         self.sentiment_agent = SentimentAgent()
         self.signal_synthesizer = SignalSynthesisAgent()
 
-        logger.info("Analysis crew initialized with 5 agents")
+        # Check LLM configuration and warn if using fallback
+        llm_configured, provider = check_llm_configuration()
+        if llm_configured:
+            logger.info(f"Analysis crew initialized with 5 agents using {provider} LLM")
+        else:
+            logger.warning(
+                "Analysis crew initialized with 5 agents in RULE-BASED MODE. "
+                "No LLM configured - using technical indicators and simple rules. "
+                "Set ANTHROPIC_API_KEY or OPENAI_API_KEY for AI-powered analysis."
+            )
 
     def analyze_instrument(
         self,

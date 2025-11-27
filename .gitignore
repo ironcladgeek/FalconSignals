@@ -215,3 +215,4 @@ logs/
 *.xlsx
 *.pdf
 *.parquet
+config/local.yaml

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from src.analysis.models import DailyReport, InvestmentSignal
+from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -122,6 +123,29 @@ class ReportGenerator:
         # Header
         md.append(f"# Investment Analysis Report - {report.report_date}")
         md.append(f"*Generated: {report.report_time.strftime('%Y-%m-%d %H:%M:%S')}*\n")
+
+        # LLM Configuration Warning
+        llm_configured, provider = check_llm_configuration()
+        if not llm_configured:
+            md.append("---")
+            md.append("⚠️ **RULE-BASED ANALYSIS MODE**")
+            md.append("")
+            md.append(
+                "This report was generated using **quantitative rule-based analysis** "
+                "without AI/LLM enhancement. Signals are based on:"
+            )
+            md.append("- Technical indicators (RSI, MACD, Moving Averages)")
+            md.append("- Price patterns and momentum")
+            md.append("- Volume analysis")
+            md.append("- Basic fundamental metrics (when available)")
+            md.append("")
+            md.append(
+                "For AI-powered analysis with enhanced sentiment and qualitative insights, "
+                "configure `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in your `.env` file."
+            )
+            md.append("---\n")
+        else:
+            md.append(f"*Analysis powered by {provider} AI*\n")
 
         # Market Overview
         md.append("## Market Overview\n")

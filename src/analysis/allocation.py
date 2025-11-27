@@ -1,5 +1,6 @@
 """Portfolio allocation engine with position sizing and diversification management."""
 
+from datetime import datetime
 from typing import Any
 
 from src.analysis.models import AllocationSuggestion, PortfolioAllocation
@@ -78,8 +79,8 @@ class AllocationEngine:
                 break
 
             ticker = signal.get("ticker", "UNKNOWN")
-            sector = signal.get("sector", "Unknown")
-            market = signal.get("market", "unknown")
+            sector = signal.get("sector") or "Unknown"
+            market = signal.get("market") or "unknown"
             current_price = signal.get("current_price", 0)
             confidence = signal.get("confidence", 0)
             final_score = signal.get("final_score", 50)
@@ -156,12 +157,12 @@ class AllocationEngine:
         sector_div = {
             sector: round((amount / current_capital_used) * 100, 2)
             for sector, amount in current_sector_allocation.items()
-            if current_capital_used > 0
+            if current_capital_used > 0 and sector is not None
         }
         market_div = {
             market: round((amount / current_capital_used) * 100, 2)
             for market, amount in current_market_allocation.items()
-            if current_capital_used > 0
+            if current_capital_used > 0 and market is not None
         }
 
         # Calculate instrument type diversification (approximation)
@@ -174,8 +175,8 @@ class AllocationEngine:
             available_for_allocation=available_for_allocation,
             suggested_positions=suggested_positions,
             diversification_score=round(diversification_score, 2),
-            market_diversification=market_div,
-            sector_diversification=sector_div,
+            market_diversification=market_div if market_div else {"unallocated": 100.0},
+            sector_diversification=sector_div if sector_div else {"unallocated": 100.0},
             instrument_diversification=instrument_div,
             total_allocated=round(current_capital_used, 2),
             total_allocated_pct=round((current_capital_used / self.total_capital) * 100, 2),
@@ -185,7 +186,7 @@ class AllocationEngine:
                 "max_sector_concentration_pct": self.max_sector_concentration_pct,
                 "min_diversification_score": self.min_diversification_score,
             },
-            generated_at=None,  # type: ignore
+            generated_at=datetime.now(),
         )
 
         logger.info(

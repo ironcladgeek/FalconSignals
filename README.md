@@ -1,8 +1,7 @@
 # NordInvest
 
-AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes Nordic and European markets to generate daily investment signals with confidence scores.
+AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes global markets to generate daily investment signals with confidence scores.
 
-**Status:** Phase 4 complete (Signal Synthesis & Reporting). Phase 5 ready (Integration, Testing & Polish).
 
 ## Quick Start
 
@@ -65,12 +64,14 @@ analysis:
 ### Environment Variables
 
 ```bash
-# Required
-export ANTHROPIC_API_KEY=your_key
+# LLM API Key (choose one - Anthropic recommended)
+export ANTHROPIC_API_KEY=your_key        # For AI-powered analysis
+# OR
+export OPENAI_API_KEY=your_key           # Alternative to Anthropic
 
 # Optional (for extended features)
-export FINNHUB_API_KEY=your_key
-export ALPHA_VANTAGE_API_KEY=your_key
+export FINNHUB_API_KEY=your_key          # For news and sentiment data
+export ALPHA_VANTAGE_API_KEY=your_key    # For backup market data
 ```
 
 Or create `.env` file in project root:
@@ -80,6 +81,12 @@ ANTHROPIC_API_KEY=your_key
 FINNHUB_API_KEY=your_key
 ALPHA_VANTAGE_API_KEY=your_key
 ```
+
+> **💡 Note on LLM Configuration:**
+> - **With LLM** (ANTHROPIC_API_KEY or OPENAI_API_KEY): AI-powered analysis with enhanced sentiment and qualitative insights
+> - **Without LLM**: Automatic fallback to rule-based analysis using technical indicators and quantitative methods
+> - Both modes generate valid trading signals - see [docs/LLM_CONFIGURATION.md](docs/LLM_CONFIGURATION.md) for details
+> - The system will display clear warnings when running in rule-based mode
 
 ## Usage
 
@@ -239,12 +246,13 @@ nordinvest/
 - **PortfolioAllocation**: Allocation suggestions with diversification tracking (Herfindahl index)
 - **RiskAssessment**: Risk levels, flags, and warnings for each position
 
-### Phase 5: Integration, Testing & Polish
-- End-to-end pipeline integration
-- Performance optimization
-- Error handling and resilience
-- Deployment automation
-- Documentation and API reference
+### Phase 5: Integration, Testing & Polish ✅
+- **AnalysisPipeline**: End-to-end orchestration from analysis to reports
+- **Error Handling**: Custom exceptions hierarchy with 8 types and severity levels
+- **Resilience Patterns**: Retry with backoff, fallback, circuit breaker, rate limiter, graceful degradation
+- **Scheduling**: CronScheduler for daily automated runs, RunLog for monitoring
+- **CLI Integration**: Full pipeline execution in 'run' command with report generation
+- **Integration Tests**: Comprehensive test suite for pipeline, errors, scheduling, resilience
 
 ## Cost Target
 
