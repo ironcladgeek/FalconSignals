@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from MARKET_TICKERS import get_tickers_for_markets
 from src.cache.manager import CacheManager
 from src.config import load_config
 from src.data.portfolio import PortfolioState
@@ -98,7 +99,8 @@ def run(
         pipeline = AnalysisPipeline(pipeline_config, cache_manager, portfolio_manager)
 
         # Run analysis on sample tickers (for demonstration)
-        tickers = ["AAPL", "MSFT", "GOOGL"][:2]  # Limit to 2 for testing
+        # tickers = ["AAPL", "MSFT", "GOOGL"][:2]  # Limit to 2 for testing
+        tickers = get_tickers_for_markets(["us"], limit=50)
         typer.echo(f"\n📊 Running analysis on {len(tickers)} instruments...")
 
         signals, portfolio_manager = pipeline.run_analysis(tickers)
