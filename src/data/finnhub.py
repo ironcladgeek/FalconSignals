@@ -6,7 +6,7 @@ from typing import Optional
 
 import requests
 
-from src.data.models import Market, NewsArticle
+from src.data.models import Market, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.logging import get_logger
 
@@ -45,6 +45,53 @@ class FinnhubProvider(DataProvider):
             logger.info("Finnhub provider initialized")
         else:
             logger.warning("Finnhub API key not found. Set FINNHUB_API_KEY env var.")
+
+    def get_stock_prices(
+        self,
+        ticker: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[StockPrice]:
+        """Fetch historical stock prices.
+
+        Note: Finnhub's free tier has limited price data access.
+        This method raises NotImplementedError as price data should use a different provider.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date for historical data
+            end_date: End date for historical data
+
+        Returns:
+            List of StockPrice objects
+
+        Raises:
+            NotImplementedError: Finnhub is optimized for news/sentiment, not price data
+        """
+        raise NotImplementedError(
+            "Finnhub provider is optimized for news and sentiment data. "
+            "Use YahooFinanceProvider or AlphaVantageProvider for price data."
+        )
+
+    def get_latest_price(self, ticker: str) -> StockPrice:
+        """Fetch latest stock price.
+
+        Note: Finnhub's free tier has limited price data access.
+        This method raises NotImplementedError as price data should use a different provider.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Latest StockPrice object
+
+        Raises:
+            NotImplementedError: Finnhub is optimized for news/sentiment, not price data
+        """
+        raise NotImplementedError(
+            "Finnhub provider is optimized for news and sentiment data. "
+            "Use YahooFinanceProvider or AlphaVantageProvider for price data."
+        )
 
     def get_news(
         self,

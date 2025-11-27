@@ -186,6 +186,18 @@ class PortfolioState:
         self.last_updated = datetime.now()
         self._load()
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert portfolio state to dictionary.
+
+        Returns:
+            Dictionary representation of portfolio state
+        """
+        return {
+            "positions": {ticker: pos.to_dict() for ticker, pos in self.positions.items()},
+            "watchlist": {ticker: item.to_dict() for ticker, item in self.watchlist.items()},
+            "last_updated": self.last_updated.isoformat(),
+        }
+
     def add_position(
         self,
         ticker: str,

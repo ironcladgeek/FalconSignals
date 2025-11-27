@@ -1,0 +1,5 @@
+{"timestamp": "2025-11-27T01:12:42.050201", "success": false, "duration_seconds": 0.01, "signal_count": 0, "error_message": "Unknown provider: yahoo_finance. Available: ", "metadata": {}}
+{"timestamp": "2025-11-27T01:14:00.686754", "success": false, "duration_seconds": 0.01, "signal_count": 0, "error_message": "Can't instantiate abstract class FinnhubProvider without an implementation for abstract methods 'get_latest_price', 'get_stock_prices'", "metadata": {}}
+{"timestamp": "2025-11-27T01:14:25.753430", "success": true, "duration_seconds": 2.28, "signal_count": 0, "error_message": null, "metadata": {}}
+{"timestamp": "2025-11-27T01:14:57.421727", "success": true, "duration_seconds": 1.8, "signal_count": 0, "error_message": null, "metadata": {}}
+{"timestamp": "2025-11-27T01:15:12.376121", "success": true, "duration_seconds": 3.94, "signal_count": 0, "error_message": null, "metadata": {}}

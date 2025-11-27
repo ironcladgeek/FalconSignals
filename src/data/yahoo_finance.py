@@ -53,6 +53,7 @@ class YahooFinanceProvider(DataProvider):
                 start=start_date,
                 end=end_date,
                 progress=False,
+                auto_adjust=False,  # Keep original and adjusted close prices
             )
 
             if data.empty:
@@ -60,18 +61,23 @@ class YahooFinanceProvider(DataProvider):
 
             prices = []
             for index, row in data.iterrows():
+                # Get adjusted close price if available, otherwise use close price
+                adjusted_close = (
+                    float(row["Adj Close"]) if "Adj Close" in row else float(row["Close"])
+                )
+
                 price = StockPrice(
                     ticker=ticker.upper(),
                     name=self._get_ticker_name(ticker),
                     market=self._infer_market(ticker),
                     instrument_type=InstrumentType.STOCK,
-                    date=index.to_pydantic(),
+                    date=index.to_pydatetime() if hasattr(index, "to_pydatetime") else index,
                     open_price=float(row["Open"]),
                     high_price=float(row["High"]),
                     low_price=float(row["Low"]),
                     close_price=float(row["Close"]),
                     volume=int(row["Volume"]),
-                    adjusted_close=float(row["Adj Close"]),
+                    adjusted_close=adjusted_close,
                     currency="USD",
                 )
                 prices.append(price)
