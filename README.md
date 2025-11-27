@@ -291,9 +291,16 @@ uv run poe lint
 
 ## Documentation
 
-- **Architecture:** See `docs/architecture.mermaid` for system design
-- **Roadmap:** See `docs/roadmap.md` for implementation plan
-- **Development:** See `CLAUDE.md` for developer guidance
+### Core Documentation
+- **[Architecture](docs/architecture.mermaid)** - System design and component overview
+- **[Roadmap](docs/roadmap.md)** - Implementation plan and development phases
+- **[Developer Guide](CLAUDE.md)** - Development setup and contribution guidelines
+
+### Configuration & Setup
+- **[LLM Configuration](docs/LLM_CONFIGURATION.md)** - AI vs Rule-based modes, setup instructions
+- **[Market Configuration Guide](docs/MARKET_CONFIG_GUIDE.md)** - Market selection and filtering
+- **[Quick Start: Full Market Analysis](docs/QUICK_START_FULL_MARKET.md)** - Running analysis on large market sets
+- **[Full Market Analysis Setup](docs/FULL_MARKET_ANALYSIS_SETUP.md)** - Complete setup for comprehensive market coverage
 
 ## Technology Stack
 
@@ -324,6 +331,7 @@ uv run poe lint
 ## Support
 
 For questions or issues:
-- Check `CLAUDE.md` for development guidance
-- Review `docs/roadmap.md` for architecture details
+- Check [Developer Guide](CLAUDE.md) for development guidance
+- Review [Roadmap](docs/roadmap.md) for architecture details
+- See [LLM Configuration](docs/LLM_CONFIGURATION.md) for setup help
 - Open an issue on GitHub
