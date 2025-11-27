@@ -1,7 +1,7 @@
 """Finnhub data provider implementation."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
@@ -96,15 +96,15 @@ class FinnhubProvider(DataProvider):
     def get_news(
         self,
         ticker: str,
-        limit: int = 10,
-        max_age_hours: int = 24,
+        limit: int = 50,
+        max_age_hours: int = 168,
     ) -> list[NewsArticle]:
         """Fetch news articles from Finnhub.
 
         Args:
             ticker: Stock ticker symbol
-            limit: Maximum number of articles to return
-            max_age_hours: Maximum age of articles in hours
+            limit: Maximum number of articles to return (default: 50)
+            max_age_hours: Maximum age of articles in hours (default: 168 = 7 days)
 
         Returns:
             List of NewsArticle objects sorted by date descending
@@ -119,10 +119,16 @@ class FinnhubProvider(DataProvider):
         try:
             logger.debug(f"Fetching news for {ticker} (limit={limit})")
 
+            # Calculate date range based on max_age_hours
+            to_date = datetime.now()
+            from_date = to_date - timedelta(hours=max_age_hours)
+
             response = requests.get(
                 f"{FINNHUB_BASE_URL}/company-news",
                 params={
                     "symbol": ticker,
+                    "from": from_date.strftime("%Y-%m-%d"),
+                    "to": to_date.strftime("%Y-%m-%d"),
                     "token": self.api_key,
                 },
                 timeout=self.timeout,

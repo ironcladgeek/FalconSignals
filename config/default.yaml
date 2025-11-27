@@ -14,13 +14,13 @@ risk:
 
 # Market Preferences
 markets:
-  included: [nordic, eu]  # Options: nordic, eu, us
+  included: [nordic, eu] # Options: nordic, eu, us
   excluded_markets: []
 
   # Instrument type preferences
-  included_instruments: [stocks, etfs]  # Options: stocks, etfs, funds
+  included_instruments: [stocks, etfs] # Options: stocks, etfs, funds
   exclude_penny_stocks: true
-  min_liquidity_usd: 1000000  # Minimum daily trading volume
+  min_liquidity_usd: 1000000 # Minimum daily trading volume
 
 # Analysis Preferences
 analysis:
@@ -41,7 +41,7 @@ analysis:
 # Output Preferences
 output:
   max_recommendations: 10
-  report_format: markdown  # Options: markdown, html, json
+  report_format: markdown # Options: markdown, html, json
   include_confidence_scores: true
   include_risk_assessment: true
 
@@ -53,7 +53,12 @@ data:
     price_data_overnight: 24
     news: 4
     fundamentals: 24
-    financial_statements: 168  # 7 days
+    financial_statements: 168 # 7 days
+
+  # News fetching settings
+  news:
+    max_articles: 50 # Maximum number of articles to fetch per ticker
+    max_age_hours: 168 # Maximum age of articles in hours (168 = 7 days)
 
   # API providers (in priority order)
   primary_provider: yahoo_finance
@@ -80,15 +85,15 @@ api:
 
 # Logging
 logging:
-  level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  format: json  # Options: json, text
+  level: INFO # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: json # Options: json, text
   log_file: logs/nordinvest.log
   max_log_size_mb: 10
   backup_count: 5
 
 # Deployment & Scheduling
 deployment:
-  run_time: "08:00"  # UTC, daily run time
+  run_time: "08:00" # UTC, daily run time
   timezone: Europe/Stockholm
   cost_limit_eur_per_month: 100
   cost_check_interval: daily

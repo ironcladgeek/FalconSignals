@@ -140,12 +140,24 @@ class CacheTTLConfig(BaseModel):
     )
 
 
+class NewsConfig(BaseModel):
+    """News fetching configuration."""
+
+    max_articles: int = Field(
+        default=50, ge=1, le=200, description="Maximum number of articles to fetch per ticker"
+    )
+    max_age_hours: int = Field(
+        default=168, ge=1, le=720, description="Maximum age of articles in hours (168 = 7 days)"
+    )
+
+
 class DataConfig(BaseModel):
     """Data fetching and caching configuration."""
 
     cache_ttl: CacheTTLConfig = Field(
         default_factory=CacheTTLConfig, description="Cache expiration times"
     )
+    news: NewsConfig = Field(default_factory=NewsConfig, description="News fetching settings")
     primary_provider: str = Field(default="yahoo_finance", description="Primary data provider")
     backup_providers: list[str] = Field(
         default=["alpha_vantage", "finnhub"], description="Backup data providers"

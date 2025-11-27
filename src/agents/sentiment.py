@@ -3,6 +3,7 @@
 from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
+from src.config import get_config
 from src.tools.analysis import SentimentAnalyzerTool
 from src.tools.fetchers import NewsFetcherTool
 from src.utils.logging import get_logger
@@ -67,7 +68,11 @@ class SentimentAgent(BaseAgent):
                     "sentiment_score": 0,
                 }
 
-            news_data = news_fetcher.run(ticker, limit=15)
+            news_data = news_fetcher.run(
+                ticker,
+                limit=get_config().data.news.max_articles,
+                max_age_hours=get_config().data.news.max_age_hours,
+            )
 
             if "error" in news_data or not news_data.get("articles"):
                 return {

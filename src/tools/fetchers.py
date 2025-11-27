@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from src.cache.manager import CacheManager
+from src.config import get_config
 from src.data.providers import DataProviderFactory
 from src.tools.base import BaseTool
 from src.utils.logging import get_logger
@@ -151,20 +152,26 @@ class NewsFetcherTool(BaseTool):
     def run(
         self,
         ticker: str,
-        limit: int = 10,
-        max_age_hours: int = 48,
+        limit: int = None,
+        max_age_hours: int = None,
     ) -> dict[str, Any]:
         """Fetch news for ticker.
 
         Args:
             ticker: Stock ticker symbol
-            limit: Maximum number of articles
-            max_age_hours: Maximum age of articles
+            limit: Maximum number of articles (default: from config)
+            max_age_hours: Maximum age of articles in hours (default: from config)
 
         Returns:
             Dictionary with articles and metadata
         """
         try:
+            # Use config defaults if not specified
+            if limit is None:
+                limit = get_config().data.news.max_articles
+            if max_age_hours is None:
+                max_age_hours = get_config().data.news.max_age_hours
+
             cache_key = f"news:{ticker}:{limit}:{max_age_hours}"
             cached = self.cache_manager.get(cache_key)
             if cached:
