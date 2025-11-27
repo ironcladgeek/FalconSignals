@@ -65,12 +65,14 @@ analysis:
 ### Environment Variables
 
 ```bash
-# Required
-export ANTHROPIC_API_KEY=your_key
+# LLM API Key (choose one - Anthropic recommended)
+export ANTHROPIC_API_KEY=your_key        # For AI-powered analysis
+# OR
+export OPENAI_API_KEY=your_key           # Alternative to Anthropic
 
 # Optional (for extended features)
-export FINNHUB_API_KEY=your_key
-export ALPHA_VANTAGE_API_KEY=your_key
+export FINNHUB_API_KEY=your_key          # For news and sentiment data
+export ALPHA_VANTAGE_API_KEY=your_key    # For backup market data
 ```
 
 Or create `.env` file in project root:
@@ -80,6 +82,12 @@ ANTHROPIC_API_KEY=your_key
 FINNHUB_API_KEY=your_key
 ALPHA_VANTAGE_API_KEY=your_key
 ```
+
+> **💡 Note on LLM Configuration:**
+> - **With LLM** (ANTHROPIC_API_KEY or OPENAI_API_KEY): AI-powered analysis with enhanced sentiment and qualitative insights
+> - **Without LLM**: Automatic fallback to rule-based analysis using technical indicators and quantitative methods
+> - Both modes generate valid trading signals - see [docs/LLM_CONFIGURATION.md](docs/LLM_CONFIGURATION.md) for details
+> - The system will display clear warnings when running in rule-based mode
 
 ## Usage
 
