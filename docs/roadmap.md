@@ -165,12 +165,12 @@ aiohttp (optional, for async)
 
 ---
 
-## Phase 3: CrewAI Agents Development (Days 6-9)
+## Phase 3: Agent Pattern Development (Days 6-9)
 
 ### Objectives
-- Implement all six specialized agents
+- Implement specialized agent architecture using custom BaseAgent pattern
 - Create custom tools for each agent
-- Configure agent collaboration
+- Configure agent orchestration and collaboration
 
 ### Tasks
 
@@ -225,7 +225,7 @@ aiohttp (optional, for async)
 - [x] Output: Sentiment scores with event summaries
 
 #### 3.6 Agent Orchestration
-- [x] Configure CrewAI Crew with all agents
+- [x] Configure AnalysisCrew with all agents
 - [x] Define task dependencies and flow
 - [x] Implement parallel execution where possible
 - [x] Set up agent communication protocols
@@ -236,28 +236,37 @@ aiohttp (optional, for async)
 - ✅ Agent orchestration with AnalysisCrew
 - ✅ Parallel execution for technical/fundamental/sentiment with sequential synthesis
 
-**Status: COMPLETE** (Commits: c8fa19f - 4e15fe7)
+**Status: COMPLETE - Rule-Based Implementation** (Commits: c8fa19f - 4e15fe7)
 
-### CrewAI Configuration Example
+**Note:** Current implementation uses custom `BaseAgent` class with rule-based analysis (mathematical formulas, technical indicators, simple scoring). **No actual CrewAI framework or LLM integration.** All analysis is deterministic and based on:
+- Technical indicators (RSI, MACD, moving averages)
+- Mathematical scoring algorithms
+- Simple sentiment counting (positive/negative news)
+- Weighted score combinations
+
+**Next Phase Required:** Actual CrewAI/LLM integration (see Phase 6 below)
+
+### Current Architecture (Custom Agent Pattern)
 ```python
-from crewai import Agent, Task, Crew, Process
+from src.agents.base import BaseAgent, AgentConfig
 
-market_scanner = Agent(
-    role="Market Scanner",
-    goal="Identify instruments with significant price movements or anomalies",
-    backstory="Expert market analyst specializing in detecting emerging trends...",
-    tools=[price_fetcher, news_fetcher],
-    verbose=True
-)
+class TechnicalAnalysisAgent(BaseAgent):
+    def __init__(self, tools: list = None):
+        config = AgentConfig(
+            role="Technical Analyst",
+            goal="Analyze technical indicators",
+            backstory="Expert in technical analysis..."
+        )
+        super().__init__(config, tools or [])
 
-# Similar definitions for other agents...
-
-crew = Crew(
-    agents=[market_scanner, fundamental_agent, technical_agent, sentiment_agent],
-    tasks=[scan_task, fundamental_task, technical_task, sentiment_task],
-    process=Process.sequential  # or Process.hierarchical
-)
+    def execute(self, task: str, context: dict) -> dict:
+        # Rule-based logic only - no LLM calls
+        indicators = self._calculate_indicators(context)
+        score = self._simple_scoring(indicators)
+        return {"technical_score": score}
 ```
+
+**Note:** Despite CrewAI dependency being installed, **no actual CrewAI imports or usage exists**. All agents use custom `BaseAgent` class with deterministic, rule-based `execute()` methods.
 
 ---
 
@@ -426,6 +435,198 @@ crew = Crew(
 
 ---
 
+## Phase 6: CrewAI & LLM Integration (Days 15-18) **[PENDING]**
+
+### Current State Analysis
+
+**The project currently does NOT use CrewAI or LLM despite:**
+- Having `crewai` in dependencies
+- Docstrings mentioning "CrewAI"
+- API keys configured for Anthropic/OpenAI
+
+**What's Actually Implemented:**
+- Custom `BaseAgent` abstract class (not CrewAI's `Agent`)
+- Rule-based analysis using mathematical formulas
+- No LLM API calls anywhere in the codebase
+- All "intelligence" comes from technical indicators and simple scoring
+
+**Why No Token Usage in Anthropic Console:**
+- Code only checks if API key exists (for warning messages)
+- Never actually calls Anthropic/Claude API
+- All analysis is deterministic and rule-based
+
+### Objectives
+- Replace rule-based agents with actual CrewAI LLM-powered agents
+- Implement intelligent reasoning for fundamental analysis
+- Add natural language insight generation
+- Enable agent collaboration and delegation
+
+### Tasks
+
+#### 6.1 CrewAI Framework Integration
+- [ ] Import actual CrewAI classes: `from crewai import Agent, Task, Crew`
+- [ ] Configure LLM providers:
+  - [ ] Set up Anthropic Claude integration
+  - [ ] Configure OpenAI as fallback
+  - [ ] Implement LLM client initialization
+- [ ] Create LLM configuration management:
+  - [ ] Model selection (claude-3-5-sonnet, gpt-4, etc.)
+  - [ ] Temperature and parameter tuning
+  - [ ] Token usage tracking and logging
+
+#### 6.2 Convert Agents to CrewAI Agents
+- [ ] **Market Scanner Agent**:
+  - [ ] Replace custom BaseAgent with CrewAI Agent
+  - [ ] Create LLM-powered task for anomaly detection
+  - [ ] Use LLM to reason about price movements and patterns
+  - [ ] Generate natural language explanations for anomalies
+
+- [ ] **Technical Analysis Agent**:
+  - [ ] Convert to CrewAI Agent with technical tools
+  - [ ] Keep indicator calculations (RSI, MACD) as tools
+  - [ ] Use LLM to interpret indicator combinations
+  - [ ] Generate trading insights from patterns
+
+- [ ] **Fundamental Analysis Agent**:
+  - [ ] Replace stub implementation with real LLM analysis
+  - [ ] Use LLM to analyze financial statements
+  - [ ] Reason about company health and growth prospects
+  - [ ] Compare metrics against industry benchmarks
+
+- [ ] **Sentiment Analysis Agent**:
+  - [ ] Enhance with LLM-powered news analysis
+  - [ ] Extract key events and implications
+  - [ ] Assess market impact of news
+  - [ ] Generate sentiment narratives
+
+- [ ] **Signal Synthesizer Agent**:
+  - [ ] Use LLM to synthesize all analyses
+  - [ ] Generate comprehensive investment thesis
+  - [ ] Provide detailed reasoning for recommendations
+  - [ ] Create risk-aware narratives
+
+#### 6.3 Create CrewAI Tasks
+- [ ] Define Task objects for each analysis phase:
+  ```python
+  scan_task = Task(
+      description="Scan {ticker} for anomalies and trading opportunities",
+      agent=market_scanner,
+      expected_output="List of anomalies with explanations"
+  )
+  ```
+- [ ] Implement sequential task dependencies
+- [ ] Enable task result sharing between agents
+- [ ] Add context propagation
+
+#### 6.4 LLM Prompt Engineering
+- [ ] Design prompts for each agent:
+  - [ ] System prompts defining agent expertise
+  - [ ] Task-specific prompts with structured outputs
+  - [ ] Few-shot examples for consistency
+- [ ] Implement prompt templates with variables
+- [ ] Create output parsers for structured data
+- [ ] Add validation for LLM responses
+
+#### 6.5 Hybrid Intelligence System
+- [ ] Keep rule-based calculations as tools (indicators, metrics)
+- [ ] Use LLM for reasoning and interpretation
+- [ ] Implement fallback to rule-based on LLM failures
+- [ ] Create quality scoring for LLM outputs
+
+#### 6.6 Cost Control & Monitoring
+- [ ] Implement token counting and cost tracking
+- [ ] Set daily/monthly budget limits
+- [ ] Create alert system for cost overruns
+- [ ] Optimize prompts for token efficiency
+- [ ] Cache LLM responses where appropriate
+
+#### 6.7 Testing & Validation
+- [ ] Test with various market conditions
+- [ ] Validate LLM reasoning quality
+- [ ] Compare LLM vs rule-based performance
+- [ ] Measure response times and costs
+- [ ] Create quality metrics for agent outputs
+
+### Deliverables
+- [ ] Actual CrewAI integration with Agent, Task, Crew classes
+- [ ] LLM-powered agents replacing rule-based implementations
+- [ ] Natural language insights and reasoning in reports
+- [ ] Token usage tracking and cost monitoring dashboard
+- [ ] Hybrid system maintaining rule-based fallbacks
+- [ ] Comprehensive prompt library and templates
+- [ ] Performance comparison report (LLM vs rule-based)
+
+**Status: NOT STARTED**
+
+### Code Transformation Example
+
+**Current (Rule-Based):**
+```python
+class TechnicalAnalysisAgent(BaseAgent):
+    def execute(self, task: str, context: dict) -> dict:
+        # Calculate indicators
+        rsi = calculate_rsi(prices)
+        macd = calculate_macd(prices)
+
+        # Simple scoring
+        score = (rsi_score + macd_score) / 2
+        return {"technical_score": score}
+```
+
+**Target (CrewAI + LLM):**
+```python
+from crewai import Agent, Task
+
+technical_agent = Agent(
+    role="Senior Technical Analyst",
+    goal="Analyze price charts and indicators to identify trading opportunities",
+    backstory="Expert technical analyst with 20 years experience...",
+    tools=[rsi_calculator, macd_calculator, pattern_detector],
+    llm=ChatAnthropic(model="claude-3-5-sonnet"),
+    verbose=True
+)
+
+technical_task = Task(
+    description="""
+    Analyze {ticker} using technical indicators:
+    1. Calculate and interpret RSI, MACD, Moving Averages
+    2. Identify chart patterns and trends
+    3. Assess momentum and volatility
+    4. Generate actionable insights
+
+    Provide: score (0-100), trend, key levels, trading signals
+    """,
+    agent=technical_agent,
+    expected_output="Structured technical analysis with reasoning"
+)
+```
+
+### Migration Strategy
+1. **Phase 6.1**: Set up LLM infrastructure without breaking existing system
+2. **Phase 6.2**: Create parallel LLM agents alongside rule-based ones
+3. **Phase 6.3**: A/B test LLM vs rule-based outputs
+4. **Phase 6.4**: Gradually transition to LLM as primary with rule-based fallback
+5. **Phase 6.5**: Full LLM integration with monitoring and optimization
+
+### Expected Benefits
+- **Richer Insights**: Natural language explanations instead of just scores
+- **Better Reasoning**: LLM can consider nuanced factors and market context
+- **Adaptability**: LLM can handle novel situations beyond programmed rules
+- **Natural Reports**: Human-readable analysis narratives
+- **Learning**: Can incorporate new analysis techniques via prompt updates
+
+### Cost Estimates (Monthly)
+| Component | Estimated Cost |
+|-----------|---------------|
+| Daily scans (200 instruments) | €10-15 |
+| Detailed analysis (20 instruments/day) | €30-40 |
+| Report generation | €5-10 |
+| **Total** | **€45-65** |
+
+*Assumes Claude 4 Sonnet pricing, efficient prompting, and caching strategies*
+
+---
+
 ## Cost Budget Breakdown
 
 | Component | Estimated Monthly Cost |
@@ -459,14 +660,27 @@ crew = Crew(
 
 ## Success Criteria Checklist
 
-- [ ] System runs daily in <15 minutes
+### Current System (Rule-Based)
+- [x] System runs daily in <15 minutes
+- [x] Monthly costs ≤€20 (data APIs only, no LLM costs)
+- [x] Generates signals with scores and recommendations
+- [x] Reports include confidence scores
+- [x] Portfolio allocation suggestions provided
+- [x] Risk warnings included where appropriate
+- [x] System handles API failures gracefully
+- [x] Progress bars and clean console output
+- [x] Comprehensive error handling and resilience patterns
+
+### Target System (LLM-Powered)
+- [ ] LLM agents actively reasoning about analysis
+- [ ] Natural language insights in reports
+- [ ] Token usage tracking and cost monitoring
+- [ ] Monthly costs ≤€100 (including LLM usage)
 - [ ] User review time <1 hour
-- [ ] Monthly costs ≤€100
-- [ ] Generates 5-10 actionable signals daily
-- [ ] Reports include confidence scores and rationale
-- [ ] Portfolio allocation suggestions provided
-- [ ] Risk warnings included where appropriate
-- [ ] System handles API failures gracefully
+- [ ] Generates 5-10 actionable signals with narratives
+- [ ] LLM-generated investment theses
+- [ ] Hybrid intelligence (LLM + rule-based fallback)
+- [ ] Quality metrics for LLM outputs
 
 ---
 
