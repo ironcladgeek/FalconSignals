@@ -60,7 +60,7 @@ class AnalysisPipeline:
         self,
         tickers: list[str],
         context: dict[str, Any] | None = None,
-    ) -> tuple[list[InvestmentSignal], PortfolioManager | None]:
+    ) -> tuple[list[InvestmentSignal], PortfolioState | None]:
         """Execute full analysis pipeline for given tickers.
 
         Args:
@@ -68,7 +68,7 @@ class AnalysisPipeline:
             context: Optional additional context
 
         Returns:
-            Tuple of (signals, updated portfolio manager)
+            Tuple of (signals, updated portfolio state)
         """
         context = context or {}
         context["tickers"] = tickers
