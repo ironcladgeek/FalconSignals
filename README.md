@@ -109,13 +109,52 @@ Output:
 
 ### Run Analysis
 
+#### Rule-Based Analysis (Default)
+
 ```bash
-# Full analysis with fresh API calls
-uv run python -m src.main analyze --config config/local.yaml
+# Analyze specific market
+uv run python -m src.main analyze --market us --limit 20
+
+# Analyze global markets
+uv run python -m src.main analyze --market global
+
+# Analyze specific stocks
+uv run python -m src.main analyze --ticker AAPL,MSFT,GOOGL
 
 # Dry run (no trades/alerts)
-uv run python -m src.main analyze --config config/local.yaml --dry-run
+uv run python -m src.main analyze --ticker INTU --dry-run
 ```
+
+#### LLM-Powered Analysis (New in Phase 6) 🤖
+
+Use intelligent CrewAI agents with Claude/GPT reasoning:
+
+```bash
+# Single stock with LLM analysis
+uv run python -m src.main analyze --ticker INTU --llm
+
+# Multiple stocks with LLM
+uv run python -m src.main analyze --ticker AAPL,MSFT,GOOGL --llm
+
+# With custom config
+uv run python -m src.main analyze --ticker INTU --llm --config config/local.yaml
+
+# JSON output instead of Markdown
+uv run python -m src.main analyze --ticker INTU --llm --format json
+
+# Without saving report to disk
+uv run python -m src.main analyze --ticker INTU --llm --no-save-report
+```
+
+**What LLM mode does:**
+- Activates 5 intelligent agents: Market Scanner, Technical Analyst, Fundamental Analyst, Sentiment Analyst, Signal Synthesizer
+- Each agent uses Claude/GPT to reason about the analysis
+- Combines insights with proper weighting (35% fundamental, 35% technical, 30% sentiment)
+- Tracks token usage and costs in EUR
+- Falls back to rule-based analysis if LLM fails
+- Generates investment recommendations with detailed reasoning
+
+**Cost:** ~€0.065 per stock analyzed (adjustable by model choice)
 
 ### Generate Reports
 
@@ -129,6 +168,9 @@ uv run python -m src.main report --date 2024-01-15
 ```bash
 uv run python -m src.main --help
 uv run python -m src.main analyze --help
+
+# See all LLM options
+uv run python -m src.main analyze --help | grep -A2 llm
 ```
 
 ## Development
@@ -181,12 +223,23 @@ nordinvest/
 │   │   ├── crew.py          # AnalysisCrew orchestrator
 │   │   ├── scanner.py       # MarketScannerAgent
 │   │   ├── analysis.py      # Technical & Fundamental agents
-│   │   └── sentiment.py     # Sentiment & Signal Synthesis agents
+│   │   ├── sentiment.py     # Sentiment & Signal Synthesis agents
+│   │   ├── crewai_agents.py # CrewAI Agent factory (Phase 6)
+│   │   └── hybrid.py        # Hybrid intelligence wrapper (Phase 6)
 │   ├── tools/               # Agent tools
 │   │   ├── base.py          # BaseTool and ToolRegistry
 │   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
 │   │   ├── analysis.py      # Technical & Sentiment tools
 │   │   └── reporting.py     # ReportGeneratorTool
+│   ├── llm/                 # LLM integration (Phase 6)
+│   │   ├── integration.py   # LLMAnalysisOrchestrator
+│   │   ├── token_tracker.py # Token usage & cost tracking
+│   │   ├── prompts.py       # Prompt templates for agents
+│   │   └── tools.py         # CrewAI tool adapters
+│   ├── config/              # Configuration
+│   │   ├── llm.py           # LLM client initialization (Phase 6)
+│   │   ├── schemas.py       # Pydantic validation
+│   │   └── loader.py        # YAML loading
 │   ├── analysis/            # Analysis modules
 │   ├── reports/             # Report generation (Phase 4)
 │   └── utils/
@@ -254,6 +307,25 @@ nordinvest/
 - **CLI Integration**: Full pipeline execution in 'run' command with report generation
 - **Integration Tests**: Comprehensive test suite for pipeline, errors, scheduling, resilience
 
+### Phase 6: CrewAI & LLM Integration ✅
+- **LLM Configuration**: Support for Anthropic Claude, OpenAI GPT, and local models (Ollama)
+- **5 Intelligent CrewAI Agents**: Market Scanner, Technical Analyst, Fundamental Analyst, Sentiment Analyst, Signal Synthesizer
+- **Hybrid Intelligence**: Automatic fallback to rule-based analysis on LLM failure
+- **Token Tracking**: Real-time monitoring of token usage and costs (EUR)
+- **Prompt Engineering**: Structured prompts with JSON-formatted responses for consistency
+- **CLI Integration**: `--llm` flag for easy switching between rule-based and AI-powered analysis
+- **Tool Adapters**: Seamless integration of existing tools with CrewAI agents
+- **High-Level Orchestrator**: LLMAnalysisOrchestrator for easy integration
+- **Comprehensive Testing**: 12 passing tests covering all LLM components
+
+**Quick start:**
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+uv run python -m src.main analyze --ticker INTU --llm
+```
+
+**See:** [LLM CLI Guide](docs/llm_cli_guide.md) | [LLM Integration Guide](docs/llm_integration.md)
+
 ## Cost Target
 
 Monthly operational cost: **€50-90**
@@ -293,11 +365,16 @@ uv run poe lint
 
 ### Core Documentation
 - **[Architecture](docs/architecture.mermaid)** - System design and component overview
-- **[Roadmap](docs/roadmap.md)** - Implementation plan and development phases
+- **[Roadmap](docs/roadmap.md)** - Implementation plan and development phases (5 phases complete, 6 in progress)
+- **[Phase 6 Summary](PHASE_6_SUMMARY.md)** - CrewAI & LLM integration implementation details
 - **[Developer Guide](CLAUDE.md)** - Development setup and contribution guidelines
 
-### Configuration & Setup
+### LLM & AI Integration (Phase 6)
+- **[LLM CLI Guide](docs/llm_cli_guide.md)** - How to use `--llm` flag with examples and troubleshooting
+- **[LLM Integration Guide](docs/llm_integration.md)** - Component architecture, API reference, and advanced usage
 - **[LLM Configuration](docs/LLM_CONFIGURATION.md)** - AI vs Rule-based modes, setup instructions
+
+### Configuration & Setup
 - **[Market Configuration Guide](docs/MARKET_CONFIG_GUIDE.md)** - Market selection and filtering
 - **[Quick Start: Full Market Analysis](docs/QUICK_START_FULL_MARKET.md)** - Running analysis on large market sets
 - **[Full Market Analysis Setup](docs/FULL_MARKET_ANALYSIS_SETUP.md)** - Complete setup for comprehensive market coverage
