@@ -42,7 +42,7 @@ Output:
 
 🤖 Using LLM-powered analysis (CrewAI with intelligent agents)
   LLM Provider: anthropic
-  Model: claude-3-5-sonnet-20241022
+  Model: claude-sonnet-4-20250514
   Temperature: 0.7
   Token tracking: enabled
 
@@ -101,7 +101,7 @@ Edit `config/local.yaml` (or create with `config-init`):
 ```yaml
 llm:
   provider: "anthropic"  # anthropic, openai, or local
-  model: "claude-3-5-sonnet-20241022"
+  model: "claude-sonnet-4-20250514"
   temperature: 0.7       # Lower = more deterministic, Higher = more creative
   max_tokens: 2000
   enable_fallback: true  # Fall back to rule-based if LLM fails
@@ -173,7 +173,7 @@ cat data/tracking/tokens_$(date +%Y-%m-%d).json
 #       "timestamp": "2024-11-28T14:32:30.123456",
 #       "input_tokens": 2847,
 #       "output_tokens": 1203,
-#       "model": "claude-3-5-sonnet-20241022",
+#       "model": "claude-sonnet-4-20250514",
 #       "cost_eur": 0.065,
 #       "success": true
 #     },

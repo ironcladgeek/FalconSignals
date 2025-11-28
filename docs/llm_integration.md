@@ -24,7 +24,7 @@ from src.config.llm import initialize_llm_client
 
 config = LLMConfig(
     provider="anthropic",  # anthropic, openai, or local
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     temperature=0.7,
     max_tokens=2000,
     enable_fallback=True
@@ -110,7 +110,7 @@ tracker = TokenTracker(config, storage_dir="data/tracking")
 cost = tracker.track(
     input_tokens=100,
     output_tokens=200,
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     success=True
 )
 
@@ -297,7 +297,7 @@ Add to `config/local.yaml`:
 ```yaml
 llm:
   provider: "anthropic"  # anthropic, openai, or local
-  model: "claude-3-5-sonnet-20241022"
+  model: "claude-sonnet-4-20250514"
   temperature: 0.7
   max_tokens: 2000
   enable_fallback: true

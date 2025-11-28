@@ -12,7 +12,7 @@ Phase 6 has successfully implemented a comprehensive CrewAI and LLM integration 
 - Added `LLMConfig` schema with provider selection (Anthropic, OpenAI, local)
 - Added `TokenTrackerConfig` for cost management
 - Implemented LLM client initialization supporting:
-  - Anthropic Claude (claude-3-5-sonnet-20241022)
+  - Anthropic Claude (claude-sonnet-4-20250514)
   - OpenAI GPT-4 and GPT-3.5
   - Local models via Ollama
 - Environment-based credential management
