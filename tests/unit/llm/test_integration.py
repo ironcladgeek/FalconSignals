@@ -12,7 +12,7 @@ def llm_config():
     """Create test LLM config."""
     return LLMConfig(
         provider="anthropic",
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         temperature=0.7,
         enable_fallback=True,
     )
@@ -132,7 +132,7 @@ class TestCrewAIConfiguration:
     def test_config_validation(self):
         """Test LLM config validation."""
         # Valid config
-        config = LLMConfig(provider="anthropic", model="claude-3-5-sonnet-20241022")
+        config = LLMConfig(provider="anthropic", model="claude-sonnet-4-20250514")
         assert config.provider == "anthropic"
 
         # Invalid provider
