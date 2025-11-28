@@ -403,7 +403,9 @@ def analyze(
             "include_disclaimers": True,
         }
 
-        pipeline = AnalysisPipeline(pipeline_config, cache_manager, portfolio_manager)
+        pipeline = AnalysisPipeline(
+            pipeline_config, cache_manager, portfolio_manager, llm_provider=config_obj.llm.provider
+        )
 
         # Determine which tickers to analyze
         if ticker:
