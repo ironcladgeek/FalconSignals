@@ -134,9 +134,10 @@ class FinancialDataFetcherTool(BaseTool):
 
     Uses Finnhub free tier endpoints:
     - /stock/profile2 (company info)
-    - /news-sentiment (sentiment analysis)
-    - /stock/recommendation-trend (analyst ratings)
+    - /stock/recommendation (analyst ratings)
     - Yahoo Finance (price data)
+
+    Note: News sentiment is analyzed by CrewAI News & Sentiment Agent (not from premium APIs)
     """
 
     def __init__(self, cache_manager: CacheManager = None):
@@ -175,32 +176,47 @@ class FinancialDataFetcherTool(BaseTool):
                 return cached
 
             if not self.finnhub_provider.is_available:
+                logger.warning(f"Finnhub provider not available for {ticker}")
+                # Return neutral data instead of error
                 return {
                     "ticker": ticker,
                     "analyst_data": {},
-                    "sentiment": {},
-                    "price_context": {},
-                    "error": "Finnhub provider not available",
+                    "price_context": self._get_price_context(ticker) or {},
+                    "data_availability": "limited - Finnhub API not configured",
+                    "timestamp": datetime.now().isoformat(),
                 }
 
             logger.debug(f"Fetching fundamental data for {ticker} (free tier only)")
 
-            # Fetch analyst recommendations
-            analyst_data = self.finnhub_provider.get_recommendation_trends(ticker)
-
-            # Fetch news sentiment
-            sentiment = self.finnhub_provider.get_news_sentiment(ticker)
+            # Fetch analyst recommendations (may return None if unavailable)
+            analyst_data = None
+            try:
+                analyst_data = self.finnhub_provider.get_recommendation_trends(ticker)
+            except Exception as e:
+                logger.warning(f"Could not fetch analyst data for {ticker}: {e}")
 
             # Fetch price context for momentum
             price_context = self._get_price_context(ticker)
 
+            # Determine data availability
+            available_sources = []
+            if analyst_data:
+                available_sources.append("analyst_consensus")
+            if price_context and price_context.get("change_percent") is not None:
+                available_sources.append("price_momentum")
+
+            # Note: Sentiment is calculated by CrewAI News & Sentiment Agent, not from premium APIs
             result = {
                 "ticker": ticker,
                 "analyst_data": analyst_data or {},
-                "sentiment": sentiment or {},
                 "price_context": price_context or {},
+                "data_availability": (
+                    ", ".join(available_sources) if available_sources else "limited"
+                ),
                 "timestamp": datetime.now().isoformat(),
             }
+
+            # Cache even partial data
             self.cache_manager.set(cache_key, result, ttl_hours=4)  # Shorter cache for sentiment
 
             return result
@@ -210,7 +226,6 @@ class FinancialDataFetcherTool(BaseTool):
             return {
                 "ticker": ticker,
                 "analyst_data": {},
-                "sentiment": {},
                 "price_context": {},
                 "error": str(e),
             }

@@ -6,7 +6,7 @@ from datetime import date, datetime
 from crewai.tools import tool
 
 from src.tools.analysis import TechnicalIndicatorTool
-from src.tools.fetchers import NewsFetcherTool, PriceFetcherTool
+from src.tools.fetchers import FinancialDataFetcherTool, NewsFetcherTool, PriceFetcherTool
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,6 +34,7 @@ class CrewAIToolAdapter:
         self.price_fetcher = PriceFetcherTool()
         self.technical_tool = TechnicalIndicatorTool()
         self.news_fetcher = NewsFetcherTool()
+        self.fundamental_fetcher = FinancialDataFetcherTool()
         # Cache to store data between tool calls
         self._data_cache = {}
         # Initialize tools once
@@ -190,10 +191,93 @@ class CrewAIToolAdapter:
                 logger.error(f"Error analyzing sentiment for {ticker}: {e}")
                 return json.dumps({"error": str(e)})
 
+        @tool("Fetch Fundamental Data")
+        def fetch_fundamental_data(ticker: str) -> str:
+            """Fetch fundamental data using free tier APIs.
+
+            This tool fetches real fundamental data from free tier endpoints:
+            - Analyst recommendations (Finnhub free tier)
+            - News sentiment scores (Finnhub free tier)
+            - Price momentum context (Yahoo Finance free tier)
+
+            Args:
+                ticker: Stock ticker symbol
+
+            Returns:
+                JSON string with analyst consensus, sentiment, and momentum data
+            """
+            try:
+                # Fetch fundamental data using the tool
+                fundamental_result = self.fundamental_fetcher.run(ticker)
+
+                if "error" in fundamental_result:
+                    return json.dumps({"error": fundamental_result["error"]})
+
+                # Extract data components
+                analyst_data = fundamental_result.get("analyst_data", {})
+                sentiment = fundamental_result.get("sentiment", {})
+                price_context = fundamental_result.get("price_context", {})
+                data_availability = fundamental_result.get("data_availability", "unknown")
+
+                # Check if we have any real data
+                has_analyst_data = analyst_data and analyst_data.get("total_analysts", 0) > 0
+                has_sentiment_data = sentiment and (
+                    sentiment.get("positive", 0) + sentiment.get("negative", 0) > 0
+                )
+                has_price_data = price_context and price_context.get("change_percent") is not None
+
+                # Format for LLM analysis
+                result = {
+                    "ticker": ticker,
+                    "data_availability": data_availability,
+                    "analyst_consensus": {
+                        "available": has_analyst_data,
+                        "strong_buy": analyst_data.get("strong_buy", 0),
+                        "buy": analyst_data.get("buy", 0),
+                        "hold": analyst_data.get("hold", 0),
+                        "sell": analyst_data.get("sell", 0),
+                        "strong_sell": analyst_data.get("strong_sell", 0),
+                        "total_analysts": analyst_data.get("total_analysts", 0),
+                        "period": analyst_data.get("period", "latest"),
+                    },
+                    "news_sentiment": {
+                        "available": has_sentiment_data,
+                        "positive": sentiment.get("positive", 0),
+                        "negative": sentiment.get("negative", 0),
+                        "neutral": sentiment.get("neutral", 0),
+                        "note": (
+                            "Sentiment from news coverage analysis"
+                            if has_sentiment_data
+                            else "No sentiment data available"
+                        ),
+                    },
+                    "price_momentum": {
+                        "available": has_price_data,
+                        "change_percent": price_context.get("change_percent", 0),
+                        "trend": price_context.get("trend", "neutral"),
+                        "latest_price": price_context.get("latest_price"),
+                        "period_days": price_context.get("period_days", 30),
+                    },
+                    "data_sources": "Free tier APIs only (Finnhub + Yahoo Finance)",
+                    "note": (
+                        "Real fundamental data from free tier endpoints. "
+                        "Use analyst consensus, sentiment distribution, and momentum "
+                        "to assess fundamental strength. "
+                        f"Data available: {data_availability}. "
+                        "If data is limited, acknowledge the limitation and focus on available information."
+                    ),
+                }
+
+                return json.dumps(result, default=json_serial)
+            except Exception as e:
+                logger.error(f"Error fetching fundamental data for {ticker}: {e}")
+                return json.dumps({"error": str(e)})
+
         return [
             fetch_price_data,
             calculate_technical_indicators,
             analyze_sentiment,
+            fetch_fundamental_data,
         ]
 
     def get_crewai_tools(self) -> list:

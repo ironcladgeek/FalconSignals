@@ -268,14 +268,14 @@ class FundamentalAnalysisAgent(BaseAgent):
 
             # Extract data sources from free tier endpoints
             analyst_data = fundamental_data.get("analyst_data", {})
-            sentiment = fundamental_data.get("sentiment", {})
             price_context = fundamental_data.get("price_context", {})
 
             # Calculate fundamental score from free tier data
+            # Note: Sentiment is analyzed separately by News & Sentiment Agent
             scoring_result = FundamentalAnalyzer.calculate_score(
                 analyst_data=analyst_data,
-                sentiment=sentiment,
                 price_context=price_context,
+                sentiment_score=None,  # Will default to 50 (neutral)
             )
 
             result = {
@@ -285,18 +285,20 @@ class FundamentalAnalysisAgent(BaseAgent):
                 "scoring_details": scoring_result,
                 "components": {
                     "analyst_consensus": scoring_result["analyst_score"],
-                    "sentiment": scoring_result["sentiment_score"],
                     "momentum": scoring_result["momentum_score"],
+                    "sentiment": {
+                        "score": scoring_result["sentiment_score"],
+                        "note": "Analyzed by News & Sentiment Agent (CrewAI/LLM)",
+                    },
                 },
                 "data_sources": {
                     "analyst": analyst_data,
-                    "sentiment": sentiment,
                     "price_context": price_context,
                 },
                 "recommendation": FundamentalAnalyzer.get_recommendation(
                     scoring_result["overall_score"]
                 ),
-                "note": "Uses free tier APIs only (no premium financial data endpoints)",
+                "note": "Uses free tier APIs only - analyst & price momentum (sentiment from CrewAI agents)",
             }
 
             logger.debug(

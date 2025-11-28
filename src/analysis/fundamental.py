@@ -1,13 +1,12 @@
 """Fundamental analysis calculations and scoring using free tier data.
 
 NOTE: This implementation uses ONLY free tier API data:
-- Company info from Finnhub (free tier)
-- News sentiment from Finnhub (free tier)
-- Analyst recommendations from Finnhub (free tier)
+- Analyst recommendations from Finnhub (free tier: /stock/recommendation-trend)
 - Price data from Yahoo Finance (free tier)
+- News sentiment analyzed by CrewAI agents/LLM (no premium API calls)
 
-Premium endpoints like /stock/metric and /stock/financials are NOT used
-to maintain cost efficiency and free tier compatibility.
+Premium endpoints like /stock/metric, /stock/financials, and /news-sentiment
+are NOT used to maintain cost efficiency and free tier compatibility.
 """
 
 from typing import Any
@@ -22,55 +21,58 @@ class FundamentalAnalyzer:
 
     Scores based on:
     - Analyst recommendations (from /stock/recommendation-trend - FREE TIER)
-    - News sentiment (from /news-sentiment - FREE TIER)
     - Price momentum (from price data - FREE TIER)
-    - Company information (from /stock/profile2 - FREE TIER)
+    - News sentiment (analyzed by CrewAI agents/LLM, not from premium APIs)
     """
 
     @staticmethod
     def calculate_score(
         analyst_data: dict[str, Any] = None,
-        sentiment: dict[str, Any] = None,
         price_context: dict[str, Any] = None,
+        sentiment_score: float = None,
     ) -> dict[str, Any]:
         """Calculate fundamental score from free tier data sources.
 
         Args:
             analyst_data: Analyst recommendation trends from Finnhub
                          Expected keys: strong_buy, buy, hold, sell, strong_sell, total_analysts
-            sentiment: News sentiment from Finnhub
-                      Expected keys: positive, negative, neutral
             price_context: Price momentum context
                           Expected keys: change_percent, trend (bullish/bearish)
+            sentiment_score: News sentiment score from CrewAI agent (0-100, optional)
+                           If None, will default to neutral (50)
 
         Returns:
             Dictionary with component scores and overall fundamental score
         """
         analyst_score = FundamentalAnalyzer._score_analyst_consensus(analyst_data)
-        sentiment_score = FundamentalAnalyzer._score_sentiment(sentiment)
         momentum_score = FundamentalAnalyzer._score_momentum(price_context)
 
+        # Use provided sentiment score or default to neutral
+        if sentiment_score is None:
+            sentiment_score = 50
+
         # Weight the components
-        # Analyst: 40%, Sentiment: 35%, Momentum: 25%
-        overall_score = analyst_score * 0.40 + sentiment_score * 0.35 + momentum_score * 0.25
+        # Analyst: 50%, Momentum: 50%
+        # (Sentiment handled separately by CrewAI News & Sentiment Agent)
+        overall_score = analyst_score * 0.50 + momentum_score * 0.50
 
         return {
             "overall_score": max(0, min(100, overall_score)),
             "analyst_score": analyst_score,
-            "sentiment_score": sentiment_score,
             "momentum_score": momentum_score,
+            "sentiment_score": sentiment_score,
             "components": {
                 "analyst_consensus": {
                     "score": analyst_score,
                     "data": analyst_data or {},
                 },
-                "sentiment": {
-                    "score": sentiment_score,
-                    "data": sentiment or {},
-                },
                 "momentum": {
                     "score": momentum_score,
                     "data": price_context or {},
+                },
+                "sentiment": {
+                    "score": sentiment_score,
+                    "note": "Calculated by News & Sentiment Agent (CrewAI/LLM)",
                 },
             },
         }
@@ -104,37 +106,6 @@ class FundamentalAnalyzer:
         bearish = sell * 25 + strong_sell * 0
 
         score = (bullish + neutral + bearish) / total
-
-        return max(0, min(100, score))
-
-    @staticmethod
-    def _score_sentiment(sentiment: dict[str, Any]) -> float:
-        """Score based on news sentiment distribution.
-
-        Args:
-            sentiment: Sentiment data with positive, negative, neutral ratios
-
-        Returns:
-            Score 0-100
-        """
-        if not sentiment:
-            return 50  # Neutral if no data
-
-        positive = sentiment.get("positive", 0)
-        negative = sentiment.get("negative", 0)
-        neutral = sentiment.get("neutral", 0)
-
-        # Normalize to 0-1 range
-        total = positive + negative + neutral
-        if total == 0:
-            return 50
-
-        positive_pct = positive / total if total > 0 else 0
-        negative_pct = negative / total if total > 0 else 0
-
-        # Score: positive sentiment increases score, negative decreases
-        # Baseline: 50 (neutral), can go 0-100
-        score = 50 + (positive_pct * 50) - (negative_pct * 50)
 
         return max(0, min(100, score))
 
