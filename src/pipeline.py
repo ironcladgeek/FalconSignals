@@ -27,6 +27,7 @@ class AnalysisPipeline:
         config: dict[str, Any],
         cache_manager: CacheManager,
         portfolio_manager: PortfolioState | None = None,
+        llm_provider: str | None = None,
     ):
         """Initialize analysis pipeline.
 
@@ -34,13 +35,14 @@ class AnalysisPipeline:
             config: Configuration dictionary with analysis parameters
             cache_manager: Cache manager for data caching
             portfolio_manager: Optional portfolio state manager for position tracking
+            llm_provider: Optional LLM provider to check configuration for
         """
         self.config = config
         self.cache_manager = cache_manager
         self.portfolio_manager = portfolio_manager
 
         # Initialize components
-        self.crew = AnalysisCrew()
+        self.crew = AnalysisCrew(llm_provider=llm_provider)
         self.risk_assessor = RiskAssessor(
             volatility_threshold_high=config.get("risk_volatility_high", 3.0),
             volatility_threshold_very_high=config.get("risk_volatility_very_high", 5.0),
@@ -56,7 +58,7 @@ class AnalysisPipeline:
         )
 
         # Check and log LLM configuration status
-        llm_configured, provider = check_llm_configuration()
+        llm_configured, provider = check_llm_configuration(llm_provider)
         if llm_configured:
             logger.debug(f"Analysis pipeline initialized with {provider} LLM")
         else:

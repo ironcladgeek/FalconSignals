@@ -30,6 +30,7 @@ class LLMAnalysisOrchestrator:
         token_tracker: Optional[TokenTracker] = None,
         enable_fallback: bool = True,
         debug_dir: Optional[Path] = None,
+        progress_callback: Optional[callable] = None,
     ):
         """Initialize analysis orchestrator.
 
@@ -38,11 +39,13 @@ class LLMAnalysisOrchestrator:
             token_tracker: Token usage tracker
             enable_fallback: Enable fallback to rule-based analysis
             debug_dir: Directory to save debug outputs (inputs/outputs from LLM)
+            progress_callback: Optional callback function(message: str) for progress updates
         """
         self.llm_config = llm_config or LLMConfig()
         self.token_tracker = token_tracker
         self.enable_fallback = enable_fallback
         self.debug_dir = debug_dir
+        self.progress_callback = progress_callback
 
         # Create debug directory if needed
         if self.debug_dir:
@@ -146,12 +149,14 @@ class LLMAnalysisOrchestrator:
         self,
         ticker: str,
         context: dict[str, Any] = None,
+        progress_callback: Optional[callable] = None,
     ) -> dict[str, Any]:
         """Perform comprehensive analysis of a single instrument.
 
         Args:
             ticker: Stock ticker symbol
             context: Additional context for analysis
+            progress_callback: Optional callback for progress updates
 
         Returns:
             Analysis results from all agents including synthesis
@@ -203,7 +208,7 @@ class LLMAnalysisOrchestrator:
             "sentiment_analysis": sentiment_task,
         }
 
-        analysis_results = self.crew.execute_analysis(tasks, context)
+        analysis_results = self.crew.execute_analysis(tasks, context, progress_callback)
 
         # Save debug: analysis outputs
         if self.debug_dir:
@@ -265,6 +270,10 @@ class LLMAnalysisOrchestrator:
         """
         logger.info(f"Synthesizing investment signal for {ticker}")
 
+        # Notify progress
+        if self.progress_callback:
+            self.progress_callback(f"  🔄 Synthesizing investment signal...")
+
         # Save debug: synthesis inputs
         if self.debug_dir:
             self._save_debug_data(
@@ -312,11 +321,19 @@ class LLMAnalysisOrchestrator:
                 },
             )
 
+        # Notify start
+        if self.progress_callback:
+            self.progress_callback(f"  → Synthesizing investment signal...")
+
         result = synthesizer_hybrid.execute_task(synthesis_task)
 
         # Save debug: synthesis output
         if self.debug_dir:
             self._save_debug_data(ticker, "synthesis_output", result)
+
+        # Notify completion
+        if self.progress_callback:
+            self.progress_callback(f"  ✓ Signal synthesis complete")
 
         logger.info(f"Signal synthesis complete for {ticker}")
 

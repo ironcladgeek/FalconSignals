@@ -61,11 +61,17 @@ def _run_llm_analysis(
             typer_instance.echo(f"  LLM debug mode: enabled")
             typer_instance.echo(f"  Debug outputs: {debug_dir}")
 
+        # Create progress callback for synthesis stage
+        def progress_callback(message: str):
+            """Display progress messages."""
+            typer_instance.echo(message)
+
         orchestrator = LLMAnalysisOrchestrator(
             llm_config=config_obj.llm,
             token_tracker=tracker,
             enable_fallback=config_obj.llm.enable_fallback,
             debug_dir=debug_dir,
+            progress_callback=progress_callback,
         )
 
         typer_instance.echo(f"  LLM Provider: {config_obj.llm.provider}")
@@ -80,7 +86,27 @@ def _run_llm_analysis(
         ) as progress:
             for ticker in progress:
                 try:
-                    result = orchestrator.analyze_instrument(ticker)
+                    # Create a sub-progress callback for agent tasks
+                    task_names = [
+                        "market_scan",
+                        "technical_analysis",
+                        "fundamental_analysis",
+                        "sentiment_analysis",
+                    ]
+                    current_task = [0]  # Use list to allow mutation in nested function
+
+                    def agent_progress_callback(current, total, task_name):
+                        """Update progress display for agent tasks."""
+                        if current > current_task[0]:
+                            current_task[0] = current
+                            # Show which agent is working
+                            agent_name = task_name.replace("_", " ").title()
+                            typer_instance.echo(f"  → {agent_name} ({current}/{total})", nl=False)
+                            typer_instance.echo("\r", nl=False)  # Carriage return to overwrite
+
+                    result = orchestrator.analyze_instrument(
+                        ticker, progress_callback=agent_progress_callback
+                    )
 
                     # Extract signal from result if successful
                     if result.get("status") == "complete":
@@ -144,21 +170,31 @@ def _create_signal_from_llm_result(
             import json
             import re
 
-            # Try to extract JSON from markdown code blocks or plain text
+            # Clean up common formatting issues
+            llm_result = llm_result.strip()
+
+            # Try to extract JSON from markdown code blocks
             json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", llm_result, re.DOTALL)
             if json_match:
                 llm_result = json.loads(json_match.group(1))
             else:
-                # Try to find JSON object in the text
-                json_match = re.search(r"\{.*\}", llm_result, re.DOTALL)
-                if json_match:
+                # Try to find JSON object in the text (looking for balanced braces)
+                # Find the first { and last }
+                first_brace = llm_result.find("{")
+                last_brace = llm_result.rfind("}")
+
+                if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                    json_str = llm_result[first_brace : last_brace + 1]
                     try:
-                        llm_result = json.loads(json_match.group(0))
-                    except json.JSONDecodeError:
-                        logger.warning(f"Could not parse LLM result as JSON: {llm_result[:200]}")
+                        llm_result = json.loads(json_str)
+                        logger.debug(f"Successfully extracted JSON from LLM response")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Could not parse extracted JSON: {e}")
+                        logger.debug(f"Attempted to parse: {json_str[:500]}")
                         return None
                 else:
-                    logger.warning(f"No JSON found in LLM result: {llm_result[:200]}")
+                    logger.warning(f"No JSON object found in LLM result")
+                    logger.debug(f"Response preview: {llm_result[:200]}")
                     return None
 
         # Map recommendation to enum values
@@ -365,7 +401,7 @@ def analyze(
         setup_logging(config_obj.logging)
 
         # Check LLM configuration and warn if using fallback mode
-        llm_configured = log_llm_status()
+        llm_configured = log_llm_status(config_obj.llm.provider)
 
         # Initialize run log
         data_dir = Path("data")
@@ -383,7 +419,9 @@ def analyze(
         typer.echo(f"  Markets: {', '.join(config_obj.markets.included)}")
 
         if not llm_configured:
-            typer.echo("\n" + get_fallback_warning_message())
+            typer.echo(
+                "\n" + get_fallback_warning_message(config_obj.llm.provider if use_llm else None)
+            )
 
         if dry_run:
             typer.echo("  [DRY RUN MODE - No trades will be executed]")
@@ -401,7 +439,9 @@ def analyze(
             "include_disclaimers": True,
         }
 
-        pipeline = AnalysisPipeline(pipeline_config, cache_manager, portfolio_manager)
+        pipeline = AnalysisPipeline(
+            pipeline_config, cache_manager, portfolio_manager, llm_provider=config_obj.llm.provider
+        )
 
         # Determine which tickers to analyze
         if ticker:

@@ -14,8 +14,12 @@ logger = get_logger(__name__)
 class AnalysisCrew:
     """Orchestrates multiple agents for comprehensive analysis."""
 
-    def __init__(self):
-        """Initialize the analysis crew."""
+    def __init__(self, llm_provider: Optional[str] = None):
+        """Initialize the analysis crew.
+
+        Args:
+            llm_provider: Optional LLM provider to check configuration for
+        """
         self.market_scanner = MarketScannerAgent()
         self.technical_agent = TechnicalAnalysisAgent()
         self.fundamental_agent = FundamentalAnalysisAgent()
@@ -23,7 +27,7 @@ class AnalysisCrew:
         self.signal_synthesizer = SignalSynthesisAgent()
 
         # Check LLM configuration and warn if using fallback
-        llm_configured, provider = check_llm_configuration()
+        llm_configured, provider = check_llm_configuration(llm_provider)
         if llm_configured:
             logger.debug(f"Analysis crew initialized with 5 agents using {provider} LLM")
         else:
