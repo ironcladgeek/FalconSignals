@@ -191,3 +191,6 @@ class DailyReport(BaseModel):
     # Metadata
     data_sources: list[str] = Field(description="Data sources used for analysis")
     next_update: str | None = Field(default=None, description="Expected time of next update")
+    analysis_mode: str = Field(
+        default="rule_based", description="Analysis mode: 'llm' or 'rule_based'"
+    )

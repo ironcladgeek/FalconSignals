@@ -127,6 +127,7 @@ class AnalysisPipeline:
         market_overview: str = "",
         generate_allocation: bool = True,
         report_date: str | None = None,
+        analysis_mode: str = "rule_based",
     ) -> DailyReport:
         """Generate daily analysis report from signals.
 
@@ -135,6 +136,7 @@ class AnalysisPipeline:
             market_overview: Optional market overview text
             generate_allocation: Whether to generate allocation suggestions
             report_date: Report date (YYYY-MM-DD), uses today if not provided
+            analysis_mode: Analysis mode used ("llm" or "rule_based")
 
         Returns:
             Daily report object
@@ -158,6 +160,7 @@ class AnalysisPipeline:
                 market_overview=market_overview,
                 allocation_suggestion=allocation_suggestion,
                 report_date=report_date,
+                analysis_mode=analysis_mode,
             )
 
             logger.debug(f"Report generated: {report.strong_signals_count} strong signals")

@@ -441,8 +441,13 @@ def analyze(
             signals, portfolio_manager = _run_llm_analysis(
                 ticker_list, config_obj, typer, debug_llm
             )
+            analysis_mode = "llm"
         else:
+            typer.echo(
+                "\n📊 Using rule-based analysis (technical indicators & fundamental metrics)"
+            )
             signals, portfolio_manager = pipeline.run_analysis(ticker_list)
+            analysis_mode = "rule_based"
         signals_count = len(signals)
 
         if signals:
@@ -453,6 +458,7 @@ def analyze(
             report = pipeline.generate_daily_report(
                 signals,
                 generate_allocation=True,
+                analysis_mode=analysis_mode,
             )
 
             # Display summary
