@@ -16,7 +16,7 @@ def initialize_llm_client(config: LLMConfig):
         config: LLM configuration
 
     Returns:
-        Initialized LLM client
+        Initialized LLM client (CrewAI LLM object or LangChain client)
 
     Raises:
         ValueError: If provider is not supported or credentials are missing
@@ -109,32 +109,37 @@ def _initialize_openai(config: LLMConfig):
 
 
 def _initialize_local(config: LLMConfig):
-    """Initialize local LLM client (Ollama or similar).
+    """Initialize local LLM client (Ollama) using CrewAI's LLM.
 
     Args:
         config: LLM configuration
 
     Returns:
-        Local LLM client
+        CrewAI LLM object configured for Ollama
 
     Raises:
         ValueError: If local LLM setup fails
     """
     try:
-        from langchain_community.llms import Ollama
+        from crewai.llm import LLM
 
-        client = Ollama(
-            model=config.model,
+        # CrewAI uses "ollama/model_name" format
+        client = LLM(
+            model=f"ollama/{config.model}",
+            base_url="http://localhost:11434",
             temperature=config.temperature,
-            num_predict=config.max_tokens,
         )
-        logger.info(f"Initialized local LLM client with model: {config.model}")
+        logger.info(f"Initialized local Ollama LLM with model: {config.model}")
         return client
     except ImportError:
         raise ValueError(
-            "langchain-community package not installed. "
-            "Install it with: pip install langchain-community"
+            "crewai or litellm package not installed. Install it with: pip install crewai litellm"
         )
+    except Exception as e:
+        raise ValueError(
+            f"Failed to initialize local LLM. Make sure Ollama is running (ollama serve) "
+            f"and the model '{config.model}' is available (ollama list). Error: {e}"
+        ) from e
 
 
 def get_llm_client(config: Optional[LLMConfig] = None):
