@@ -243,6 +243,59 @@ class CacheManager:
             "cache_dir": str(self.cache_dir),
         }
 
+    def get_latest_price(self, ticker: str) -> Optional[Any]:
+        """Get latest price for a ticker from cache.
+
+        Searches for price cache files matching the ticker pattern
+        and returns the latest_price from the most recent file.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Price object with close_price and currency, or None if not found
+        """
+        try:
+            # Search for price cache files matching this ticker
+            pattern = f"prices_{ticker.upper()}_*.json"
+            matching_files = list(self.cache_dir.glob(pattern))
+
+            if not matching_files:
+                logger.debug(f"No price cache found for {ticker}")
+                return None
+
+            # Load the most recent file (they should be sorted by name)
+            latest_file = sorted(matching_files)[-1]
+
+            with open(latest_file, "r") as f:
+                cached = json.load(f)
+                data = cached.get("data", {})
+
+                # Extract the latest_price and construct a simple object
+                latest_price = data.get("latest_price")
+                if latest_price is None:
+                    logger.debug(f"No latest_price in cache for {ticker}")
+                    return None
+
+                # Get currency from the last price entry
+                prices = data.get("prices", [])
+                currency = "USD"
+                if prices:
+                    currency = prices[-1].get("currency", "USD")
+
+                # Return a simple object with close_price and currency
+                class PriceData:
+                    def __init__(self, price, curr):
+                        self.close_price = price
+                        self.currency = curr
+
+                logger.debug(f"Found cached price for {ticker}: {latest_price} {currency}")
+                return PriceData(latest_price, currency)
+
+        except Exception as e:
+            logger.debug(f"Error fetching price cache for {ticker}: {e}")
+            return None
+
     def _get_file_path(self, key: str) -> Path:
         """Get file path for cache key.
 
