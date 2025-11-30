@@ -258,7 +258,7 @@ class FinnhubProvider(DataProvider):
                 return None
 
             # Get most recent recommendation data
-            latest = data[0]
+            latest = data[-1]  # Last item is most recent
             return {
                 "ticker": ticker,
                 "period": latest.get("period"),
