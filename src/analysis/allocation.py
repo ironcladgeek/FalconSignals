@@ -125,10 +125,11 @@ class AllocationEngine:
 
             # Create allocation suggestion
             shares = position_size / current_price if current_price > 0 else 0
+            percentage = (position_size / self.total_capital) * 100 if self.total_capital > 0 else 0
             allocation = AllocationSuggestion(
                 ticker=ticker,
                 eur=round(position_size, 2),
-                percentage=round((position_size / self.total_capital) * 100, 2),
+                percentage=round(percentage, 2),
                 shares=round(shares, 2) if shares > 0 else None,
             )
 
@@ -179,7 +180,11 @@ class AllocationEngine:
             sector_diversification=sector_div if sector_div else {"unallocated": 100.0},
             instrument_diversification=instrument_div,
             total_allocated=round(current_capital_used, 2),
-            total_allocated_pct=round((current_capital_used / self.total_capital) * 100, 2),
+            total_allocated_pct=(
+                round((current_capital_used / self.total_capital) * 100, 2)
+                if self.total_capital > 0
+                else 0
+            ),
             unallocated=round(self.total_capital - allocated_capital - current_capital_used, 2),
             constraints_applied={
                 "max_position_size_pct": self.max_position_size_pct,
