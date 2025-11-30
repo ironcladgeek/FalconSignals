@@ -1547,68 +1547,68 @@ def get_us_tickers_by_category(category: str, limit: int = None) -> list[str]:
         List of tickers for the specified category
 
     Examples:
-        >>> get_us_tickers_by_category('tech_software', limit=10)
+        >>> get_us_tickers_by_category('us_tech_software', limit=10)
         ['MSFT', 'CRM', 'ADBE', ...]
 
-        >>> get_us_tickers_by_category('small_cap')
+        >>> get_us_tickers_by_category('us_small_cap')
         ['BIGC', 'ALKT', 'BRZE', ...]
     """
     category_map = {
         # By Market Cap
-        "mega_cap": US_MEGA_CAP,
-        "large_cap": US_LARGE_CAP,
-        "mid_cap": US_MID_CAP,
-        "small_cap": US_SMALL_CAP,
+        "us_mega_cap": US_MEGA_CAP,
+        "us_large_cap": US_LARGE_CAP,
+        "us_mid_cap": US_MID_CAP,
+        "us_small_cap": US_SMALL_CAP,
         # By Sector - Technology
-        "tech": US_TECH_SOFTWARE + US_TECH_SEMICONDUCTORS + US_TECH_HARDWARE + US_TECH_INTERNET,
-        "tech_software": US_TECH_SOFTWARE,
-        "tech_semiconductors": US_TECH_SEMICONDUCTORS,
-        "tech_hardware": US_TECH_HARDWARE,
-        "tech_internet": US_TECH_INTERNET,
+        "us_tech": US_TECH_SOFTWARE + US_TECH_SEMICONDUCTORS + US_TECH_HARDWARE + US_TECH_INTERNET,
+        "us_tech_software": US_TECH_SOFTWARE,
+        "us_tech_semiconductors": US_TECH_SEMICONDUCTORS,
+        "us_tech_hardware": US_TECH_HARDWARE,
+        "us_tech_internet": US_TECH_INTERNET,
         # By Sector - Healthcare
-        "healthcare": US_HEALTHCARE_PHARMA + US_HEALTHCARE_DEVICES,
-        "healthcare_pharma": US_HEALTHCARE_PHARMA,
-        "healthcare_devices": US_HEALTHCARE_DEVICES,
+        "us_healthcare": US_HEALTHCARE_PHARMA + US_HEALTHCARE_DEVICES,
+        "us_healthcare_pharma": US_HEALTHCARE_PHARMA,
+        "us_healthcare_devices": US_HEALTHCARE_DEVICES,
         # By Sector - Financials
-        "financials": US_FINANCIALS_BANKS + US_FINANCIALS_FINTECH + US_FINANCIALS_ASSET_MGMT,
-        "financials_banks": US_FINANCIALS_BANKS,
-        "financials_fintech": US_FINANCIALS_FINTECH,
-        "financials_asset_mgmt": US_FINANCIALS_ASSET_MGMT,
+        "us_financials": US_FINANCIALS_BANKS + US_FINANCIALS_FINTECH + US_FINANCIALS_ASSET_MGMT,
+        "us_financials_banks": US_FINANCIALS_BANKS,
+        "us_financials_fintech": US_FINANCIALS_FINTECH,
+        "us_financials_asset_mgmt": US_FINANCIALS_ASSET_MGMT,
         # By Sector - Consumer
-        "consumer": US_CONSUMER_RETAIL + US_CONSUMER_FOOD_BEV + US_CONSUMER_RESTAURANTS,
-        "consumer_retail": US_CONSUMER_RETAIL,
-        "consumer_food_bev": US_CONSUMER_FOOD_BEV,
-        "consumer_restaurants": US_CONSUMER_RESTAURANTS,
+        "us_consumer": US_CONSUMER_RETAIL + US_CONSUMER_FOOD_BEV + US_CONSUMER_RESTAURANTS,
+        "us_consumer_retail": US_CONSUMER_RETAIL,
+        "us_consumer_food_bev": US_CONSUMER_FOOD_BEV,
+        "us_consumer_restaurants": US_CONSUMER_RESTAURANTS,
         # By Sector - Other
-        "industrials": US_INDUSTRIALS,
-        "energy": US_ENERGY,
-        "clean_energy": US_CLEAN_ENERGY,
-        "utilities": US_UTILITIES,
-        "real_estate": US_REAL_ESTATE,
-        "materials": US_MATERIALS,
-        "communication": US_COMMUNICATION,
-        "transportation": US_TRANSPORTATION,
+        "us_industrials": US_INDUSTRIALS,
+        "us_energy": US_ENERGY,
+        "us_clean_energy": US_CLEAN_ENERGY,
+        "us_utilities": US_UTILITIES,
+        "us_real_estate": US_REAL_ESTATE,
+        "us_materials": US_MATERIALS,
+        "us_communication": US_COMMUNICATION,
+        "us_transportation": US_TRANSPORTATION,
         # By Theme
-        "ai_ml": US_AI_ML,
-        "cybersecurity": US_CYBERSECURITY,
-        "cloud_computing": US_CLOUD_COMPUTING,
-        "space_defense": US_SPACE_DEFENSE,
-        "ev_autonomous": US_EV_AUTONOMOUS,
-        "biotech_genomics": US_BIOTECH_GENOMICS,
-        "quantum_computing": US_QUANTUM_COMPUTING,
+        "us_ai_ml": US_AI_ML,
+        "us_cybersecurity": US_CYBERSECURITY,
+        "us_cloud_computing": US_CLOUD_COMPUTING,
+        "us_space_defense": US_SPACE_DEFENSE,
+        "us_ev_autonomous": US_EV_AUTONOMOUS,
+        "us_biotech_genomics": US_BIOTECH_GENOMICS,
+        "us_quantum_computing": US_QUANTUM_COMPUTING,
         # ETFs
-        "etfs": US_ETFS_BROAD_MARKET
+        "us_etfs": US_ETFS_BROAD_MARKET
         + US_ETFS_SECTOR
         + US_ETFS_FIXED_INCOME
         + US_ETFS_INTERNATIONAL
         + US_ETFS_THEMATIC
         + US_ETFS_DIVIDEND,
-        "etfs_broad_market": US_ETFS_BROAD_MARKET,
-        "etfs_sector": US_ETFS_SECTOR,
-        "etfs_fixed_income": US_ETFS_FIXED_INCOME,
-        "etfs_international": US_ETFS_INTERNATIONAL,
-        "etfs_thematic": US_ETFS_THEMATIC,
-        "etfs_dividend": US_ETFS_DIVIDEND,
+        "us_etfs_broad_market": US_ETFS_BROAD_MARKET,
+        "us_etfs_sector": US_ETFS_SECTOR,
+        "us_etfs_fixed_income": US_ETFS_FIXED_INCOME,
+        "us_etfs_international": US_ETFS_INTERNATIONAL,
+        "us_etfs_thematic": US_ETFS_THEMATIC,
+        "us_etfs_dividend": US_ETFS_DIVIDEND,
     }
 
     if category.lower() not in category_map:
@@ -1625,50 +1625,50 @@ def get_us_categories() -> dict[str, int]:
     """Get all available US ticker categories and their counts."""
     return {
         # Market Cap
-        "mega_cap": len(US_MEGA_CAP),
-        "large_cap": len(US_LARGE_CAP),
-        "mid_cap": len(US_MID_CAP),
-        "small_cap": len(US_SMALL_CAP),
+        "us_mega_cap": len(US_MEGA_CAP),
+        "us_large_cap": len(US_LARGE_CAP),
+        "us_mid_cap": len(US_MID_CAP),
+        "us_small_cap": len(US_SMALL_CAP),
         # Technology
-        "tech_software": len(US_TECH_SOFTWARE),
-        "tech_semiconductors": len(US_TECH_SEMICONDUCTORS),
-        "tech_hardware": len(US_TECH_HARDWARE),
-        "tech_internet": len(US_TECH_INTERNET),
+        "us_tech_software": len(US_TECH_SOFTWARE),
+        "us_tech_semiconductors": len(US_TECH_SEMICONDUCTORS),
+        "us_tech_hardware": len(US_TECH_HARDWARE),
+        "us_tech_internet": len(US_TECH_INTERNET),
         # Healthcare
-        "healthcare_pharma": len(US_HEALTHCARE_PHARMA),
-        "healthcare_devices": len(US_HEALTHCARE_DEVICES),
+        "us_healthcare_pharma": len(US_HEALTHCARE_PHARMA),
+        "us_healthcare_devices": len(US_HEALTHCARE_DEVICES),
         # Financials
-        "financials_banks": len(US_FINANCIALS_BANKS),
-        "financials_fintech": len(US_FINANCIALS_FINTECH),
-        "financials_asset_mgmt": len(US_FINANCIALS_ASSET_MGMT),
+        "us_financials_banks": len(US_FINANCIALS_BANKS),
+        "us_financials_fintech": len(US_FINANCIALS_FINTECH),
+        "us_financials_asset_mgmt": len(US_FINANCIALS_ASSET_MGMT),
         # Consumer
-        "consumer_retail": len(US_CONSUMER_RETAIL),
-        "consumer_food_bev": len(US_CONSUMER_FOOD_BEV),
-        "consumer_restaurants": len(US_CONSUMER_RESTAURANTS),
+        "us_consumer_retail": len(US_CONSUMER_RETAIL),
+        "us_consumer_food_bev": len(US_CONSUMER_FOOD_BEV),
+        "us_consumer_restaurants": len(US_CONSUMER_RESTAURANTS),
         # Other Sectors
-        "industrials": len(US_INDUSTRIALS),
-        "energy": len(US_ENERGY),
-        "clean_energy": len(US_CLEAN_ENERGY),
-        "utilities": len(US_UTILITIES),
-        "real_estate": len(US_REAL_ESTATE),
-        "materials": len(US_MATERIALS),
-        "communication": len(US_COMMUNICATION),
-        "transportation": len(US_TRANSPORTATION),
+        "us_industrials": len(US_INDUSTRIALS),
+        "us_energy": len(US_ENERGY),
+        "us_clean_energy": len(US_CLEAN_ENERGY),
+        "us_utilities": len(US_UTILITIES),
+        "us_real_estate": len(US_REAL_ESTATE),
+        "us_materials": len(US_MATERIALS),
+        "us_communication": len(US_COMMUNICATION),
+        "us_transportation": len(US_TRANSPORTATION),
         # Themes
-        "ai_ml": len(US_AI_ML),
-        "cybersecurity": len(US_CYBERSECURITY),
-        "cloud_computing": len(US_CLOUD_COMPUTING),
-        "space_defense": len(US_SPACE_DEFENSE),
-        "ev_autonomous": len(US_EV_AUTONOMOUS),
-        "biotech_genomics": len(US_BIOTECH_GENOMICS),
-        "quantum_computing": len(US_QUANTUM_COMPUTING),
+        "us_ai_ml": len(US_AI_ML),
+        "us_cybersecurity": len(US_CYBERSECURITY),
+        "us_cloud_computing": len(US_CLOUD_COMPUTING),
+        "us_space_defense": len(US_SPACE_DEFENSE),
+        "us_ev_autonomous": len(US_EV_AUTONOMOUS),
+        "us_biotech_genomics": len(US_BIOTECH_GENOMICS),
+        "us_quantum_computing": len(US_QUANTUM_COMPUTING),
         # ETFs
-        "etfs_broad_market": len(US_ETFS_BROAD_MARKET),
-        "etfs_sector": len(US_ETFS_SECTOR),
-        "etfs_fixed_income": len(US_ETFS_FIXED_INCOME),
-        "etfs_international": len(US_ETFS_INTERNATIONAL),
-        "etfs_thematic": len(US_ETFS_THEMATIC),
-        "etfs_dividend": len(US_ETFS_DIVIDEND),
+        "us_etfs_broad_market": len(US_ETFS_BROAD_MARKET),
+        "us_etfs_sector": len(US_ETFS_SECTOR),
+        "us_etfs_fixed_income": len(US_ETFS_FIXED_INCOME),
+        "us_etfs_international": len(US_ETFS_INTERNATIONAL),
+        "us_etfs_thematic": len(US_ETFS_THEMATIC),
+        "us_etfs_dividend": len(US_ETFS_DIVIDEND),
     }
 
 
@@ -1744,27 +1744,38 @@ if __name__ == "__main__":
 
     # Group by type
     print("\n  Market Cap:")
-    for cat in ["mega_cap", "large_cap", "mid_cap", "small_cap"]:
+    for cat in ["us_mega_cap", "us_large_cap", "us_mid_cap", "us_small_cap"]:
         print(f"    {cat}: {categories[cat]}")
 
     print("\n  Technology:")
-    for cat in ["tech_software", "tech_semiconductors", "tech_hardware", "tech_internet"]:
+    for cat in [
+        "us_tech_software",
+        "us_tech_semiconductors",
+        "us_tech_hardware",
+        "us_tech_internet",
+    ]:
         print(f"    {cat}: {categories[cat]}")
 
     print("\n  Healthcare:")
-    for cat in ["healthcare_pharma", "healthcare_devices"]:
+    for cat in ["us_healthcare_pharma", "us_healthcare_devices"]:
         print(f"    {cat}: {categories[cat]}")
 
     print("\n  Financials:")
-    for cat in ["financials_banks", "financials_fintech", "financials_asset_mgmt"]:
+    for cat in ["us_financials_banks", "us_financials_fintech", "us_financials_asset_mgmt"]:
         print(f"    {cat}: {categories[cat]}")
 
     print("\n  Themes:")
-    for cat in ["ai_ml", "cybersecurity", "cloud_computing", "ev_autonomous", "biotech_genomics"]:
+    for cat in [
+        "us_ai_ml",
+        "us_cybersecurity",
+        "us_cloud_computing",
+        "us_ev_autonomous",
+        "us_biotech_genomics",
+    ]:
         print(f"    {cat}: {categories[cat]}")
 
     print("\n  ETFs:")
-    for cat in ["etfs_broad_market", "etfs_sector", "etfs_dividend", "etfs_thematic"]:
+    for cat in ["us_etfs_broad_market", "us_etfs_sector", "us_etfs_dividend", "us_etfs_thematic"]:
         print(f"    {cat}: {categories[cat]}")
 
     # Example queries
@@ -1773,16 +1784,16 @@ if __name__ == "__main__":
     print("=" * 60)
 
     print("\n🔍 Top 5 AI/ML tickers:")
-    ai_tickers = get_us_tickers_by_category("ai_ml", limit=5)
+    ai_tickers = get_us_tickers_by_category("us_ai_ml", limit=5)
     print(f"   {ai_tickers}")
 
     print("\n🔍 Top 5 Small Cap tickers:")
-    small_caps = get_us_tickers_by_category("small_cap", limit=5)
+    small_caps = get_us_tickers_by_category("us_small_cap", limit=5)
     print(f"   {small_caps}")
 
     print("\n🔍 Combined analysis (Nordic + US Tech):")
     combined = get_tickers_for_analysis(
-        markets=["nordic"], categories=["tech_software"], limit_per_category=5
+        markets=["nordic"], categories=["us_tech_software"], limit_per_category=5
     )
     print(f"   Total: {len(combined)} tickers")
     print(f"   Sample: {combined[:10]}")

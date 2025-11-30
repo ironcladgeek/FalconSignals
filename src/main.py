@@ -85,7 +85,7 @@ def _scan_market_for_anomalies(
                     "Market scan found no anomalies in the selected instruments.\n"
                     "To analyze all instruments anyway in LLM mode (higher cost), "
                     "use --force-full-analysis flag.\n"
-                    "Example: analyze --category mega_cap --llm --force-full-analysis"
+                    "Example: analyze --category us_mega_cap --llm --force-full-analysis"
                 )
             typer_instance.echo("  ⚠️  No anomalies detected, but proceeding with all instruments")
             typer_instance.echo("     (--force-full-analysis flag was provided)")
@@ -364,7 +364,7 @@ def analyze(
     category: str = typer.Option(
         None,
         "--category",
-        help="US ticker category: 'mega_cap', 'tech_software', 'ai_ml', 'cybersecurity', etc. Comma-separated for multiple (e.g., 'tech_software,ai_ml'). Use list-categories to see all options",
+        help="US ticker category: 'us_mega_cap', 'us_tech_software', 'us_ai_ml', 'us_cybersecurity', etc. Comma-separated for multiple (e.g., 'us_tech_software,us_ai_ml'). Use list-categories to see all options",
     ),
     ticker: str = typer.Option(
         None,
@@ -450,12 +450,12 @@ def analyze(
         analyze --ticker AAPL,MSFT,GOOGL
 
         # Analyze US categories
-        analyze --category tech_software
-        analyze --category ai_ml,cybersecurity --limit 30
-        analyze --category mega_cap
+        analyze --category us_tech_software
+        analyze --category us_ai_ml,us_cybersecurity --limit 30
+        analyze --category us_mega_cap
 
         # Combine markets and categories
-        analyze --market nordic --category tech_software
+        analyze --market nordic --category us_tech_software
     """
     start_time = time.time()
     run_log = None
@@ -481,8 +481,8 @@ def analyze(
             "  analyze --test --llm        # Quick test with LLM\n"
             "  analyze --market global\n"
             "  analyze --market us\n"
-            "  analyze --category tech_software\n"
-            "  analyze --category ai_ml,cybersecurity --limit 30\n"
+            "  analyze --category us_tech_software\n"
+            "  analyze --category us_ai_ml,us_cybersecurity --limit 30\n"
             "  analyze --market us,eu --limit 50\n"
             "  analyze --ticker AAPL,MSFT,GOOGL",
             err=True,
@@ -564,6 +564,8 @@ def analyze(
             available_categories = get_us_categories()
             invalid_categories = [c for c in categories if c not in available_categories]
             if invalid_categories:
+                import sys
+
                 typer.echo(
                     f"❌ Error: Invalid category(ies): {', '.join(invalid_categories)}",
                     err=True,
@@ -571,7 +573,7 @@ def analyze(
                 typer.echo("Available categories:", err=True)
                 for cat_name, count in sorted(available_categories.items()):
                     typer.echo(f"  {cat_name}: {count} tickers", err=True)
-                raise typer.Exit(code=1)
+                sys.exit(1)
 
             # Get tickers from categories, optionally combined with markets
             if market:
@@ -775,49 +777,54 @@ def list_categories() -> None:
 
     # Group by type for better readability
     groups = {
-        "Market Cap": ["mega_cap", "large_cap", "mid_cap", "small_cap"],
+        "Market Cap": ["us_mega_cap", "us_large_cap", "us_mid_cap", "us_small_cap"],
         "Technology": [
-            "tech",
-            "tech_software",
-            "tech_semiconductors",
-            "tech_hardware",
-            "tech_internet",
+            "us_tech",
+            "us_tech_software",
+            "us_tech_semiconductors",
+            "us_tech_hardware",
+            "us_tech_internet",
         ],
-        "Healthcare": ["healthcare", "healthcare_pharma", "healthcare_devices"],
+        "Healthcare": ["us_healthcare", "us_healthcare_pharma", "us_healthcare_devices"],
         "Financials": [
-            "financials",
-            "financials_banks",
-            "financials_fintech",
-            "financials_asset_mgmt",
+            "us_financials",
+            "us_financials_banks",
+            "us_financials_fintech",
+            "us_financials_asset_mgmt",
         ],
-        "Consumer": ["consumer", "consumer_retail", "consumer_food_bev", "consumer_restaurants"],
+        "Consumer": [
+            "us_consumer",
+            "us_consumer_retail",
+            "us_consumer_food_bev",
+            "us_consumer_restaurants",
+        ],
         "Other Sectors": [
-            "industrials",
-            "energy",
-            "clean_energy",
-            "utilities",
-            "real_estate",
-            "materials",
-            "communication",
-            "transportation",
+            "us_industrials",
+            "us_energy",
+            "us_clean_energy",
+            "us_utilities",
+            "us_real_estate",
+            "us_materials",
+            "us_communication",
+            "us_transportation",
         ],
         "Themes": [
-            "ai_ml",
-            "cybersecurity",
-            "cloud_computing",
-            "space_defense",
-            "ev_autonomous",
-            "biotech_genomics",
-            "quantum_computing",
+            "us_ai_ml",
+            "us_cybersecurity",
+            "us_cloud_computing",
+            "us_space_defense",
+            "us_ev_autonomous",
+            "us_biotech_genomics",
+            "us_quantum_computing",
         ],
         "ETFs": [
-            "etfs",
-            "etfs_broad_market",
-            "etfs_sector",
-            "etfs_fixed_income",
-            "etfs_international",
-            "etfs_thematic",
-            "etfs_dividend",
+            "us_etfs",
+            "us_etfs_broad_market",
+            "us_etfs_sector",
+            "us_etfs_fixed_income",
+            "us_etfs_international",
+            "us_etfs_thematic",
+            "us_etfs_dividend",
         ],
     }
 
@@ -831,9 +838,9 @@ def list_categories() -> None:
 
     # Usage examples
     typer.echo("💡 Usage Examples:")
-    typer.echo("  analyze --category tech_software")
-    typer.echo("  analyze --category ai_ml,cybersecurity --limit 30")
-    typer.echo("  analyze --market nordic --category tech_software")
+    typer.echo("  analyze --category us_tech_software")
+    typer.echo("  analyze --category us_ai_ml,us_cybersecurity --limit 30")
+    typer.echo("  analyze --market nordic --category us_tech_software")
     typer.echo()
 
 
