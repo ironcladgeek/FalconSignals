@@ -129,7 +129,7 @@ uv run python -m src.main analyze --ticker INTU --llm --debug-llm
 - Tracks token usage and costs in EUR
 - Falls back to rule-based analysis if LLM fails
 
-**Cost:** ~€0.065 per stock analyzed (adjustable by model choice)
+**Cost:** ~€0.65 per stock analyzed (adjustable by model choice)
 
 ### List Available Categories
 
