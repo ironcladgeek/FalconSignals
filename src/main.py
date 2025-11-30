@@ -13,7 +13,11 @@ from src.config import load_config
 from src.data.portfolio import PortfolioState
 from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
-from src.MARKET_TICKERS import get_tickers_for_markets
+from src.MARKET_TICKERS import (
+    get_tickers_for_analysis,
+    get_tickers_for_markets,
+    get_us_categories,
+)
 from src.pipeline import AnalysisPipeline
 from src.utils.llm_check import get_fallback_warning_message, log_llm_status
 from src.utils.logging import get_logger, setup_logging
@@ -277,6 +281,11 @@ def analyze(
         "-m",
         help="Market to analyze: 'global', 'us', 'eu', 'nordic', or comma-separated (e.g., 'us,eu')",
     ),
+    category: str = typer.Option(
+        None,
+        "--category",
+        help="US ticker category: 'mega_cap', 'tech_software', 'ai_ml', 'cybersecurity', etc. Comma-separated for multiple (e.g., 'tech_software,ai_ml'). Use list-categories to see all options",
+    ),
     ticker: str = typer.Option(
         None,
         "--ticker",
@@ -354,6 +363,14 @@ def analyze(
 
         # Analyze specific tickers
         analyze --ticker AAPL,MSFT,GOOGL
+
+        # Analyze US categories
+        analyze --category tech_software
+        analyze --category ai_ml,cybersecurity --limit 30
+        analyze --category mega_cap
+
+        # Combine markets and categories
+        analyze --market nordic --category tech_software
     """
     start_time = time.time()
     run_log = None
@@ -370,27 +387,29 @@ def analyze(
             save_report = False
             typer.echo("  Report saving: disabled (test mode)")
 
-    # Validate that either market, ticker, or test is provided
-    if not market and not ticker and not test:
+    # Validate that either market, category, ticker, or test is provided
+    if not market and not category and not ticker and not test:
         typer.echo(
-            "❌ Error: Either --market, --ticker, or --test must be provided\n"
+            "❌ Error: Either --market, --category, --ticker, or --test must be provided\n"
             "Examples:\n"
             "  analyze --test              # Quick test\n"
             "  analyze --test --llm        # Quick test with LLM\n"
             "  analyze --market global\n"
             "  analyze --market us\n"
+            "  analyze --category tech_software\n"
+            "  analyze --category ai_ml,cybersecurity --limit 30\n"
             "  analyze --market us,eu --limit 50\n"
             "  analyze --ticker AAPL,MSFT,GOOGL",
             err=True,
         )
         raise typer.Exit(code=1)
 
-    if market and ticker:
-        typer.echo("❌ Error: Cannot specify both --market and --ticker", err=True)
+    if (market or category) and ticker:
+        typer.echo("❌ Error: Cannot specify --ticker with --market or --category", err=True)
         raise typer.Exit(code=1)
 
-    if test and (market or (ticker and not ticker == "AAPL")):
-        typer.echo("❌ Error: Cannot use --test with --market or --ticker", err=True)
+    if test and (market or category or (ticker and not ticker == "AAPL")):
+        typer.echo("❌ Error: Cannot use --test with --market, --category, or --ticker", err=True)
         raise typer.Exit(code=1)
 
     try:
@@ -449,6 +468,47 @@ def analyze(
             ticker_list = [t.strip().upper() for t in ticker.split(",")]
             typer.echo(f"\n📊 Running analysis on {len(ticker_list)} specified instruments...")
             typer.echo(f"  Tickers: {', '.join(ticker_list)}")
+        elif category:
+            # Parse category specification
+            categories = [c.strip().lower() for c in category.split(",")]
+            typer.echo(
+                f"\n📊 Running analysis for category(ies): {', '.join(categories).upper()}..."
+            )
+
+            # Validate categories
+            available_categories = get_us_categories()
+            invalid_categories = [c for c in categories if c not in available_categories]
+            if invalid_categories:
+                typer.echo(
+                    f"❌ Error: Invalid category(ies): {', '.join(invalid_categories)}",
+                    err=True,
+                )
+                typer.echo("Available categories:", err=True)
+                for cat_name, count in sorted(available_categories.items()):
+                    typer.echo(f"  {cat_name}: {count} tickers", err=True)
+                raise typer.Exit(code=1)
+
+            # Get tickers from categories, optionally combined with markets
+            if market:
+                markets = (
+                    ["global"]
+                    if market.lower() == "global"
+                    else [m.strip().lower() for m in market.split(",")]
+                )
+                if market.lower() == "global":
+                    markets = ["nordic", "eu"]
+                ticker_list = get_tickers_for_analysis(
+                    markets=markets, categories=categories, limit_per_category=limit
+                )
+                typer.echo(f"  Markets: {', '.join(markets).upper()}")
+            else:
+                ticker_list = get_tickers_for_analysis(
+                    categories=categories, limit_per_category=limit
+                )
+
+            if limit:
+                typer.echo(f"  Limit: {limit} instruments per category")
+            typer.echo(f"  Total instruments to analyze: {len(ticker_list)}")
         else:
             # Parse market specification
             if market.lower() == "global":
@@ -585,6 +645,81 @@ def analyze(
                 error_message=str(e),
             )
         raise typer.Exit(code=1)
+
+
+@app.command()
+def list_categories() -> None:
+    """List all available US ticker categories.
+
+    Shows all category names with the number of tickers in each.
+    Use these category names with the `analyze --category` option.
+    """
+    categories = get_us_categories()
+
+    typer.echo("\n🇺🇸 Available US Ticker Categories:\n")
+
+    # Group by type for better readability
+    groups = {
+        "Market Cap": ["mega_cap", "large_cap", "mid_cap", "small_cap"],
+        "Technology": [
+            "tech",
+            "tech_software",
+            "tech_semiconductors",
+            "tech_hardware",
+            "tech_internet",
+        ],
+        "Healthcare": ["healthcare", "healthcare_pharma", "healthcare_devices"],
+        "Financials": [
+            "financials",
+            "financials_banks",
+            "financials_fintech",
+            "financials_asset_mgmt",
+        ],
+        "Consumer": ["consumer", "consumer_retail", "consumer_food_bev", "consumer_restaurants"],
+        "Other Sectors": [
+            "industrials",
+            "energy",
+            "clean_energy",
+            "utilities",
+            "real_estate",
+            "materials",
+            "communication",
+            "transportation",
+        ],
+        "Themes": [
+            "ai_ml",
+            "cybersecurity",
+            "cloud_computing",
+            "space_defense",
+            "ev_autonomous",
+            "biotech_genomics",
+            "quantum_computing",
+        ],
+        "ETFs": [
+            "etfs",
+            "etfs_broad_market",
+            "etfs_sector",
+            "etfs_fixed_income",
+            "etfs_international",
+            "etfs_thematic",
+            "etfs_dividend",
+        ],
+    }
+
+    for group_name, cat_list in groups.items():
+        typer.echo(f"📌 {group_name}:")
+        for cat in cat_list:
+            if cat in categories:
+                count = categories[cat]
+                typer.echo(f"  • {cat}: {count} tickers")
+        typer.echo()
+
+    # Usage examples
+    typer.echo("💡 Usage Examples:")
+    typer.echo("  analyze --category tech_software")
+    typer.echo("  analyze --category ai_ml,cybersecurity --limit 30")
+    typer.echo("  analyze --market nordic --category tech_software")
+    typer.echo()
 
 
 @app.command()
