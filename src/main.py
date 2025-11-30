@@ -115,6 +115,7 @@ def _run_llm_analysis(
     typer_instance,
     debug_llm: bool = False,
     is_filtered: bool = False,
+    cache_manager=None,
 ) -> tuple[list[InvestmentSignal], None]:
     """Run analysis using LLM-powered orchestrator.
 
@@ -208,7 +209,9 @@ def _run_llm_analysis(
                                 signal_text = str(signal_data)
 
                             # Create InvestmentSignal from LLM result
-                            signal = _create_signal_from_llm_result(ticker, signal_text)
+                            signal = _create_signal_from_llm_result(
+                                ticker, signal_text, cache_manager
+                            )
                             if signal:
                                 signals.append(signal)
                         else:
@@ -238,12 +241,14 @@ def _run_llm_analysis(
 def _create_signal_from_llm_result(
     ticker: str,
     llm_result: dict | str,
+    cache_manager=None,
 ) -> InvestmentSignal | None:
     """Convert LLM analysis result to InvestmentSignal.
 
     Args:
         ticker: Stock ticker
         llm_result: LLM analysis result (dict or JSON string)
+        cache_manager: Optional cache manager for fetching current price
 
     Returns:
         InvestmentSignal or None if conversion fails
@@ -314,13 +319,27 @@ def _create_signal_from_llm_result(
         # Create signal with proper schema
         from datetime import datetime
 
+        # Fetch actual current price and currency from cache
+        current_price = llm_result.get("current_price", 0.0)
+        currency = llm_result.get("currency", "USD")
+        if cache_manager:
+            try:
+                latest_price = cache_manager.get_latest_price(ticker)
+                if latest_price:
+                    current_price = latest_price.close_price
+                    currency = latest_price.currency
+            except Exception as e:
+                logger.debug(
+                    f"Could not fetch price for {ticker} from cache: {e}. Using LLM defaults."
+                )
+
         signal = InvestmentSignal(
             ticker=ticker,
             name=llm_result.get("name", ticker),
             market=llm_result.get("market", "Global"),
             sector=llm_result.get("sector"),
-            current_price=llm_result.get("current_price", 0.0),
-            currency=llm_result.get("currency", "USD"),
+            current_price=current_price,
+            currency=currency,
             scores=ComponentScores(
                 **llm_result.get(
                     "scores",
@@ -657,6 +676,7 @@ def analyze(
                 typer,
                 debug_llm,
                 is_filtered=True,
+                cache_manager=cache_manager,
             )
             analysis_mode = "llm"
         else:

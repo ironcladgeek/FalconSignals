@@ -96,10 +96,11 @@ class YahooFinanceProvider(DataProvider):
                     logger.warning(f"Missing price data for {ticker} on {index}")
                     continue
 
+                market = self._infer_market(ticker)
                 price = StockPrice(
                     ticker=ticker.upper(),
                     name=self._get_ticker_name(ticker),
-                    market=self._infer_market(ticker),
+                    market=market,
                     instrument_type=InstrumentType.STOCK,
                     date=index.to_pydatetime() if hasattr(index, "to_pydatetime") else index,
                     open_price=open_price,
@@ -108,7 +109,7 @@ class YahooFinanceProvider(DataProvider):
                     close_price=close_price,
                     volume=int(volume),
                     adjusted_close=adjusted_close,
-                    currency="USD",
+                    currency=self._get_currency_for_market(market),
                 )
                 prices.append(price)
 
@@ -145,10 +146,11 @@ class YahooFinanceProvider(DataProvider):
                 raise ValueError(f"No data found for ticker: {ticker}")
 
             latest = hist.iloc[-1]
+            market = self._infer_market(ticker)
             price = StockPrice(
                 ticker=ticker.upper(),
                 name=self._get_ticker_name(ticker),
-                market=self._infer_market(ticker),
+                market=market,
                 instrument_type=InstrumentType.STOCK,
                 date=hist.index[-1].to_pydantic(),
                 open_price=float(latest["Open"]),
@@ -157,7 +159,7 @@ class YahooFinanceProvider(DataProvider):
                 close_price=float(latest["Close"]),
                 volume=int(latest["Volume"]),
                 adjusted_close=float(latest["Close"]),
-                currency="USD",
+                currency=self._get_currency_for_market(market),
             )
 
             logger.debug(f"Latest price for {ticker}: {price.close_price}")
@@ -210,6 +212,23 @@ class YahooFinanceProvider(DataProvider):
 
         # Default to US
         return Market.US
+
+    @staticmethod
+    def _get_currency_for_market(market: Market) -> str:
+        """Get currency code for market.
+
+        Args:
+            market: Market classification
+
+        Returns:
+            Currency code (USD, EUR, etc.)
+        """
+        if market == Market.US:
+            return "USD"
+        elif market == Market.NORDIC or market == Market.EU:
+            return "EUR"
+        else:
+            return "USD"  # Default fallback
 
 
 # Register the provider

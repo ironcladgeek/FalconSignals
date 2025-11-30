@@ -214,6 +214,17 @@ class AnalysisPipeline:
             fundamental_score = analysis_data.get("fundamental", {}).get("fundamental_score", 50)
             sentiment_score = analysis_data.get("sentiment", {}).get("sentiment_score", 50)
 
+            # Fetch actual current price and currency from cache
+            current_price = 0.0
+            currency = "USD"
+            try:
+                latest_price = self.cache_manager.get_latest_price(ticker)
+                if latest_price:
+                    current_price = latest_price.close_price
+                    currency = latest_price.currency
+            except Exception as e:
+                logger.warning(f"Could not fetch price for {ticker}: {e}. Using fallback.")
+
             # Assess risks
             signal_dict = {
                 "ticker": ticker,
@@ -241,8 +252,8 @@ class AnalysisPipeline:
                 name=analysis.get("ticker", "Unknown"),
                 market="unknown",
                 sector=None,
-                current_price=100.0,  # Placeholder
-                currency="EUR",
+                current_price=current_price,
+                currency=currency,
                 scores=analysis_data.get("synthesis", {}).get("component_scores")
                 or {
                     "technical": technical_score,
