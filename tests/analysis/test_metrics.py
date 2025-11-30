@@ -1,8 +1,11 @@
 """Tests for fundamental metrics analyzer using yfinance data."""
 
+import pytest
+
 from src.analysis.metrics import FundamentalMetricsAnalyzer
 
 
+@pytest.mark.unit
 class TestFundamentalMetricsAnalyzer:
     """Test FundamentalMetricsAnalyzer class with yfinance metrics."""
 
