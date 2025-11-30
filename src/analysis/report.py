@@ -88,8 +88,9 @@ class ReportGenerator:
         strong_signals = [s for s in signals if s.confidence >= 70]
         moderate_signals = [s for s in signals if 50 <= s.confidence < 70]
 
-        # Take top 10 strong signals
+        # Take top 10 strong signals and top 10 moderate signals
         top_signals = strong_signals[:10]
+        top_moderate_signals = moderate_signals[:10]
 
         # Generate watchlist changes
         watchlist_additions = [
@@ -106,6 +107,7 @@ class ReportGenerator:
             market_overview=market_overview or self._generate_market_overview(signals),
             market_indices={},  # Can be populated with actual index data
             strong_signals=top_signals,
+            moderate_signals=top_moderate_signals,
             portfolio_alerts=portfolio_alerts,
             key_news=key_news,
             watchlist_additions=watchlist_additions,
@@ -182,7 +184,7 @@ class ReportGenerator:
 
         # Stage 1 Anomaly Detection (LLM mode only)
         if report.analysis_mode == "llm" and report.tickers_with_anomalies:
-            md.append("\n### Stage 1: Market Scan Results\n")
+            md.append("\n### Market Scan Results\n")
             md.append(f"Anomalies detected in **{len(report.tickers_with_anomalies)}** out of ")
             md.append(f"**{len(report.initial_tickers)}** instruments:\n")
             if len(report.tickers_with_anomalies) <= 20:
@@ -192,7 +194,7 @@ class ReportGenerator:
                     f"\n{', '.join(report.tickers_with_anomalies[:15])} ... and {len(report.tickers_with_anomalies) - 15} more\n"
                 )
         elif report.analysis_mode == "llm" and not report.tickers_with_anomalies:
-            md.append("\n### Stage 1: Market Scan Results\n")
+            md.append("\n### Market Scan Results\n")
             if report.force_full_analysis_used:
                 md.append(
                     "No anomalies detected (full analysis performed due to --force-full-analysis)\n"
@@ -206,12 +208,23 @@ class ReportGenerator:
         md.append("")
 
         # Strong Signals
-        md.append(f"## Investment Opportunities ({report.strong_signals_count} signals)\n")
+        all_displayed_signals = len(report.strong_signals) + len(report.moderate_signals)
+        md.append(f"## Investment Opportunities ({all_displayed_signals} signals)\n")
+
+        # Strong signals section
         if report.strong_signals:
+            md.append("### Strong Buy Signals\n")
             for signal in report.strong_signals:
                 md.append(self._format_signal_markdown(signal))
-        else:
-            md.append("No strong signals identified.\n")
+
+        # Moderate signals section
+        if report.moderate_signals:
+            md.append("\n### Moderate Hold Signals\n")
+            for signal in report.moderate_signals:
+                md.append(self._format_signal_markdown(signal))
+
+        if not report.strong_signals and not report.moderate_signals:
+            md.append("No signals identified.\n")
 
         # Allocation Suggestion
         if report.allocation_suggestion:
