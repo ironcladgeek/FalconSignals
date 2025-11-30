@@ -151,6 +151,7 @@ class RiskAssessor:
             "cryptocurrency",
             "renewable_energy",
             "penny stocks",
+            "leveraged",
         ]
         cyclical_sectors = ["consumer_discretionary", "industrial", "materials"]
 
