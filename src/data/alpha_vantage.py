@@ -219,7 +219,13 @@ class AlphaVantageProvider(DataProvider):
                 )
                 response.raise_for_status()
 
-                return response.json()
+                data = response.json()
+
+                # Check for rate limit messages
+                if "Note" in data and "call frequency" in data["Note"].lower():
+                    raise RuntimeError("Alpha Vantage API rate limit exceeded")
+
+                return data
 
             except requests.exceptions.Timeout:
                 logger.warning(f"Request timeout on attempt {attempt + 1}")

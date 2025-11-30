@@ -162,6 +162,9 @@ class DailyReport(BaseModel):
     strong_signals: list[InvestmentSignal] = Field(
         description="High-confidence buy opportunities (top 10)"
     )
+    moderate_signals: list[InvestmentSignal] = Field(
+        default_factory=list, description="Moderate confidence signals (confidence 50-70)"
+    )
 
     # Portfolio alerts
     portfolio_alerts: list[dict[str, str]] = Field(

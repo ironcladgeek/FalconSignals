@@ -7,7 +7,7 @@ class CapitalConfig(BaseModel):
     """Capital settings for portfolio management."""
 
     starting_capital_eur: float = Field(gt=0, description="Initial capital in EUR")
-    monthly_deposit_eur: float = Field(ge=0, description="Monthly deposit amount in EUR")
+    monthly_deposit_eur: float = Field(default=0, ge=0, description="Monthly deposit amount in EUR")
 
 
 class RiskConfig(BaseModel):

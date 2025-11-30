@@ -1,8 +1,11 @@
 """Tests for fundamental analysis module using free tier data."""
 
+import pytest
+
 from src.analysis.fundamental import FundamentalAnalyzer
 
 
+@pytest.mark.unit
 class TestFundamentalAnalyzer:
     """Test FundamentalAnalyzer class with free tier data sources."""
 

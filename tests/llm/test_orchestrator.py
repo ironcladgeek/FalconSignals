@@ -34,6 +34,7 @@ def token_tracker(tmp_path, token_tracker_config):
     return TokenTracker(token_tracker_config, storage_dir=tmp_path)
 
 
+@pytest.mark.unit
 class TestTokenTracker:
     """Test TokenTracker functionality."""
 
@@ -80,6 +81,7 @@ class TestTokenTracker:
         assert token_tracker.get_daily_tokens() >= token_tracker.config.daily_limit * 0.8
 
 
+@pytest.mark.unit
 class TestLLMAnalysisOrchestrator:
     """Test LLM Analysis Orchestrator."""
 
@@ -121,6 +123,7 @@ class TestLLMAnalysisOrchestrator:
         assert len(tools) > 0
 
 
+@pytest.mark.unit
 class TestCrewAIConfiguration:
     """Test CrewAI configuration."""
 
@@ -144,6 +147,7 @@ class TestCrewAIConfiguration:
             LLMConfig(temperature=3.0)
 
 
+@pytest.mark.unit
 class TestTokenTrackerConfig:
     """Test token tracker configuration."""
 

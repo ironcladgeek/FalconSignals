@@ -43,6 +43,16 @@ line-length = 100
 # Ignore logging f-string interpolation warning (G004)
 ignore = ["G004"]
 
+[tool.pytest.ini_options]
+markers = [
+    "unit: Unit tests that test individual components in isolation",
+    "integration: Integration tests that test component interactions",
+]
+filterwarnings = [
+    "ignore::ImportWarning",
+    "ignore::DeprecationWarning:litellm.*",
+]
+
 # Poethepoet task definitions
 # Usage: uv run poe <task>
 [tool.poe.tasks]
