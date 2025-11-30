@@ -2,6 +2,17 @@
 
 AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes global markets to generate daily investment signals with confidence scores.
 
+## Overview
+
+NordInvest is designed to help investors make informed decisions by providing daily, data-driven investment analysis. The system combines fundamental analysis, technical indicators, and news sentiment to generate actionable investment signals with confidence scores.
+
+**Key Features:**
+- 🤖 Multi-agent AI system with 5 specialized analysis agents
+- 📊 Dual analysis modes: LLM-powered (AI) and Rule-based (technical indicators)
+- 💰 Cost-conscious design: Target €50-90/month operational cost
+- 🌍 Global market coverage: 1000+ US, Nordic, and EU instruments
+- ⚡ Fast execution: Complete analysis in <15 minutes
+- 📈 Confidence-scored recommendations with detailed reasoning
 
 ## Quick Start
 
@@ -10,7 +21,7 @@ AI-powered financial analysis and investment recommendation system using multi-a
 - Python 3.12+
 - UV package manager
 - API keys (free tiers supported):
-  - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (for LLM)
+  - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (for LLM mode)
   - `FINNHUB_API_KEY` (optional, for news/sentiment)
   - `ALPHA_VANTAGE_API_KEY` (optional, for backup data)
 
@@ -29,36 +40,6 @@ uv run python -m src.main config-init
 
 # Edit configuration (optional)
 # nano config/local.yaml
-```
-
-### Configuration
-
-Create `config/local.yaml` from template:
-
-```bash
-uv run python -m src.main config-init --output config/local.yaml
-```
-
-Key settings in `config/local.yaml`:
-
-```yaml
-capital:
-  starting_capital_eur: 2000
-  monthly_deposit_eur: 500
-
-risk:
-  tolerance: moderate              # conservative, moderate, aggressive
-  max_position_size_percent: 10
-  max_sector_concentration_percent: 20
-
-markets:
-  included: [nordic, eu]           # nordic, eu, us
-  included_instruments: [stocks, etfs]
-
-analysis:
-  weight_fundamental: 0.35
-  weight_technical: 0.35
-  weight_sentiment: 0.30
 ```
 
 ### Environment Variables
@@ -82,11 +63,10 @@ FINNHUB_API_KEY=your_key
 ALPHA_VANTAGE_API_KEY=your_key
 ```
 
-> **💡 Note on LLM Configuration:**
-> - **With LLM** (ANTHROPIC_API_KEY or OPENAI_API_KEY): AI-powered analysis with enhanced sentiment and qualitative insights
-> - **Without LLM**: Automatic fallback to rule-based analysis using technical indicators and quantitative methods
-> - Both modes generate valid trading signals - see [docs/LLM_CONFIGURATION.md](docs/LLM_CONFIGURATION.md) for details
-> - The system will display clear warnings when running in rule-based mode
+> **💡 Note on Analysis Modes:**
+> - **LLM Mode** (`--llm` flag): AI-powered analysis with enhanced sentiment and qualitative insights
+> - **Rule-Based Mode** (default): Technical indicators and quantitative methods
+> - Both modes generate valid trading signals - see [LLM Configuration](docs/LLM_CONFIGURATION.md) for details
 
 ## Usage
 
@@ -96,22 +76,14 @@ ALPHA_VANTAGE_API_KEY=your_key
 uv run python -m src.main validate-config
 ```
 
-Output:
-```
-✓ Configuration is valid
-  Risk tolerance: moderate
-  Capital: €2,000.00
-  Markets: nordic, eu
-  Instruments: stocks, etfs
-  Buy threshold: 70.0
-  Cost limit: €100.00/month
-```
-
 ### Run Analysis
 
 #### Rule-Based Analysis (Default)
 
 ```bash
+# Quick test
+uv run python -m src.main analyze --test
+
 # Analyze specific market
 uv run python -m src.main analyze --market us --limit 20
 
@@ -121,15 +93,19 @@ uv run python -m src.main analyze --market global
 # Analyze specific stocks
 uv run python -m src.main analyze --ticker AAPL,MSFT,GOOGL
 
-# Dry run (no trades/alerts)
-uv run python -m src.main analyze --ticker INTU --dry-run
+# Analyze by category
+uv run python -m src.main analyze --category us_tech_software
+uv run python -m src.main analyze --category us_ai_ml,us_cybersecurity --limit 30
 ```
 
-#### LLM-Powered Analysis (New in Phase 6) 🤖
+#### LLM-Powered Analysis 🤖
 
 Use intelligent CrewAI agents with Claude/GPT reasoning:
 
 ```bash
+# Quick test with LLM
+uv run python -m src.main analyze --test --llm
+
 # Single stock with LLM analysis
 uv run python -m src.main analyze --ticker INTU --llm
 
@@ -142,8 +118,8 @@ uv run python -m src.main analyze --ticker INTU --llm --config config/local.yaml
 # JSON output instead of Markdown
 uv run python -m src.main analyze --ticker INTU --llm --format json
 
-# Without saving report to disk
-uv run python -m src.main analyze --ticker INTU --llm --no-save-report
+# With LLM debug mode (saves inputs/outputs)
+uv run python -m src.main analyze --ticker INTU --llm --debug-llm
 ```
 
 **What LLM mode does:**
@@ -152,9 +128,14 @@ uv run python -m src.main analyze --ticker INTU --llm --no-save-report
 - Combines insights with proper weighting (35% fundamental, 35% technical, 30% sentiment)
 - Tracks token usage and costs in EUR
 - Falls back to rule-based analysis if LLM fails
-- Generates investment recommendations with detailed reasoning
 
 **Cost:** ~€0.065 per stock analyzed (adjustable by model choice)
+
+### List Available Categories
+
+```bash
+uv run python -m src.main list-categories
+```
 
 ### Generate Reports
 
@@ -168,9 +149,138 @@ uv run python -m src.main report --date 2024-01-15
 ```bash
 uv run python -m src.main --help
 uv run python -m src.main analyze --help
+```
 
-# See all LLM options
-uv run python -m src.main analyze --help | grep -A2 llm
+## Configuration
+
+Create `config/local.yaml` from template:
+
+```bash
+uv run python -m src.main config-init --output config/local.yaml
+```
+
+Key settings:
+
+```yaml
+capital:
+  starting_capital_eur: 2000
+  monthly_deposit_eur: 500
+
+risk:
+  tolerance: moderate              # conservative, moderate, aggressive
+  max_position_size_percent: 10
+  max_sector_concentration_percent: 20
+
+markets:
+  included: [nordic, eu, us]       # Available markets
+  included_instruments: [stocks, etfs]
+
+analysis:
+  weight_fundamental: 0.35
+  weight_technical: 0.35
+  weight_sentiment: 0.30
+
+llm:
+  provider: anthropic              # anthropic, openai, local
+  model: claude-sonnet-4-20250514
+  temperature: 0.7
+```
+
+## Architecture
+
+NordInvest uses a multi-agent CrewAI architecture:
+
+```
+Configuration Layer (YAML/CLI)
+    ↓
+Data Fetching (Multiple APIs + Caching)
+    ↓
+Analysis Mode Selection
+    ├─ LLM Mode: CrewAI Multi-Agent System
+    │   ├─ Market Scanner Agent (anomaly detection, screening)
+    │   ├─ Fundamental Analysis Agent (earnings, valuations, growth)
+    │   ├─ Technical Analysis Agent (indicators: SMA, RSI, MACD, ATR)
+    │   ├─ News & Sentiment Agent (news processing, sentiment scoring)
+    │   └─ Signal Synthesis Agent (weighted scoring + confidence)
+    │
+    └─ Rule-Based Mode: Direct Analysis Pipeline
+        ├─ Technical Indicators (SMA, RSI, MACD, ATR)
+        ├─ Fundamental Metrics (P/E, EV/EBITDA, margins)
+        └─ Signal Scoring (weighted combination)
+    ↓
+Report Generation (Markdown/JSON)
+    ↓
+Output (Files, Terminal)
+```
+
+For detailed architecture diagrams, see:
+- [System Architecture](docs/architecture.mermaid) - Complete system overview
+- [Analyze Command Workflow](docs/analyze_workflow.mermaid) - Detailed command flow
+
+## Project Structure
+
+```
+nordinvest/
+├── src/
+│   ├── main.py              # CLI entry point
+│   ├── config/              # Configuration system
+│   │   ├── schemas.py       # Pydantic validation
+│   │   ├── loader.py        # YAML loading
+│   │   └── llm.py           # LLM client initialization
+│   ├── data/                # Data layer
+│   │   ├── models.py        # Pydantic data models
+│   │   ├── providers.py     # Abstract provider
+│   │   ├── yahoo_finance.py # Yahoo Finance impl
+│   │   ├── alpha_vantage.py # Alpha Vantage impl
+│   │   ├── finnhub.py       # Finnhub impl
+│   │   ├── screening.py     # Instrument filtering
+│   │   ├── normalization.py # Data cleaning
+│   │   └── portfolio.py     # Portfolio state
+│   ├── cache/               # Caching layer
+│   │   └── manager.py       # Cache management
+│   ├── agents/              # Agent system
+│   │   ├── base.py          # BaseAgent and AgentConfig
+│   │   ├── crew.py          # AnalysisCrew orchestrator
+│   │   ├── scanner.py       # MarketScannerAgent
+│   │   ├── analysis.py      # Technical & Fundamental agents
+│   │   ├── sentiment.py     # Sentiment & Signal Synthesis agents
+│   │   ├── crewai_agents.py # CrewAI Agent factory
+│   │   └── hybrid.py        # Hybrid intelligence wrapper
+│   ├── tools/               # Agent tools
+│   │   ├── base.py          # BaseTool and ToolRegistry
+│   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
+│   │   ├── analysis.py      # Technical & Sentiment tools
+│   │   └── reporting.py     # ReportGeneratorTool
+│   ├── llm/                 # LLM integration
+│   │   ├── integration.py   # LLMAnalysisOrchestrator
+│   │   ├── token_tracker.py # Token usage & cost tracking
+│   │   ├── prompts.py       # Prompt templates
+│   │   └── tools.py         # CrewAI tool adapters
+│   ├── analysis/            # Analysis modules
+│   │   ├── technical.py     # Technical indicators
+│   │   ├── fundamental.py   # Fundamental analysis
+│   │   ├── signals.py       # Signal generation
+│   │   └── report.py        # Report generation
+│   ├── pipeline/            # Pipeline orchestration
+│   │   └── orchestrator.py  # AnalysisPipeline
+│   └── utils/               # Utilities
+│       ├── logging.py       # Logging setup
+│       └── llm_check.py     # LLM configuration check
+├── config/
+│   └── default.yaml         # Configuration template
+├── data/
+│   ├── cache/               # API response cache
+│   ├── features/            # Preprocessed data
+│   ├── reports/             # Generated reports
+│   └── tracking/            # Token usage tracking
+├── tests/                   # Test suite
+└── docs/
+    ├── architecture.mermaid     # System architecture
+    ├── analyze_workflow.mermaid # Analyze command workflow
+    ├── roadmap.md               # Implementation plan
+    ├── llm_integration.md       # LLM integration guide
+    ├── llm_cli_guide.md         # LLM CLI usage guide
+    └── LLM_CONFIGURATION.md     # LLM configuration guide
 ```
 
 ## Development
@@ -185,7 +295,7 @@ uv run poe lint
 uv run poe pre-commit
 ```
 
-### Testing (Phase 5)
+### Testing
 
 ```bash
 # Run all tests
@@ -198,165 +308,25 @@ pytest tests/unit/data/test_models.py
 pytest --cov=src
 ```
 
-### Project Structure
-
-```
-nordinvest/
-├── src/
-│   ├── main.py              # CLI entry point
-│   ├── config/              # Configuration system
-│   │   ├── schemas.py       # Pydantic validation
-│   │   └── loader.py        # YAML loading
-│   ├── data/                # Data layer
-│   │   ├── models.py        # Pydantic data models
-│   │   ├── providers.py     # Abstract provider
-│   │   ├── yahoo_finance.py # Yahoo Finance impl
-│   │   ├── alpha_vantage.py # Alpha Vantage impl
-│   │   ├── finnhub.py       # Finnhub impl
-│   │   ├── screening.py     # Instrument filtering
-│   │   ├── normalization.py # Data cleaning
-│   │   └── portfolio.py     # Portfolio state
-│   ├── cache/               # Caching layer
-│   │   └── manager.py       # Cache management
-│   ├── agents/              # CrewAI agents
-│   │   ├── base.py          # BaseAgent and AgentConfig
-│   │   ├── crew.py          # AnalysisCrew orchestrator
-│   │   ├── scanner.py       # MarketScannerAgent
-│   │   ├── analysis.py      # Technical & Fundamental agents
-│   │   ├── sentiment.py     # Sentiment & Signal Synthesis agents
-│   │   ├── crewai_agents.py # CrewAI Agent factory (Phase 6)
-│   │   └── hybrid.py        # Hybrid intelligence wrapper (Phase 6)
-│   ├── tools/               # Agent tools
-│   │   ├── base.py          # BaseTool and ToolRegistry
-│   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
-│   │   ├── analysis.py      # Technical & Sentiment tools
-│   │   └── reporting.py     # ReportGeneratorTool
-│   ├── llm/                 # LLM integration (Phase 6)
-│   │   ├── integration.py   # LLMAnalysisOrchestrator
-│   │   ├── token_tracker.py # Token usage & cost tracking
-│   │   ├── prompts.py       # Prompt templates for agents
-│   │   └── tools.py         # CrewAI tool adapters
-│   ├── config/              # Configuration
-│   │   ├── llm.py           # LLM client initialization (Phase 6)
-│   │   ├── schemas.py       # Pydantic validation
-│   │   └── loader.py        # YAML loading
-│   ├── analysis/            # Analysis modules
-│   ├── reports/             # Report generation (Phase 4)
-│   └── utils/
-│       └── logging.py       # Logging setup
-├── config/
-│   └── default.yaml         # Configuration template
-├── data/
-│   ├── cache/               # API response cache
-│   ├── features/            # Preprocessed data
-│   └── reports/             # Generated reports
-├── tests/                   # Test suite
-└── docs/
-    ├── architecture.mermaid # System design
-    └── roadmap.md           # Implementation plan
-```
-
-## Features
-
-### Phase 1: Foundation ✅
-- CLI with Typer
-- YAML configuration system
-- Pydantic validation
-- Structured logging with Loguru
-
-### Phase 2: Data Layer ✅
-- **3 Data Providers:**
-  - Yahoo Finance (unlimited free)
-  - Alpha Vantage (25/day free, with retries)
-  - Finnhub (60/min free, news/sentiment)
-- **Caching System:**
-  - Dual-layer (memory + disk)
-  - Configurable TTL
-  - Automatic expiration cleanup
-- **Data Processing:**
-  - Pydantic data models
-  - Instrument screening
-  - Data normalization & validation
-  - Multi-period return calculations
-- **Portfolio Management:**
-  - Position tracking
-  - P&L calculations
-  - Watchlist management
-
-### Phase 3: CrewAI Agents ✅
-- **Market Scanner Agent**: Identifies instruments with price/volume anomalies
-- **Fundamental Analysis Agent**: Evaluates financial health and valuation
-- **Technical Analysis Agent**: Analyzes technical indicators (SMA, RSI, MACD, ATR)
-- **Sentiment Agent**: Analyzes news sentiment (positive/negative/neutral)
-- **Signal Synthesis Agent**: Combines signals with weighted scoring (35% technical, 35% fundamental, 30% sentiment)
-- **Analysis Crew**: Orchestrates parallel analysis with sequential synthesis
-
-### Phase 4: Signal Synthesis & Reporting ✅
-- **InvestmentSignal Model**: Comprehensive signal with component scores, confidence, recommendations
-- **AllocationEngine**: Position sizing using modified Kelly criterion with constraint enforcement
-- **RiskAssessor**: Multi-factor risk evaluation (volatility, liquidity, sector, concentration)
-- **ReportGenerator**: Daily report generation in Markdown and JSON formats
-- **PortfolioAllocation**: Allocation suggestions with diversification tracking (Herfindahl index)
-- **RiskAssessment**: Risk levels, flags, and warnings for each position
-
-### Phase 5: Integration, Testing & Polish ✅
-- **AnalysisPipeline**: End-to-end orchestration from analysis to reports
-- **Error Handling**: Custom exceptions hierarchy with 8 types and severity levels
-- **Resilience Patterns**: Retry with backoff, fallback, circuit breaker, rate limiter, graceful degradation
-- **Scheduling**: CronScheduler for daily automated runs, RunLog for monitoring
-- **CLI Integration**: Full pipeline execution in 'run' command with report generation
-- **Integration Tests**: Comprehensive test suite for pipeline, errors, scheduling, resilience
-
-### Phase 6: CrewAI & LLM Integration ✅
-- **LLM Configuration**: Support for Anthropic Claude, OpenAI GPT, and local models (Ollama)
-- **5 Intelligent CrewAI Agents**: Market Scanner, Technical Analyst, Fundamental Analyst, Sentiment Analyst, Signal Synthesizer
-- **Hybrid Intelligence**: Automatic fallback to rule-based analysis on LLM failure
-- **Token Tracking**: Real-time monitoring of token usage and costs (EUR)
-- **Prompt Engineering**: Structured prompts with JSON-formatted responses for consistency
-- **CLI Integration**: `--llm` flag for easy switching between rule-based and AI-powered analysis
-- **Tool Adapters**: Seamless integration of existing tools with CrewAI agents
-- **High-Level Orchestrator**: LLMAnalysisOrchestrator for easy integration
-- **Comprehensive Testing**: 12 passing tests covering all LLM components
-
-**Quick start:**
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-uv run python -m src.main analyze --ticker INTU --llm
-```
-
-**See:** [LLM CLI Guide](docs/llm_cli_guide.md) | [LLM Integration Guide](docs/llm_integration.md)
-
-## Cost Target
-
-Monthly operational cost: **€50-90**
-
-- LLM API: €50-70
-- Financial Data APIs: €0-20 (free tiers)
-- Compute: €0 (local execution)
-
 ## Troubleshooting
 
 ### "API key not found"
-Ensure environment variables are set:
 ```bash
 echo $ANTHROPIC_API_KEY
 echo $FINNHUB_API_KEY
 ```
 
 ### "Config file not found"
-Create local configuration:
 ```bash
 uv run python -m src.main config-init
 ```
 
 ### "Cache permission denied"
-Ensure `data/` directory is writable:
 ```bash
 mkdir -p data/cache data/features data/reports
 ```
 
 ### "Pre-commit hooks failing"
-Run linting to fix:
 ```bash
 uv run poe lint
 ```
@@ -365,19 +335,19 @@ uv run poe lint
 
 ### Core Documentation
 - **[Architecture](docs/architecture.mermaid)** - System design and component overview
-- **[Roadmap](docs/roadmap.md)** - Implementation plan and development phases (5 phases complete, 6 in progress)
-- **[Phase 6 Summary](PHASE_6_SUMMARY.md)** - CrewAI & LLM integration implementation details
+- **[Analyze Workflow](docs/analyze_workflow.mermaid)** - Detailed analyze command flow
+- **[Roadmap](docs/roadmap.md)** - Implementation plan and development phases
 - **[Developer Guide](CLAUDE.md)** - Development setup and contribution guidelines
 
-### LLM & AI Integration (Phase 6)
-- **[LLM CLI Guide](docs/llm_cli_guide.md)** - How to use `--llm` flag with examples and troubleshooting
-- **[LLM Integration Guide](docs/llm_integration.md)** - Component architecture, API reference, and advanced usage
-- **[LLM Configuration](docs/LLM_CONFIGURATION.md)** - AI vs Rule-based modes, setup instructions
+### LLM & AI Integration
+- **[LLM CLI Guide](docs/llm_cli_guide.md)** - How to use `--llm` flag
+- **[LLM Integration Guide](docs/llm_integration.md)** - Component architecture and API reference
+- **[LLM Configuration](docs/LLM_CONFIGURATION.md)** - AI vs Rule-based modes
 
 ### Configuration & Setup
 - **[Market Configuration Guide](docs/MARKET_CONFIG_GUIDE.md)** - Market selection and filtering
-- **[Quick Start: Full Market Analysis](docs/QUICK_START_FULL_MARKET.md)** - Running analysis on large market sets
-- **[Full Market Analysis Setup](docs/FULL_MARKET_ANALYSIS_SETUP.md)** - Complete setup for comprehensive market coverage
+- **[Quick Start: Full Market](docs/QUICK_START_FULL_MARKET.md)** - Large market analysis
+- **[Full Market Setup](docs/FULL_MARKET_ANALYSIS_SETUP.md)** - Comprehensive coverage
 
 ## Technology Stack
 
@@ -392,23 +362,3 @@ uv run poe lint
 | Logging | Loguru |
 | Package Manager | UV |
 | Code Quality | Black, Ruff, Pre-commit |
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feat/feature-name`
-3. Make changes and test: `uv run poe lint && pytest`
-4. Commit with semantic messages: `git commit -m "feat: description"`
-5. Push and create pull request
-
-## License
-
-[Add your license here]
-
-## Support
-
-For questions or issues:
-- Check [Developer Guide](CLAUDE.md) for development guidance
-- Review [Roadmap](docs/roadmap.md) for architecture details
-- See [LLM Configuration](docs/LLM_CONFIGURATION.md) for setup help
-- Open an issue on GitHub

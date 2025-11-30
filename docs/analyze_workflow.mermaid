@@ -1,0 +1,198 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1a365d', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2d4a6f', 'lineColor': '#4a5568', 'secondaryColor': '#2d3748', 'tertiaryColor': '#4a5568', 'background': '#0d1117', 'mainBkg': '#1a365d', 'nodeBorder': '#4a5568', 'clusterBkg': '#161b22', 'clusterBorder': '#30363d', 'titleColor': '#e2e8f0', 'edgeLabelBackground': '#21262d'}}}%%
+
+flowchart TB
+    %% ============================================
+    %% ANALYZE COMMAND WORKFLOW
+    %% Shows both Rule-Based and LLM analysis modes
+    %% ============================================
+
+    subgraph CLI["📟 CLI Entry Point"]
+        direction TB
+        CMD["uv run python -m src.main analyze"]
+        ARGS["Arguments Parser<br/>--ticker, --market, --category<br/>--llm, --limit, --config"]
+    end
+
+    subgraph INIT["⚙️ Initialization"]
+        direction TB
+        CONFIG["Load Configuration<br/>(config/local.yaml)"]
+        VALIDATE["Validate Config<br/>(Pydantic schemas)"]
+        LOGGING["Setup Logging<br/>(Loguru)"]
+        CACHE_INIT["Initialize Cache Manager"]
+    end
+
+    subgraph TICKER_RESOLUTION["🎯 Ticker Resolution"]
+        direction TB
+        MARKET_SELECT["Market Selection<br/>(us, nordic, eu, global)"]
+        CATEGORY_SELECT["Category Selection<br/>(us_tech_software, us_ai_ml, etc.)"]
+        TICKER_DIRECT["Direct Tickers<br/>(--ticker AAPL,MSFT)"]
+        TICKER_LIST["Resolved Ticker List"]
+    end
+
+    subgraph MODE_DECISION["🔀 Analysis Mode Decision"]
+        direction TB
+        LLM_FLAG{"--llm flag?"}
+        CHECK_API{"API Key<br/>Available?"}
+    end
+
+    %% ============================================
+    %% RULE-BASED MODE (Left Branch)
+    %% ============================================
+    subgraph RULE_BASED["📊 Rule-Based Mode"]
+        direction TB
+
+        subgraph RULE_DATA["Data Fetching"]
+            RB_PRICE["Fetch Price Data<br/>(Yahoo Finance)"]
+            RB_FUND["Fetch Fundamentals<br/>(Yahoo Finance)"]
+            RB_NEWS["Fetch News<br/>(Finnhub)"]
+        end
+
+        subgraph RULE_ANALYSIS["Analysis Pipeline"]
+            RB_TECH["Technical Analysis<br/>• SMA (20, 50, 200)<br/>• RSI, MACD<br/>• ATR, Volume"]
+            RB_FUNDAMENTAL["Fundamental Analysis<br/>• P/E, EV/EBITDA<br/>• Margins, Growth<br/>• Debt Ratios"]
+            RB_SENTIMENT["Sentiment Scoring<br/>• News Classification<br/>• Positive/Negative/Neutral"]
+        end
+
+        subgraph RULE_SCORING["Signal Scoring"]
+            RB_COMBINE["Weighted Combination<br/>35% Technical<br/>35% Fundamental<br/>30% Sentiment"]
+            RB_SIGNAL["Generate Signals<br/>Buy/Hold/Avoid"]
+        end
+    end
+
+    %% ============================================
+    %% LLM MODE (Right Branch)
+    %% ============================================
+    subgraph LLM_MODE["🤖 LLM Mode (CrewAI)"]
+        direction TB
+
+        subgraph LLM_STAGE1["Stage 1: Market Scan"]
+            LLM_SCANNER["🔍 Market Scanner Agent<br/>• Detect price anomalies<br/>• Volume spikes<br/>• New highs/lows"]
+            LLM_FILTER["Filter Tickers<br/>(Only anomalies proceed)"]
+        end
+
+        subgraph LLM_STAGE2["Stage 2: Deep Analysis"]
+            direction LR
+            LLM_TECH["📉 Technical Agent<br/>• Chart patterns<br/>• Momentum analysis<br/>• Trend strength"]
+            LLM_FUND["📈 Fundamental Agent<br/>• Earnings quality<br/>• Cash flow analysis<br/>• Valuation metrics"]
+            LLM_SENT["📰 Sentiment Agent<br/>• News interpretation<br/>• Market catalysts<br/>• Analyst consensus"]
+        end
+
+        subgraph LLM_STAGE3["Stage 3: Synthesis"]
+            LLM_SYNTH["⚡ Signal Synthesizer<br/>• Merge all analyses<br/>• Investment thesis<br/>• Risk assessment"]
+            LLM_SIGNAL["Generate Signals<br/>with Reasoning"]
+        end
+
+        subgraph LLM_TRACKING["Token Tracking"]
+            TOKEN_TRACK["Track Usage<br/>• Input tokens<br/>• Output tokens<br/>• Cost (EUR)"]
+        end
+    end
+
+    subgraph FALLBACK["🔄 Fallback Handler"]
+        direction TB
+        FALLBACK_CHECK{"LLM<br/>Failed?"}
+        FALLBACK_RULE["Use Rule-Based<br/>Analysis"]
+    end
+
+    %% ============================================
+    %% COMMON OUTPUT PATH
+    %% ============================================
+    subgraph REPORT_GEN["📋 Report Generation"]
+        direction TB
+        SIGNALS_COLLECT["Collect All Signals"]
+        ALLOCATION["Portfolio Allocation<br/>(Kelly Criterion)"]
+        RISK_ASSESS["Risk Assessment<br/>• Volatility flags<br/>• Concentration risk"]
+        FORMAT_REPORT["Format Report<br/>(Markdown/JSON)"]
+    end
+
+    subgraph OUTPUT["📤 Output"]
+        direction TB
+        SAVE_REPORT["Save to<br/>data/reports/"]
+        DISPLAY["Display Summary<br/>in Terminal"]
+        COST_SUMMARY["Show Cost Summary<br/>(LLM mode only)"]
+    end
+
+    %% ============================================
+    %% CONNECTIONS
+    %% ============================================
+
+    %% CLI to Init
+    CMD --> ARGS
+    ARGS --> CONFIG
+    CONFIG --> VALIDATE
+    VALIDATE --> LOGGING
+    LOGGING --> CACHE_INIT
+
+    %% Init to Ticker Resolution
+    CACHE_INIT --> MARKET_SELECT
+    CACHE_INIT --> CATEGORY_SELECT
+    CACHE_INIT --> TICKER_DIRECT
+    MARKET_SELECT --> TICKER_LIST
+    CATEGORY_SELECT --> TICKER_LIST
+    TICKER_DIRECT --> TICKER_LIST
+
+    %% Mode Decision
+    TICKER_LIST --> LLM_FLAG
+    LLM_FLAG -->|"No"| RULE_BASED
+    LLM_FLAG -->|"Yes"| CHECK_API
+    CHECK_API -->|"Yes"| LLM_MODE
+    CHECK_API -->|"No"| RULE_BASED
+
+    %% Rule-Based Flow
+    RB_PRICE --> RB_TECH
+    RB_FUND --> RB_FUNDAMENTAL
+    RB_NEWS --> RB_SENTIMENT
+    RB_TECH --> RB_COMBINE
+    RB_FUNDAMENTAL --> RB_COMBINE
+    RB_SENTIMENT --> RB_COMBINE
+    RB_COMBINE --> RB_SIGNAL
+    RB_SIGNAL --> SIGNALS_COLLECT
+
+    %% LLM Flow
+    LLM_SCANNER --> LLM_FILTER
+    LLM_FILTER --> LLM_TECH
+    LLM_FILTER --> LLM_FUND
+    LLM_FILTER --> LLM_SENT
+    LLM_TECH --> LLM_SYNTH
+    LLM_FUND --> LLM_SYNTH
+    LLM_SENT --> LLM_SYNTH
+    LLM_SYNTH --> LLM_SIGNAL
+    LLM_SIGNAL --> TOKEN_TRACK
+    TOKEN_TRACK --> FALLBACK_CHECK
+
+    %% Fallback
+    FALLBACK_CHECK -->|"No"| SIGNALS_COLLECT
+    FALLBACK_CHECK -->|"Yes"| FALLBACK_RULE
+    FALLBACK_RULE --> RULE_BASED
+
+    %% Report Generation
+    SIGNALS_COLLECT --> ALLOCATION
+    ALLOCATION --> RISK_ASSESS
+    RISK_ASSESS --> FORMAT_REPORT
+
+    %% Output
+    FORMAT_REPORT --> SAVE_REPORT
+    FORMAT_REPORT --> DISPLAY
+    TOKEN_TRACK -.-> COST_SUMMARY
+    SAVE_REPORT --> COST_SUMMARY
+
+    %% ============================================
+    %% STYLING
+    %% ============================================
+    classDef cliStyle fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    classDef initStyle fill:#234e52,stroke:#2c7a7b,color:#e2e8f0
+    classDef tickerStyle fill:#1a365d,stroke:#2d4a6f,color:#e2e8f0
+    classDef decisionStyle fill:#744210,stroke:#b7791f,color:#e2e8f0
+    classDef ruleStyle fill:#22543d,stroke:#38a169,color:#e2e8f0
+    classDef llmStyle fill:#322659,stroke:#805ad5,color:#e2e8f0
+    classDef fallbackStyle fill:#742a2a,stroke:#c53030,color:#e2e8f0
+    classDef reportStyle fill:#1a4731,stroke:#276749,color:#e2e8f0
+    classDef outputStyle fill:#702459,stroke:#97266d,color:#e2e8f0
+
+    class CLI cliStyle
+    class INIT initStyle
+    class TICKER_RESOLUTION tickerStyle
+    class MODE_DECISION decisionStyle
+    class RULE_BASED ruleStyle
+    class LLM_MODE llmStyle
+    class FALLBACK fallbackStyle
+    class REPORT_GEN reportStyle
+    class OUTPUT outputStyle
