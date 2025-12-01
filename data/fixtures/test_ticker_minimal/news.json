@@ -1,0 +1,57 @@
+[
+  {
+    "ticker": "AAPL",
+    "title": "Apple Q4 2024 Earnings Beat Expectations with Strong Services Growth",
+    "summary": "Apple reports record Q4 earnings with Services segment driving growth. iPhone sales remain stable while Services reach new all-time highs.",
+    "source": "Reuters",
+    "url": "https://www.reuters.com/apple-q4-2024-earnings",
+    "published_date": "2024-10-25T14:30:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.78,
+    "importance": 95
+  },
+  {
+    "ticker": "AAPL",
+    "title": "Goldman Sachs Raises Apple Price Target to $250 on Services Momentum",
+    "summary": "Analyst upgrade reflects confidence in Services segment expansion and margin improvements. Maintains positive outlook on AI opportunities.",
+    "source": "MarketWatch",
+    "url": "https://www.marketwatch.com/apple-price-target-increase",
+    "published_date": "2024-10-24T10:15:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.82,
+    "importance": 88
+  },
+  {
+    "ticker": "AAPL",
+    "title": "Apple Faces New Regulatory Scrutiny in EU Over App Store Practices",
+    "summary": "European Commission opens new investigation into Apple's App Store policies. Potential impact on revenue model still being assessed.",
+    "source": "CNBC",
+    "url": "https://www.cnbc.com/apple-eu-investigation",
+    "published_date": "2024-10-23T09:45:00",
+    "sentiment": "negative",
+    "sentiment_score": -0.55,
+    "importance": 72
+  },
+  {
+    "ticker": "AAPL",
+    "title": "iPhone 16 Demand Accelerates in Early Sales Figures",
+    "summary": "Preliminary data suggests strong iPhone 16 demand, particularly for Pro models. Supply chain reports indicate healthy order flow.",
+    "source": "Bloomberg",
+    "url": "https://www.bloomberg.com/iphone-16-demand",
+    "published_date": "2024-10-22T16:20:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.65,
+    "importance": 80
+  },
+  {
+    "ticker": "AAPL",
+    "title": "Apple Intelligence Features Roll Out to iPhone Users",
+    "summary": "New AI-powered features begin rolling out globally. Users report improved productivity features and better device integration.",
+    "source": "TechCrunch",
+    "url": "https://www.techcrunch.com/apple-intelligence-rollout",
+    "published_date": "2024-10-21T13:00:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.72,
+    "importance": 78
+  }
+]

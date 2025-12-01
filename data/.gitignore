@@ -1,4 +1,6 @@
 *.json
+!fixtures/*.json
+!fixtures/**/*.json
 *.jsonl
 *.md
 *.html
