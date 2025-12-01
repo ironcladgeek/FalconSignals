@@ -3,6 +3,18 @@ name: Code Coverage
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to analyze (default: main)"
+        required: false
+        default: "main"
+        type: string
+      verbose:
+        description: "Enable verbose Codecov output"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   coverage:
@@ -11,6 +23,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,6 +57,6 @@ jobs:
         with:
           files: ./coverage.xml
           flags: unittests
-          name: codecov-umbrella
+          name: codecov-coverage
           fail_ci_if_error: false
-          verbose: true
+          verbose: ${{ github.event.inputs.verbose != 'false' }}
