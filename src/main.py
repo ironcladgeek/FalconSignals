@@ -593,8 +593,10 @@ def analyze(
 
         # Setup test mode if enabled
         if test:
+            fixture_path = data_dir / "fixtures" / fixture
             config_obj.test_mode.enabled = True
             config_obj.test_mode.fixture_name = fixture
+            config_obj.test_mode.fixture_path = str(fixture_path)
             config_obj.test_mode.use_mock_llm = use_llm
             logger.debug(f"Test mode enabled with fixture: {fixture}")
 

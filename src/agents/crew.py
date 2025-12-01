@@ -22,7 +22,14 @@ class AnalysisCrew:
             test_mode_config: Optional test mode configuration for fixtures/mock LLM
         """
         self.test_mode_config = test_mode_config
-        self.market_scanner = MarketScannerAgent()
+
+        # Determine data provider based on test mode
+        provider_name = "fixture" if test_mode_config and test_mode_config.enabled else None
+        fixture_path = getattr(test_mode_config, "fixture_path", None) if test_mode_config else None
+
+        self.market_scanner = MarketScannerAgent(
+            provider_name=provider_name, fixture_path=fixture_path
+        )
         self.technical_agent = TechnicalAnalysisAgent()
         self.fundamental_agent = FundamentalAnalysisAgent()
         self.sentiment_agent = SentimentAgent()

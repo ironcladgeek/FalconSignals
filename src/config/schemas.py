@@ -270,6 +270,7 @@ class TestModeConfig(BaseModel):
     fixture_name: str = Field(
         default="test_ticker_minimal", description="Name of fixture to use (in data/fixtures/)"
     )
+    fixture_path: str | None = Field(default=None, description="Full path to fixture directory")
     use_mock_llm: bool = Field(
         default=True, description="Use MockLLMClient instead of real LLM (zero cost)"
     )
