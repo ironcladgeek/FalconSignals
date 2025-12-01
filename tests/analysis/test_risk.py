@@ -172,11 +172,15 @@ class TestRiskAssessor:
 
             assessment = risk_assessor.assess_signal(signal)
             # Risk level depends on multiple factors, just check volatility is correct
-            assert assessment.volatility == (
-                "low"
-                if volatility < 1.0
-                else "normal" if volatility < 3.0 else "high" if volatility < 5.0 else "very_high"
-            )
+            if volatility < 1.0:
+                expected_volatility = "low"
+            elif volatility < 3.0:
+                expected_volatility = "normal"
+            elif volatility < 5.0:
+                expected_volatility = "high"
+            else:
+                expected_volatility = "very_high"
+            assert assessment.volatility == expected_volatility
 
     def test_liquidity_assessment_levels(self, risk_assessor):
         """Test liquidity assessment at different levels."""
