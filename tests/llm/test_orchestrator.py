@@ -7,6 +7,12 @@ from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
 
 
+@pytest.fixture(autouse=True)
+def mock_anthropic_api_key(monkeypatch):
+    """Mock ANTHROPIC_API_KEY for testing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy-key-for-testing-only")
+
+
 @pytest.fixture
 def llm_config():
     """Create test LLM config."""
