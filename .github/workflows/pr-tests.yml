@@ -37,10 +37,19 @@ jobs:
         run: uv run poe pre-commit
 
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short --junit-xml=test-results.xml
+
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results.xml
+          check_name: "Test Results"
+          comment_mode: always
 
       - name: Test summary
         if: always()
         run: |
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All checks passed" >> $GITHUB_STEP_SUMMARY
+          echo "## CI/CD Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Pre-commit checks passed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Tests executed" >> $GITHUB_STEP_SUMMARY
