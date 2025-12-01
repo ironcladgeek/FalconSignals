@@ -1,0 +1,49 @@
+graph TD
+    PR["Pull Request to Main Branch"]
+
+    PR -->|triggers| PR_Tests["PR Tests Workflow<br/>(pr-tests.yml)"]
+    PR -->|triggers| Coverage["Code Coverage Workflow<br/>(coverage.yml)"]
+
+    subgraph "PR Tests Workflow"
+        Checkout["Checkout Code"]
+        Python["Setup Python 3.12"]
+        UV["Install UV"]
+        CacheSync["Sync Dependencies<br/>(with caching)"]
+        PreCommit["Run Pre-commit Checks<br/>• Trailing whitespace<br/>• EOF newlines<br/>• YAML/TOML validation<br/>• Ruff linting<br/>• Black formatting<br/>• Conventional commits"]
+        Tests["Run pytest<br/>• 219 unit tests<br/>• ~4s execution<br/>• JUnit XML output"]
+        Publish["Publish Test Results<br/>to PR"]
+
+        Checkout --> Python
+        Python --> UV
+        UV --> CacheSync
+        CacheSync --> PreCommit
+        PreCommit --> Tests
+        Tests --> Publish
+    end
+
+    subgraph "Coverage Workflow"
+        CovCheckout["Checkout Code"]
+        CovPython["Setup Python 3.12"]
+        CovUV["Install UV"]
+        CovSync["Sync Dependencies"]
+        CovTests["Run pytest with Coverage<br/>• Measure coverage %<br/>• Generate XML report<br/>• Show missing lines"]
+        CovUpload["Upload to Codecov<br/>• Historical tracking<br/>• Trend analysis"]
+
+        CovCheckout --> CovPython
+        CovPython --> CovUV
+        CovUV --> CovSync
+        CovSync --> CovTests
+        CovTests --> CovUpload
+    end
+
+    Publish -->|must pass| Decision{"Branch Protection<br/>Check"}
+    CovUpload -->|optional gate| Decision
+
+    Decision -->|all checks pass| Merge["✅ Can Merge to Main"]
+    Decision -->|checks fail| Failed["❌ PR Blocked<br/>Fix Issues & Recommit"]
+
+    style PR fill:#e1f5ff
+    style Merge fill:#c8e6c9
+    style Failed fill:#ffcdd2
+    style Publish fill:#fff9c4
+    style CovUpload fill:#fff9c4
