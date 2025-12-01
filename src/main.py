@@ -431,7 +431,12 @@ def analyze(
     test: bool = typer.Option(
         False,
         "--test",
-        help="Run minimal test case with a single ticker (AAPL) to verify system functionality",
+        help="Run true test mode with pre-cached fixture data (zero API/LLM cost, fast, reproducible)",
+    ),
+    fixture: str = typer.Option(
+        "test_ticker_minimal",
+        "--fixture",
+        help="Name of fixture to use in test mode (in data/fixtures/)",
     ),
     force_full_analysis: bool = typer.Option(
         False,
@@ -478,12 +483,15 @@ def analyze(
     run_log = None
     signals_count = 0
 
-    # Handle test mode
+    # Handle test mode (true test mode with fixtures)
     if test:
-        ticker = "AAPL"  # Use a single, well-known ticker for testing
-        typer.echo("🧪 Running minimal test case...")
-        typer.echo(f"  Test ticker: {ticker}")
-        typer.echo(f"  Mode: {'LLM-powered' if use_llm else 'Rule-based'}")
+        typer.echo("🧪 Running TRUE TEST MODE (offline, zero cost, reproducible)...")
+        typer.echo(f"  Fixture: {fixture}")
+        typer.echo("  Data source: Local fixture files (no API calls)")
+        if use_llm:
+            typer.echo("  LLM: MockLLMClient (zero cost)")
+        else:
+            typer.echo("  Mode: Rule-based analysis")
         # Don't save report in test mode unless explicitly requested
         if save_report:
             save_report = False
@@ -494,8 +502,8 @@ def analyze(
         typer.echo(
             "❌ Error: Either --market, --category, --ticker, or --test must be provided\n"
             "Examples:\n"
-            "  analyze --test              # Quick test\n"
-            "  analyze --test --llm        # Quick test with LLM\n"
+            "  analyze --test              # True test mode (offline, zero cost)\n"
+            "  analyze --test --llm        # True test with mock LLM\n"
             "  analyze --market global\n"
             "  analyze --market us\n"
             "  analyze --category us_tech_software\n"
@@ -510,8 +518,11 @@ def analyze(
         typer.echo("❌ Error: Cannot specify --ticker with --market or --category", err=True)
         raise typer.Exit(code=1)
 
-    if test and (market or category or (ticker and not ticker == "AAPL")):
-        typer.echo("❌ Error: Cannot use --test with --market, --category, or --ticker", err=True)
+    if test and (market or category or ticker):
+        typer.echo(
+            "❌ Error: Cannot use --test with --market, --category, or --ticker",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     try:
@@ -552,6 +563,15 @@ def analyze(
         cache_manager = CacheManager(str(data_dir / "cache"))
         portfolio_manager = PortfolioState(data_dir / "portfolio_state.json")
 
+        # Setup test mode if enabled
+        if test:
+            fixture_path = data_dir / "fixtures" / fixture
+            config_obj.test_mode.enabled = True
+            config_obj.test_mode.fixture_name = fixture
+            config_obj.test_mode.fixture_path = str(fixture_path)
+            config_obj.test_mode.use_mock_llm = use_llm
+            logger.debug(f"Test mode enabled with fixture: {fixture}")
+
         pipeline_config = {
             "capital_starting": config_obj.capital.starting_capital_eur,
             "capital_monthly_deposit": config_obj.capital.monthly_deposit_eur,
@@ -561,11 +581,30 @@ def analyze(
         }
 
         pipeline = AnalysisPipeline(
-            pipeline_config, cache_manager, portfolio_manager, llm_provider=config_obj.llm.provider
+            pipeline_config,
+            cache_manager,
+            portfolio_manager,
+            llm_provider=config_obj.llm.provider,
+            test_mode_config=config_obj.test_mode if test else None,
         )
 
         # Determine which tickers to analyze
-        if ticker:
+        if test:
+            # In test mode, load ticker from fixture metadata
+            from src.data.fixture import FixtureDataProvider
+
+            fixture_path = data_dir / "fixtures" / fixture
+            if not fixture_path.exists():
+                typer.echo(f"❌ Error: Fixture not found: {fixture_path}", err=True)
+                raise typer.Exit(code=1)
+
+            fixture_provider = FixtureDataProvider(fixture_path)
+            metadata = fixture_provider.get_fixture_metadata()
+            test_ticker = metadata.get("ticker", "AAPL")
+            ticker_list = [test_ticker]
+            typer.echo("\n📊 Running analysis on test fixture...")
+            typer.echo(f"  Ticker: {test_ticker}")
+        elif ticker:
             # Parse comma-separated tickers
             ticker_list = [t.strip().upper() for t in ticker.split(",")]
             typer.echo(f"\n📊 Running analysis on {len(ticker_list)} specified instruments...")

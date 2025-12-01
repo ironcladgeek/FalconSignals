@@ -1,0 +1,57 @@
+[
+  {
+    "ticker": "ZS",
+    "title": "Zscaler Slides Despite Strong Quarter",
+    "summary": "Guidance improves but market shrugs and takes profits instead",
+    "source": "Yahoo",
+    "url": "https://example.com/zscaler-strong-quarter",
+    "published_date": "2025-11-28T12:45:30",
+    "sentiment": "neutral",
+    "sentiment_score": 0.15,
+    "importance": 85
+  },
+  {
+    "ticker": "ZS",
+    "title": "Zscaler Revenue Growth Accelerates to 25%",
+    "summary": "Strong revenue growth and improving margins support bullish outlook",
+    "source": "TechCrunch",
+    "url": "https://example.com/zscaler-revenue-growth",
+    "published_date": "2025-11-27T14:20:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.68,
+    "importance": 90
+  },
+  {
+    "ticker": "ZS",
+    "title": "Zscaler Raises Full Year Guidance",
+    "summary": "Company increases revenue and earnings guidance on strong demand",
+    "source": "Reuters",
+    "url": "https://example.com/zscaler-guidance",
+    "published_date": "2025-11-26T09:30:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.75,
+    "importance": 95
+  },
+  {
+    "ticker": "ZS",
+    "title": "Cybersecurity Spending Boom Benefits Zscaler",
+    "summary": "Enterprise cybersecurity budgets expanding, driving demand for zero-trust solutions",
+    "source": "Seeking Alpha",
+    "url": "https://example.com/cybersecurity-boom",
+    "published_date": "2025-11-25T11:45:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.72,
+    "importance": 80
+  },
+  {
+    "ticker": "ZS",
+    "title": "Analysts Maintain Buy Rating on ZS Valuation Concerns",
+    "summary": "Despite valuation concerns, 41 out of 55 analysts rate the stock as buy or strong buy",
+    "source": "MarketWatch",
+    "url": "https://example.com/analyst-rating",
+    "published_date": "2025-11-24T13:00:00",
+    "sentiment": "positive",
+    "sentiment_score": 0.58,
+    "importance": 75
+  }
+]

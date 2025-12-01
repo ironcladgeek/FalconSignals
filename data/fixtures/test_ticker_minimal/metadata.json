@@ -1,0 +1,24 @@
+{
+  "ticker": "ZS",
+  "name": "Zscaler, Inc.",
+  "description": "Test fixture with real ZS data that contains price volatility anomalies. Perfect for testing both rule-based and LLM analysis without API calls.",
+  "data_points": {
+    "price_records": 10,
+    "fundamentals": 30,
+    "news_articles": 5,
+    "anomalies": ["Large price swings (5-7% daily moves)", "Trading near 52-week highs", "High volume on some days"]
+  },
+  "expected_output": {
+    "signal_type": "buy",
+    "should_detect_anomalies": true,
+    "anomaly_detection": "Market scanner should detect large daily moves and high-price positions",
+    "score_range": [60, 85],
+    "technical_score_range": [65, 80],
+    "fundamental_score_range": [55, 75],
+    "sentiment_score_range": [60, 80],
+    "confidence_range": [0.65, 0.85],
+    "minimum_confidence": 0.6,
+    "rationale": "Strong revenue growth (25% YoY), positive analyst consensus (41 buy/strong buy out of 55), and improving guidance. Price volatility shows strong interest. Main risk is high valuation and current unprofitability."
+  },
+  "validation_notes": "Expected to generate BUY signal with strong anomalies detected in market scan stage. Suitable for testing complete LLM pipeline (rule-based anomaly detection + LLM analysis)."
+}

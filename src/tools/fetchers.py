@@ -15,11 +15,18 @@ logger = get_logger(__name__)
 class PriceFetcherTool(BaseTool):
     """Tool for fetching stock price data."""
 
-    def __init__(self, cache_manager: CacheManager = None):
+    def __init__(
+        self,
+        cache_manager: CacheManager = None,
+        provider_name: str = None,
+        fixture_path: str = None,
+    ):
         """Initialize price fetcher.
 
         Args:
             cache_manager: Optional cache manager for caching prices
+            provider_name: Data provider to use (default: yahoo_finance, or 'fixture' for test mode)
+            fixture_path: Path to fixture directory (required if provider_name is 'fixture')
         """
         super().__init__(
             name="PriceFetcher",
@@ -30,7 +37,16 @@ class PriceFetcherTool(BaseTool):
             ),
         )
         self.cache_manager = cache_manager or CacheManager()
-        self.provider = DataProviderFactory.create("yahoo_finance")
+        self.provider_name = provider_name or "yahoo_finance"
+        self.fixture_path = fixture_path
+
+        # Create provider with fixture path if needed
+        if self.provider_name == "fixture" and fixture_path:
+            self.provider = DataProviderFactory.create(
+                self.provider_name, fixture_path=fixture_path
+            )
+        else:
+            self.provider = DataProviderFactory.create(self.provider_name)
 
     def run(
         self,
