@@ -438,11 +438,6 @@ def analyze(
         "--fixture",
         help="Name of fixture to use in test mode (in data/fixtures/)",
     ),
-    live_test: bool = typer.Option(
-        False,
-        "--live-test",
-        help="Run test with live data on AAPL (old --test behavior for backward compatibility)",
-    ),
     force_full_analysis: bool = typer.Option(
         False,
         "--force-full-analysis",
@@ -502,25 +497,13 @@ def analyze(
             save_report = False
             typer.echo("  Report saving: disabled (test mode)")
 
-    # Handle live test mode (old --test behavior for backward compatibility)
-    if live_test:
-        ticker = "AAPL"  # Use a single, well-known ticker for testing
-        typer.echo("📱 Running LIVE TEST MODE (with real data)...")
-        typer.echo(f"  Test ticker: {ticker}")
-        typer.echo(f"  Mode: {'LLM-powered' if use_llm else 'Rule-based'}")
-        # Don't save report in test mode unless explicitly requested
-        if save_report:
-            save_report = False
-            typer.echo("  Report saving: disabled (test mode)")
-
-    # Validate that either market, category, ticker, test, or live_test is provided
-    if not market and not category and not ticker and not test and not live_test:
+    # Validate that either market, category, ticker, or test is provided
+    if not market and not category and not ticker and not test:
         typer.echo(
-            "❌ Error: Either --market, --category, --ticker, --test, or --live-test must be provided\n"
+            "❌ Error: Either --market, --category, --ticker, or --test must be provided\n"
             "Examples:\n"
             "  analyze --test              # True test mode (offline, zero cost)\n"
             "  analyze --test --llm        # True test with mock LLM\n"
-            "  analyze --live-test         # Live test on AAPL\n"
             "  analyze --market global\n"
             "  analyze --market us\n"
             "  analyze --category us_tech_software\n"
@@ -535,21 +518,10 @@ def analyze(
         typer.echo("❌ Error: Cannot specify --ticker with --market or --category", err=True)
         raise typer.Exit(code=1)
 
-    if test and live_test:
-        typer.echo("❌ Error: Cannot use both --test and --live-test", err=True)
-        raise typer.Exit(code=1)
-
-    if test and (market or category or (ticker and ticker != "AAPL")):
+    if test and (market or category or ticker):
         typer.echo(
-            "❌ Error: Cannot use --test with --market, --category, or --ticker\n"
-            "Hint: Use --live-test for backward compatibility with live AAPL analysis",
+            "❌ Error: Cannot use --test with --market, --category, or --ticker",
             err=True,
-        )
-        raise typer.Exit(code=1)
-
-    if live_test and (market or category or (ticker and ticker != "AAPL")):
-        typer.echo(
-            "❌ Error: Cannot use --live-test with --market, --category, or --ticker", err=True
         )
         raise typer.Exit(code=1)
 
