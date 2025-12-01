@@ -14,12 +14,14 @@ logger = get_logger(__name__)
 class AnalysisCrew:
     """Orchestrates multiple agents for comprehensive analysis."""
 
-    def __init__(self, llm_provider: Optional[str] = None):
+    def __init__(self, llm_provider: Optional[str] = None, test_mode_config: Optional[Any] = None):
         """Initialize the analysis crew.
 
         Args:
             llm_provider: Optional LLM provider to check configuration for
+            test_mode_config: Optional test mode configuration for fixtures/mock LLM
         """
+        self.test_mode_config = test_mode_config
         self.market_scanner = MarketScannerAgent()
         self.technical_agent = TechnicalAnalysisAgent()
         self.fundamental_agent = FundamentalAnalysisAgent()

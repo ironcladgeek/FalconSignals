@@ -263,6 +263,21 @@ class DeploymentConfig(BaseModel):
     )
 
 
+class TestModeConfig(BaseModel):
+    """Test mode configuration for zero-cost testing."""
+
+    enabled: bool = Field(default=False, description="Enable test mode (fixtures instead of APIs)")
+    fixture_name: str = Field(
+        default="test_ticker_minimal", description="Name of fixture to use (in data/fixtures/)"
+    )
+    use_mock_llm: bool = Field(
+        default=True, description="Use MockLLMClient instead of real LLM (zero cost)"
+    )
+    validate_expected: bool = Field(
+        default=True, description="Validate that results match expected ranges from fixture"
+    )
+
+
 class Config(BaseModel):
     """Root configuration schema."""
 
@@ -286,4 +301,7 @@ class Config(BaseModel):
     )
     deployment: DeploymentConfig = Field(
         default_factory=DeploymentConfig, description="Deployment settings"
+    )
+    test_mode: TestModeConfig = Field(
+        default_factory=TestModeConfig, description="Test mode configuration"
     )
