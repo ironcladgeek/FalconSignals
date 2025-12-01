@@ -31,37 +31,49 @@ The CI/CD pipeline automatically validates all pull requests to the `main` branc
    - Ruff linting (import sorting, unused imports, formatting)
    - Black code formatting
    - Conventional commit validation
-7. **Run Tests** - Execute pytest with verbose output and short tracebacks
-8. **Publish Results** - Annotate PR with detailed test results
+7. **Run Tests with Coverage** - Execute pytest with:
+   - Verbose output and short tracebacks
+   - Coverage measurement (XML + terminal report)
+   - Missing line coverage details
+8. **Check Coverage Threshold** - Enforce minimum coverage:
+   - Fails if coverage drops below 50%
+   - Continues with warning if already below threshold
+9. **Upload Coverage** - Send results to Codecov for:
+   - Historical trend tracking
+   - PR annotations with coverage diff
+10. **Publish Test Results** - Annotate PR with detailed test results
 
 **Expected Output:**
 
 - ✅ All pre-commit checks pass
 - ✅ All tests pass (219 tests)
+- ✅ Coverage meets 50% threshold
 - Test results comment on PR showing:
   - Number of passed/failed/skipped tests
   - Duration of test run
   - Detailed failure information (if any)
+- Coverage report on Codecov with:
+  - Coverage percentage
+  - Missing coverage by file
+  - Coverage trends and diffs
 
-### 2. Code Coverage (`coverage.yml`)
+### 2. Code Coverage (Integrated in PR Tests)
 
-**Triggers:** Pull requests to `main` branch
+**Status:** Coverage checking is now integrated into the PR Tests workflow (`pr-tests.yml`)
 
-**Steps:**
+Coverage is no longer run in a separate workflow. Instead, it's measured during the main PR Tests workflow to:
+- Reduce CI/CD execution time
+- Provide faster feedback on PRs
+- Combine test and coverage results in one report
 
-1. Setup Python 3.12 environment
-2. Install uv and sync dependencies
-3. Run pytest with coverage reporting:
-   - Generates XML coverage report
-   - Displays terminal output with missing coverage
-   - Tracks coverage statistics
-4. Upload to Codecov for historical tracking
+The standalone `coverage.yml` workflow is still available for optional scheduled runs or manual execution, but is not required for PR validation.
 
-**Output:**
+**Coverage Metrics Tracked:**
 
-- Coverage percentage per module
+- Coverage percentage per module (target: 70%+)
 - Missing line coverage details
-- Historical trend visualization (on Codecov)
+- Coverage trends over time (via Codecov)
+- Coverage diff vs. base branch
 
 ## Branch Protection Rules
 
@@ -79,39 +91,74 @@ To enforce the CI/CD pipeline, configure branch protection rules on `main`:
 
 ## Metrics & Thresholds
 
-Current baseline metrics (as of Phase 7):
+Current baseline metrics (as of Phase 7+):
 
 - **Test Count:** 219 tests
 - **Skipped Tests:** 14 (expected - skipped for integration tests)
 - **Pass Rate:** 100% (219/219)
-- **Execution Time:** ~4-5 seconds
-- **Coverage:** Currently not enforced (can add threshold)
+- **Coverage Threshold:** 50% (enforced, blocks PRs if breached)
+- **Execution Time:** ~10-12 seconds (with coverage)
 
-### Recommended Coverage Thresholds
+### Coverage Threshold Strategy
 
-Consider adding coverage requirements:
+The project uses a tiered approach to coverage:
+
+1. **PR Gate (Hard Requirement):** 50% minimum coverage
+   - Blocks PR merge if coverage drops below 50%
+   - Prevents regressions in test coverage
+   - Applied in `pr-tests.yml` workflow
+
+2. **Target Coverage:** 70%+ recommended
+   - Aim for higher coverage in new code
+   - Review coverage diffs in Codecov comments
+   - Not enforced (warning only)
+
+3. **Future Enhancement:** 80%+ for core modules
+   - Consider enforcing higher thresholds for critical code
+   - Can be configured per module/package
+
+### Adjusting Coverage Threshold
+
+To change the coverage requirement, edit the `pr-tests.yml` workflow:
 
 ```yaml
-# In coverage.yml, after upload step:
 - name: Check coverage threshold
   run: |
-    # Fail if coverage drops below 70%
-    coverage report --fail-under=70
+    # Adjust the value below (current: 50)
+    uv run coverage report --fail-under=50
 ```
+
+Recommended progression:
+- Phase 7: 50% (current - establish baseline)
+- Phase 8: 60% (mature codebase)
+- Phase 9: 70% (stable features)
 
 ## Local Development
 
 To run the same checks locally before pushing:
 
 ```bash
-# Run pre-commit checks
+# Run pre-commit checks (formatting, linting, commit validation)
 uv run poe pre-commit
 
 # Run all tests
 uv run pytest tests/ -q
 
-# Run tests with coverage
+# Run tests with coverage report
 uv run pytest tests/ --cov=src --cov-report=term-missing
+
+# Check if coverage meets threshold (50%)
+uv run pytest tests/ --cov=src --cov-report=term-missing && uv run coverage report --fail-under=50
+
+# Run exactly what CI/CD runs
+uv run pytest tests/ -v --tb=short --junit-xml=test-results.xml --cov=src --cov-report=xml --cov-report=term-missing && uv run coverage report --fail-under=50
+```
+
+**Tip:** Run these commands before committing to catch issues locally:
+
+```bash
+# All-in-one: linting + tests + coverage (what CI/CD checks)
+uv run poe pre-commit && uv run pytest tests/ --cov=src --cov-report=term-missing && uv run coverage report --fail-under=50
 ```
 
 ## Troubleshooting
@@ -162,38 +209,83 @@ git commit -m "style: apply formatting rules"
 2. Create secret `CODECOV_TOKEN` (get from codecov.io)
 3. Workflow will automatically use the token
 
+### Coverage Threshold Check Fails
+
+**Cause:** Test coverage dropped below 50% threshold
+**Fix:**
+
+Option 1 - Write more tests (recommended):
+```bash
+# See which lines/files lack coverage
+uv run pytest tests/ --cov=src --cov-report=term-missing
+
+# Write tests for uncovered code
+# Then verify coverage improves
+uv run coverage report --fail-under=50
+```
+
+Option 2 - Temporarily lower threshold (not recommended):
+```bash
+# Only do this if coverage was legitimately lower before
+# Edit .github/workflows/pr-tests.yml and change:
+uv run coverage report --fail-under=40  # Lower from 50 to 40
+```
+
+**Best Practice:** Always improve coverage rather than lower thresholds. Better coverage = fewer bugs.
+
+### Coverage Reports Not Generated Locally
+
+**Cause:** `pytest-cov` not installed
+**Fix:**
+```bash
+uv sync  # Ensures pytest-cov is installed
+uv run pip list | grep pytest-cov  # Verify installation
+uv run pytest tests/ --cov=src --cov-report=term-missing
+```
+
 ## Performance Optimization
 
-The workflow uses several optimizations to keep execution time under 1 minute:
+The workflow uses several optimizations to keep execution time reasonable:
 
 1. **Dependency Caching** - Reuses cached dependencies across runs
 2. **Parallel Testing** - pytest runs all tests in parallel by default
 3. **Fast Linting** - Ruff is extremely fast (< 1 second for this project)
 4. **JIT Compilation** - Python 3.12 with optimizations
+5. **Combined Coverage** - Coverage measured during test run (no extra step)
 
-Current benchmark (Ubuntu runner):
+Current benchmark (Ubuntu runner) - PR Tests workflow:
 - Checkout: ~2s
 - Setup Python: ~5s
 - Install uv: ~3s
 - Sync dependencies: ~8s
 - Pre-commit checks: ~3s
-- Tests: ~4s
-- Coverage: ~5s
+- Tests + Coverage: ~8s
+- Coverage upload: ~2s
 
-**Total:** ~30 seconds per workflow
+**Total:** ~30-35 seconds per PR workflow
+
+**Note:** Coverage integration adds ~3-4 seconds vs. tests alone, but eliminates the need for a separate coverage workflow, resulting in net time savings.
 
 ## Future Enhancements
 
 Potential improvements:
 
-1. **Coverage Threshold** - Fail if coverage drops below 70%
-2. **Performance Benchmarks** - Track test execution time trends
-3. **Dependency Security Checks** - Run `safety` or `pip-audit`
-4. **LLM API Key Validation** - Ensure secrets are not leaked
-5. **Docker Build** - Build and test Docker image in CI
-6. **Scheduled Runs** - Daily tests against main branch
-7. **PR Size Checks** - Warn on large PRs (help enforce small commits)
+### Implemented Features ✅
+- **Coverage Threshold** - Now enforces 50% minimum (Phase 7)
+- **Test Result Publishing** - Annotates PRs with detailed results (Phase 7)
+- **Codecov Integration** - Tracks coverage trends over time (Phase 7)
+
+### Planned Enhancements
+1. **Increase Coverage Threshold** - Gradually raise from 50% to 70%+ for mature modules
+2. **Performance Benchmarks** - Track test execution time trends (detect regressions)
+3. **Dependency Security Checks** - Run `safety` or `pip-audit` to catch vulnerabilities
+4. **LLM API Key Validation** - Ensure secrets are not leaked in outputs
+5. **Docker Build** - Build and test Docker image in CI for containerization
+6. **Scheduled Runs** - Daily tests against main branch (nighttime builds)
+7. **PR Size Checks** - Warn on large PRs to enforce small, focused commits
 8. **Auto-merge** - Auto-merge PRs from dependabot if all checks pass
+9. **Coverage Comment** - Post coverage diff summary directly on PRs
+10. **Performance Regression Detection** - Alert if tests slow down significantly
 
 ## Maintenance
 
