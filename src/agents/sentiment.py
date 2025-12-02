@@ -71,7 +71,6 @@ class SentimentAgent(BaseAgent):
             news_data = news_fetcher.run(
                 ticker,
                 limit=get_config().data.news.max_articles,
-                max_age_hours=get_config().data.news.max_age_hours,
             )
 
             if "error" in news_data or not news_data.get("articles"):
