@@ -3,23 +3,15 @@
 import os
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import requests
-from dotenv import load_dotenv
 
 from src.data.models import InstrumentType, Market, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-# Load environment variables from .env file if present
-_project_root = Path(__file__).parent.parent.parent
-_env_file = _project_root / ".env"
-if _env_file.exists():
-    load_dotenv(_env_file)
 
 # Alpha Vantage API constants
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
