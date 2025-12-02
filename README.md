@@ -20,10 +20,10 @@ NordInvest is designed to help investors make informed decisions by providing da
 
 - Python 3.12+
 - UV package manager
-- API keys (free tiers supported):
-  - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (for LLM mode)
-  - `FINNHUB_API_KEY` (optional, for news/sentiment)
-  - `ALPHA_VANTAGE_API_KEY` (optional, for backup data)
+- API keys:
+  - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (required for LLM mode)
+  - `ALPHA_VANTAGE_API_KEY` (required - Premium tier recommended for news + earnings)
+  - `FINNHUB_API_KEY` (optional - for analyst recommendations)
 
 ### Installation
 
@@ -50,9 +50,9 @@ export ANTHROPIC_API_KEY=your_key        # For AI-powered analysis
 # OR
 export OPENAI_API_KEY=your_key           # Alternative to Anthropic
 
-# Optional (for extended features)
-export FINNHUB_API_KEY=your_key          # For news and sentiment data
-export ALPHA_VANTAGE_API_KEY=your_key    # For backup market data
+# Financial Data APIs
+export ALPHA_VANTAGE_API_KEY=your_key    # Premium tier: 75 requests/min, news + earnings
+export FINNHUB_API_KEY=your_key          # Optional: analyst recommendations
 ```
 
 Or create `.env` file in project root:
@@ -232,7 +232,7 @@ nordinvest/
 │   │   ├── providers.py     # Abstract provider
 │   │   ├── yahoo_finance.py # Yahoo Finance impl
 │   │   ├── alpha_vantage.py # Alpha Vantage impl
-│   │   ├── finnhub.py       # Finnhub impl
+│   │   ├── finnhub.py       # Finnhub impl (analyst recommendations only)
 │   │   ├── screening.py     # Instrument filtering
 │   │   ├── normalization.py # Data cleaning
 │   │   └── portfolio.py     # Portfolio state
@@ -313,6 +313,7 @@ pytest --cov=src
 ### "API key not found"
 ```bash
 echo $ANTHROPIC_API_KEY
+echo $ALPHA_VANTAGE_API_KEY
 echo $FINNHUB_API_KEY
 ```
 
