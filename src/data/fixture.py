@@ -148,14 +148,12 @@ class FixtureDataProvider(DataProvider):
         self,
         ticker: str,
         limit: int = 10,
-        max_age_hours: int = 24,
     ) -> list[NewsArticle]:
         """Get news articles from fixture data.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles
-            max_age_hours: Maximum age of articles (ignored for fixtures)
 
         Returns:
             List of NewsArticle objects
