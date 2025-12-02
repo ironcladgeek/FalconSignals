@@ -25,7 +25,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "black>=25.11.0",
     "notebook>=7.5.0",
     "poethepoet>=0.38.0",
     "pre-commit>=4.5.0",
@@ -33,9 +32,6 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.6",
 ]
-
-[tool.black]
-line-length = 100
 
 [tool.ruff]
 line-length = 100
@@ -57,5 +53,5 @@ filterwarnings = [
 # Poethepoet task definitions
 # Usage: uv run poe <task>
 [tool.poe.tasks]
-lint = "sh -c 'ruff check --select I --select F401 --fix && ruff format && black .'"
+lint = "sh -c 'ruff check --select I --select F401 --fix && ruff format'"
 pre-commit = "pre-commit run --all-files"

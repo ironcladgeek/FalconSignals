@@ -20,12 +20,6 @@ repos:
         args: [--fix, --select, F401]
       - id: ruff-format
 
-  - repo: https://github.com/psf/black
-    rev: 25.11.0
-    hooks:
-      - id: black
-        language_version: python3.12
-
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0
     hooks:
