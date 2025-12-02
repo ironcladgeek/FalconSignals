@@ -267,19 +267,53 @@ def _create_signal_from_llm_result(
             if json_match:
                 llm_result = json.loads(json_match.group(1))
             else:
-                # Try to find JSON object in the text (looking for balanced braces)
-                # Find the first { and last }
+                # Try to find the first complete JSON object in the text
+                # Strategy: Start from first { and try to parse incrementally until we get valid JSON
                 first_brace = llm_result.find("{")
-                last_brace = llm_result.rfind("}")
 
-                if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-                    json_str = llm_result[first_brace : last_brace + 1]
-                    try:
-                        llm_result = json.loads(json_str)
-                        logger.debug("Successfully extracted JSON from LLM response")
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Could not parse extracted JSON: {e}")
-                        logger.debug(f"Attempted to parse: {json_str[:500]}")
+                if first_brace != -1:
+                    # Try to find a complete JSON object by parsing with increasing end positions
+                    brace_count = 0
+                    in_string = False
+                    escape_next = False
+                    json_end = -1
+
+                    for i in range(first_brace, len(llm_result)):
+                        char = llm_result[i]
+
+                        if escape_next:
+                            escape_next = False
+                            continue
+
+                        if char == "\\":
+                            escape_next = True
+                            continue
+
+                        if char == '"' and not escape_next:
+                            in_string = not in_string
+                            continue
+
+                        if not in_string:
+                            if char == "{":
+                                brace_count += 1
+                            elif char == "}":
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    json_end = i + 1
+                                    break
+
+                    if json_end != -1:
+                        json_str = llm_result[first_brace:json_end]
+                        try:
+                            llm_result = json.loads(json_str)
+                            logger.debug("Successfully extracted JSON from LLM response")
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Could not parse extracted JSON: {e}")
+                            logger.debug(f"Attempted to parse: {json_str[:500]}")
+                            return None
+                    else:
+                        logger.warning("Could not find complete JSON object (unbalanced braces)")
+                        logger.debug(f"Response preview: {llm_result[:200]}")
                         return None
                 else:
                     logger.warning("No JSON object found in LLM result")
