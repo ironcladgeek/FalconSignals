@@ -3,15 +3,23 @@
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import requests
+from dotenv import load_dotenv
 
-from src.data.models import InstrumentType, Market, StockPrice
+from src.data.models import InstrumentType, Market, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Load environment variables from .env file if present
+_project_root = Path(__file__).parent.parent.parent
+_env_file = _project_root / ".env"
+if _env_file.exists():
+    load_dotenv(_env_file)
 
 # Alpha Vantage API constants
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
@@ -23,9 +31,10 @@ DEFAULT_TIMEOUT = 30
 class AlphaVantageProvider(DataProvider):
     """Alpha Vantage data provider implementation.
 
-    Supports stock price data fetching using Alpha Vantage API.
-    Free tier: 25 requests/day with 5-minute delay between requests.
-    Backup data source.
+    Supports stock price data, news sentiment, and company overview using Alpha Vantage API.
+    Free tier: 25 requests/day, 500 requests/day with free API key.
+    Provides enriched news sentiment data with topic relevance and sentiment scores.
+    Primary data source for news and sentiment analysis.
     """
 
     def __init__(
@@ -245,6 +254,320 @@ class AlphaVantageProvider(DataProvider):
                 else:
                     raise RuntimeError(f"API call failed after retries: {e}")
 
+    def get_news(
+        self,
+        ticker: str,
+        limit: int = 50,
+    ) -> list[NewsArticle]:
+        """Fetch news articles with sentiment analysis from Alpha Vantage.
+
+        Uses the NEWS_SENTIMENT endpoint which provides:
+        - Article title, summary, URL, publication time
+        - Overall sentiment score and label
+        - Ticker-specific sentiment scores and relevance
+        - Topics with relevance scores
+
+        Args:
+            ticker: Stock ticker symbol
+            limit: Maximum number of articles to return (default: 50)
+
+        Returns:
+            List of NewsArticle objects with sentiment data, sorted by date descending
+
+        Raises:
+            ValueError: If API key is not configured
+            RuntimeError: If API call fails
+        """
+        if not self.api_key:
+            raise ValueError("Alpha Vantage API key is not configured")
+
+        try:
+            logger.debug(f"Fetching news sentiment for {ticker} (limit={limit})")
+
+            # Call NEWS_SENTIMENT API without time filters
+            # Alpha Vantage sorts by LATEST automatically, so we get the most recent articles
+            params = {
+                "function": "NEWS_SENTIMENT",
+                "tickers": ticker,
+                "limit": limit,  # Request exactly what we need
+                "sort": "LATEST",  # Get newest first
+            }
+
+            logger.debug(f"Alpha Vantage NEWS_SENTIMENT params: {params}")
+            data = self._api_call(params)
+
+            if "Error Message" in data:
+                raise ValueError(f"Invalid ticker or API error: {ticker}")
+
+            if "feed" not in data:
+                logger.warning(f"No news data available for {ticker}")
+                return []
+
+            articles = []
+            for item in data["feed"]:
+                try:
+                    # Parse publication time (format: YYYYMMDDTHHMMSS)
+                    time_str = item.get("time_published", "")
+                    if len(time_str) >= 8:
+                        # Parse date part (YYYYMMDD)
+                        published_date = datetime.strptime(time_str[:8], "%Y%m%d")
+                        # Try to parse time part if available
+                        if len(time_str) >= 15 and "T" in time_str:
+                            try:
+                                time_part = time_str.split("T")[1][:6]
+                                hour = int(time_part[:2])
+                                minute = int(time_part[2:4])
+                                second = int(time_part[4:6])
+                                published_date = published_date.replace(
+                                    hour=hour, minute=minute, second=second
+                                )
+                            except (ValueError, IndexError):
+                                pass  # Use date only
+                    else:
+                        published_date = datetime.now()
+
+                    # Extract ticker-specific sentiment
+                    ticker_sentiment_score = None
+                    ticker_sentiment_label = None
+                    ticker_relevance = 0.0
+
+                    ticker_sentiments = item.get("ticker_sentiment", [])
+                    for ts in ticker_sentiments:
+                        if ts.get("ticker", "").upper() == ticker.upper():
+                            ticker_sentiment_score = float(ts.get("ticker_sentiment_score", 0))
+                            ticker_sentiment_label = ts.get("ticker_sentiment_label", "Neutral")
+                            ticker_relevance = float(ts.get("relevance_score", 0))
+                            break
+
+                    # Use overall sentiment if ticker-specific not found
+                    if ticker_sentiment_score is None:
+                        ticker_sentiment_score = float(item.get("overall_sentiment_score", 0))
+                        ticker_sentiment_label = item.get("overall_sentiment_label", "Neutral")
+
+                    # Map sentiment label to our format
+                    sentiment_map = {
+                        "Bearish": "negative",
+                        "Somewhat-Bearish": "negative",
+                        "Neutral": "neutral",
+                        "Somewhat-Bullish": "positive",
+                        "Bullish": "positive",
+                    }
+                    sentiment = sentiment_map.get(ticker_sentiment_label, "neutral")
+
+                    # Calculate importance based on relevance and sentiment strength
+                    importance = min(100, int(ticker_relevance * 100))
+
+                    article = NewsArticle(
+                        ticker=ticker.upper(),
+                        title=item.get("title", "")[:200],
+                        summary=item.get("summary", "")[:500],
+                        source=item.get("source", "Alpha Vantage"),
+                        url=item.get("url", ""),
+                        published_date=published_date,
+                        sentiment=sentiment,
+                        sentiment_score=ticker_sentiment_score,
+                        importance=importance,
+                    )
+                    articles.append(article)
+
+                    # Stop if we have enough articles
+                    if len(articles) >= limit:
+                        break
+
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.warning(f"Skipping malformed news item: {e}")
+                    continue
+
+            # Sort by date descending (most recent first)
+            articles.sort(key=lambda a: a.published_date, reverse=True)
+
+            logger.debug(f"Retrieved {len(articles)} news articles with sentiment for {ticker}")
+            return articles
+
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching news for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch news for {ticker}: {e}")
+
+    def get_company_info(self, ticker: str) -> Optional[dict]:
+        """Fetch company overview and fundamental data.
+
+        Uses the OVERVIEW endpoint to get:
+        - Company name, description, sector, industry
+        - Market capitalization, PE ratio, dividend yield
+        - 52-week high/low, beta, analyst target price
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Dictionary with company information or None if not available
+
+        Raises:
+            ValueError: If API key is not configured
+            RuntimeError: If API call fails
+        """
+        if not self.api_key:
+            raise ValueError("Alpha Vantage API key is not configured")
+
+        try:
+            logger.debug(f"Fetching company overview for {ticker}")
+
+            data = self._api_call({"function": "OVERVIEW", "symbol": ticker})
+
+            if "Error Message" in data:
+                raise ValueError(f"Invalid ticker: {ticker}")
+
+            # Check if we got valid data
+            if not data or "Symbol" not in data:
+                logger.warning(f"No company data available for {ticker}")
+                return None
+
+            # Extract key information
+            return {
+                "ticker": data.get("Symbol", ticker),
+                "name": data.get("Name", ""),
+                "description": data.get("Description", ""),
+                "sector": data.get("Sector", ""),
+                "industry": data.get("Industry", ""),
+                "market_cap": self._safe_float(data.get("MarketCapitalization")),
+                "pe_ratio": self._safe_float(data.get("PERatio")),
+                "dividend_yield": self._safe_float(data.get("DividendYield")),
+                "eps": self._safe_float(data.get("EPS")),
+                "beta": self._safe_float(data.get("Beta"), default=1.0),
+                "52_week_high": self._safe_float(data.get("52WeekHigh")),
+                "52_week_low": self._safe_float(data.get("52WeekLow")),
+                "analyst_target_price": self._safe_float(data.get("AnalystTargetPrice")),
+                "currency": data.get("Currency", "USD"),
+                "exchange": data.get("Exchange", ""),
+            }
+
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching company info for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
+
+    def get_earnings_estimates(self, ticker: str) -> Optional[dict]:
+        """Fetch earnings estimates from Alpha Vantage.
+
+        Uses the EARNINGS_ESTIMATES endpoint to get:
+        - EPS estimates (average, high, low) for next quarter and year
+        - Revenue estimates
+        - Analyst count and estimate revisions
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Dictionary with earnings estimates or None if not available
+
+        Raises:
+            ValueError: If API key is not configured
+            RuntimeError: If API call fails
+        """
+        if not self.api_key:
+            raise ValueError("Alpha Vantage API key is not configured")
+
+        try:
+            logger.debug(f"Fetching earnings estimates for {ticker}")
+
+            data = self._api_call({"function": "EARNINGS_ESTIMATES", "symbol": ticker})
+
+            if "Error Message" in data:
+                raise ValueError(f"Invalid ticker: {ticker}")
+
+            # Check if we got valid data
+            if not data or "estimates" not in data or not data["estimates"]:
+                logger.warning(f"No earnings estimates available for {ticker}")
+                return None
+
+            estimates = data["estimates"]
+
+            # Get next quarter and next year estimates
+            next_quarter = None
+            next_year = None
+
+            for estimate in estimates:
+                horizon = estimate.get("horizon", "").lower()
+                if "quarter" in horizon and not next_quarter:
+                    next_quarter = estimate
+                elif "year" in horizon and not next_year:
+                    next_year = estimate
+
+            result = {
+                "ticker": data.get("symbol", ticker),
+                "next_quarter": (
+                    self._parse_earnings_estimate(next_quarter) if next_quarter else None
+                ),
+                "next_year": self._parse_earnings_estimate(next_year) if next_year else None,
+            }
+
+            logger.debug(f"Retrieved earnings estimates for {ticker}")
+            return result
+
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching earnings estimates for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch earnings estimates for {ticker}: {e}")
+
+    @staticmethod
+    def _parse_earnings_estimate(estimate: dict) -> dict:
+        """Parse earnings estimate data.
+
+        Args:
+            estimate: Raw estimate data from API
+
+        Returns:
+            Parsed estimate dictionary
+        """
+        return {
+            "date": estimate.get("date"),
+            "horizon": estimate.get("horizon"),
+            "eps_estimate_avg": AlphaVantageProvider._safe_float(
+                estimate.get("eps_estimate_average")
+            ),
+            "eps_estimate_high": AlphaVantageProvider._safe_float(
+                estimate.get("eps_estimate_high")
+            ),
+            "eps_estimate_low": AlphaVantageProvider._safe_float(estimate.get("eps_estimate_low")),
+            "eps_analyst_count": AlphaVantageProvider._safe_float(
+                estimate.get("eps_estimate_analyst_count")
+            ),
+            "revenue_estimate_avg": AlphaVantageProvider._safe_float(
+                estimate.get("revenue_estimate_average")
+            ),
+            "revenue_estimate_high": AlphaVantageProvider._safe_float(
+                estimate.get("revenue_estimate_high")
+            ),
+            "revenue_estimate_low": AlphaVantageProvider._safe_float(
+                estimate.get("revenue_estimate_low")
+            ),
+            "revenue_analyst_count": AlphaVantageProvider._safe_float(
+                estimate.get("revenue_estimate_analyst_count")
+            ),
+        }
+
+    @staticmethod
+    def _safe_float(value: str | None, default: float | None = None) -> float | None:
+        """Safely convert string to float, handling None and 'None' strings.
+
+        Args:
+            value: String value to convert
+            default: Default value if conversion fails
+
+        Returns:
+            Float value or default
+        """
+        if value is None or value == "" or value == "None" or value == "-":
+            return default
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
     @staticmethod
     def _infer_market(ticker: str) -> Market:
         """Infer market from ticker.
@@ -272,4 +595,5 @@ class AlphaVantageProvider(DataProvider):
 
 
 # Register the provider
+DataProviderFactory.register("alpha_vantage", AlphaVantageProvider)
 DataProviderFactory.register("alpha_vantage", AlphaVantageProvider)
