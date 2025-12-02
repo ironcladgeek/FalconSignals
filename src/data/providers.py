@@ -90,14 +90,12 @@ class DataProvider(ABC):
         self,
         ticker: str,
         limit: int = 10,
-        max_age_hours: int = 24,
     ) -> list[NewsArticle]:
         """Fetch news articles.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles
-            max_age_hours: Maximum age of articles in hours
 
         Returns:
             List of NewsArticle objects
