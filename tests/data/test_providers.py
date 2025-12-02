@@ -150,6 +150,104 @@ class TestAlphaVantageProvider:
         with pytest.raises(RuntimeError, match="Alpha Vantage API rate limit exceeded"):
             av_provider.get_stock_prices("AAPL", start_date, end_date)
 
+    @patch("src.data.alpha_vantage.requests.get")
+    def test_get_news_sentiment(self, mock_get, av_provider):
+        """Test news sentiment fetching from Alpha Vantage."""
+        # Mock NEWS_SENTIMENT response with recent dates (within 168 hours)
+        from datetime import datetime, timedelta
+
+        # Use recent dates that won't be filtered out
+        recent_date = datetime.now()
+        older_date = datetime.now() - timedelta(hours=24)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "feed": [
+                {
+                    "title": "Apple announces new product",
+                    "url": "https://example.com/article1",
+                    "time_published": recent_date.strftime("%Y%m%dT%H%M%S"),
+                    "summary": "Apple unveiled its latest innovation...",
+                    "source": "TechNews",
+                    "overall_sentiment_score": 0.45,
+                    "overall_sentiment_label": "Bullish",
+                    "ticker_sentiment": [
+                        {
+                            "ticker": "AAPL",
+                            "relevance_score": "0.95",
+                            "ticker_sentiment_score": "0.5",
+                            "ticker_sentiment_label": "Bullish",
+                        }
+                    ],
+                },
+                {
+                    "title": "Market concerns about Apple supply chain",
+                    "url": "https://example.com/article2",
+                    "time_published": older_date.strftime("%Y%m%dT%H%M%S"),
+                    "summary": "Analysts express concerns...",
+                    "source": "Financial Times",
+                    "overall_sentiment_score": -0.25,
+                    "overall_sentiment_label": "Somewhat-Bearish",
+                    "ticker_sentiment": [
+                        {
+                            "ticker": "AAPL",
+                            "relevance_score": "0.85",
+                            "ticker_sentiment_score": "-0.3",
+                            "ticker_sentiment_label": "Somewhat-Bearish",
+                        }
+                    ],
+                },
+            ]
+        }
+        # Mock needs to be returned from _api_call, which uses requests.get internally
+        mock_get.return_value = mock_response
+
+        articles = av_provider.get_news("AAPL", limit=50)
+
+        assert len(articles) == 2
+        # Articles are sorted by date descending (most recent first)
+        assert articles[0].ticker == "AAPL"
+        assert articles[0].sentiment == "positive"  # Bullish -> positive
+        assert articles[0].sentiment_score == 0.5
+        assert articles[0].title == "Apple announces new product"
+        assert articles[1].sentiment == "negative"  # Somewhat-Bearish -> negative
+        assert articles[1].sentiment_score == -0.3
+        assert articles[1].title == "Market concerns about Apple supply chain"
+
+    @patch("src.data.alpha_vantage.requests.get")
+    def test_get_company_info(self, mock_get, av_provider):
+        """Test company overview fetching from Alpha Vantage."""
+        # Mock OVERVIEW response
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "Symbol": "AAPL",
+            "Name": "Apple Inc",
+            "Description": "Apple Inc. designs, manufactures, and markets smartphones...",
+            "Sector": "Technology",
+            "Industry": "Consumer Electronics",
+            "MarketCapitalization": "3000000000000",
+            "PERatio": "28.5",
+            "DividendYield": "0.005",
+            "EPS": "6.15",
+            "Beta": "1.25",
+            "52WeekHigh": "195.00",
+            "52WeekLow": "140.00",
+            "AnalystTargetPrice": "185.50",
+            "Currency": "USD",
+            "Exchange": "NASDAQ",
+        }
+        mock_get.return_value = mock_response
+
+        info = av_provider.get_company_info("AAPL")
+
+        assert info["ticker"] == "AAPL"
+        assert info["name"] == "Apple Inc"
+        assert info["sector"] == "Technology"
+        assert info["industry"] == "Consumer Electronics"
+        assert info["market_cap"] == 3000000000000.0
+        assert info["pe_ratio"] == 28.5
+        assert info["beta"] == 1.25
+
 
 @pytest.mark.unit
 class TestFinnhubProvider:
