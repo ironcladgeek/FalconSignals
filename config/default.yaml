@@ -58,13 +58,12 @@ data:
   # News fetching settings
   news:
     max_articles: 50 # Maximum number of articles to fetch per ticker
-    max_age_hours: 168 # Maximum age of articles in hours (168 = 7 days)
 
   # API providers (in priority order)
-  primary_provider: yahoo_finance
+  primary_provider: alpha_vantage # Alpha Vantage Premium: news sentiment + fundamentals + earnings estimates
   backup_providers:
-    - alpha_vantage
-    - finnhub
+    - yahoo_finance # Yahoo Finance: reliable price data
+    - finnhub # Finnhub: analyst recommendations only
 
 # API Credentials (use environment variables in production)
 # Export these as environment variables:
