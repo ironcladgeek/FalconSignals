@@ -363,9 +363,9 @@ class ReportGenerator:
             f"| **Risk Level** | {signal.risk.level.value} |\n",
             f"| **Volatility** | {signal.risk.volatility} |\n\n",
             "**Component Scores:**\n",
-            f"- Technical: {signal.scores.technical}/100\n",
-            f"- Fundamental: {signal.scores.fundamental}/100\n",
-            f"- Sentiment: {signal.scores.sentiment}/100\n\n",
+            f"- Technical: {signal.scores.technical:.2f}/100\n",
+            f"- Fundamental: {signal.scores.fundamental:.2f}/100\n",
+            f"- Sentiment: {signal.scores.sentiment:.2f}/100\n\n",
             "**Key Reasons:**\n",
         ]
 
