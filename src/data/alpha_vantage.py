@@ -522,15 +522,41 @@ class AlphaVantageProvider(DataProvider):
             estimates = data["estimates"]
 
             # Get next quarter and next year estimates
+            # For historical analysis, select estimates where estimate date > analysis date
+            # For current analysis (as_of_date=None), select immediate next quarter and year
+            as_of_date_only = (
+                as_of_date.date() if as_of_date else None
+            )  # Convert to date for comparison
+
             next_quarter = None
             next_year = None
 
             for estimate in estimates:
+                estimate_date_str = estimate.get("date", "")
                 horizon = estimate.get("horizon", "").lower()
-                if "next" in horizon and "quarter" in horizon and not next_quarter:
-                    next_quarter = estimate
-                elif "next" in horizon and "year" in horizon and not next_year:
-                    next_year = estimate
+
+                # Parse estimate date (format: YYYY-MM-DD)
+                try:
+                    estimate_date = datetime.strptime(estimate_date_str, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+
+                # For historical analysis: select estimates AFTER the analysis date
+                if as_of_date_only:
+                    if (
+                        "quarter" in horizon
+                        and estimate_date > as_of_date_only
+                        and not next_quarter
+                    ):
+                        next_quarter = estimate
+                    elif "year" in horizon and estimate_date > as_of_date_only and not next_year:
+                        next_year = estimate
+                # For current analysis: use standard "next" pattern
+                else:
+                    if "next" in horizon and "quarter" in horizon and not next_quarter:
+                        next_quarter = estimate
+                    elif "next" in horizon and "year" in horizon and not next_year:
+                        next_year = estimate
 
             result = {
                 "ticker": data.get("symbol", ticker),
@@ -557,60 +583,19 @@ class AlphaVantageProvider(DataProvider):
     def _parse_earnings_estimate(estimate: dict, as_of_date: Optional[datetime] = None) -> dict:
         """Parse earnings estimate data.
 
-        For historical analysis, selects the appropriate historical snapshot based on date.
-        Alpha Vantage provides: _7_days_ago, _30_days_ago, _60_days_ago, _90_days_ago
-
         Args:
             estimate: Raw estimate data from API
-            as_of_date: Historical date to use for selecting snapshot (None = current)
+            as_of_date: Historical date (only used for logging context)
 
         Returns:
-            Parsed estimate dictionary with appropriate historical snapshot if requested
+            Parsed estimate dictionary
         """
-        # Determine which estimate values to use (current or historical snapshot)
-        if as_of_date and as_of_date.date() < datetime.now().date():
-            # Calculate days ago from analysis date
-            days_ago = (datetime.now().date() - as_of_date.date()).days
-
-            logger.debug(
-                f"Using historical estimate snapshot for {days_ago} days ago "
-                f"({as_of_date.date()} vs today {datetime.now().date()})"
-            )
-
-            # Select appropriate historical snapshot based on days_ago
-            if days_ago <= 7:
-                # Use 7-day-ago snapshot
-                eps_avg = estimate.get("eps_estimate_average_7_days_ago")
-                revenue_avg = estimate.get("revenue_estimate_average_7_days_ago")
-            elif days_ago <= 30:
-                # Use 30-day-ago snapshot
-                eps_avg = estimate.get("eps_estimate_average_30_days_ago")
-                revenue_avg = estimate.get("revenue_estimate_average_30_days_ago")
-            elif days_ago <= 60:
-                # Use 60-day-ago snapshot
-                eps_avg = estimate.get("eps_estimate_average_60_days_ago")
-                revenue_avg = estimate.get("revenue_estimate_average_60_days_ago")
-            elif days_ago <= 90:
-                # Use 90-day-ago snapshot
-                eps_avg = estimate.get("eps_estimate_average_90_days_ago")
-                revenue_avg = estimate.get("revenue_estimate_average_90_days_ago")
-            else:
-                # Beyond 90 days - use current estimate as approximation
-                logger.warning(
-                    f"Historical date {as_of_date.date()} is >90 days ago. "
-                    f"Using current estimate as approximation."
-                )
-                eps_avg = estimate.get("eps_estimate_average")
-                revenue_avg = estimate.get("revenue_estimate_average")
-        else:
-            # Current analysis - use current estimates
-            eps_avg = estimate.get("eps_estimate_average")
-            revenue_avg = estimate.get("revenue_estimate_average")
-
         return {
             "date": estimate.get("date"),
             "horizon": estimate.get("horizon"),
-            "eps_estimate_avg": AlphaVantageProvider._safe_float(eps_avg),
+            "eps_estimate_avg": AlphaVantageProvider._safe_float(
+                estimate.get("eps_estimate_average")
+            ),
             "eps_estimate_high": AlphaVantageProvider._safe_float(
                 estimate.get("eps_estimate_high")
             ),
@@ -618,7 +603,9 @@ class AlphaVantageProvider(DataProvider):
             "eps_analyst_count": AlphaVantageProvider._safe_float(
                 estimate.get("eps_estimate_analyst_count")
             ),
-            "revenue_estimate_avg": AlphaVantageProvider._safe_float(revenue_avg),
+            "revenue_estimate_avg": AlphaVantageProvider._safe_float(
+                estimate.get("revenue_estimate_average")
+            ),
             "revenue_estimate_high": AlphaVantageProvider._safe_float(
                 estimate.get("revenue_estimate_high")
             ),
