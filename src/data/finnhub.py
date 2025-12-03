@@ -157,6 +157,15 @@ class FinnhubProvider(DataProvider):
                     # Convert Unix timestamp to datetime
                     published_date = datetime.fromtimestamp(item["datetime"])
 
+                    # CLIENT-SIDE FILTERING: For historical analysis, ensure no future articles
+                    # This prevents look-ahead bias even if API parameter filtering is incomplete
+                    if as_of_date and published_date.date() > as_of_date.date():
+                        logger.debug(
+                            f"Filtering out future article (pub: {published_date.date()}, "
+                            f"analysis: {as_of_date.date()})"
+                        )
+                        continue
+
                     article = NewsArticle(
                         ticker=ticker.upper(),
                         title=item.get("headline", "")[:200],
