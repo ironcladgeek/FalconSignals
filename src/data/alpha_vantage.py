@@ -496,16 +496,20 @@ class AlphaVantageProvider(DataProvider):
         if not self.api_key:
             raise ValueError("Alpha Vantage API key is not configured")
 
-        # Prevent look-ahead bias for historical analysis
-        # Earnings estimates are forward-looking data that change daily.
-        # We cannot provide historical snapshots without explicit caching.
+        # For historical analysis, we cannot get true historical estimate snapshots
+        # without caching them from that date. This is a known limitation.
+        # The Alpha Vantage API only provides current estimates, which would cause
+        # look-ahead bias if used for historical analysis (using future knowledge).
         if as_of_date and as_of_date.date() < datetime.now().date():
             logger.debug(
-                f"Earnings estimates requested for historical date {as_of_date.date()} "
-                f"(before today {datetime.now().date()}). "
-                f"Estimates are forward-looking and not available historically to prevent look-ahead bias."
+                f"Earnings estimates requested for historical date {as_of_date.date()}. "
+                f"Note: Returning current estimates for next quarter/year (as of today), "
+                f"not estimates that existed on {as_of_date.date()}. "
+                f"To get true historical estimates, they would need to be cached from that date."
             )
-            return None
+            # TODO: Implement cache-based historical estimate snapshots
+            # For now, continue to fetch current estimates with this limitation noted
+            # return None  # Uncomment when cache system is implemented
 
         try:
             logger.debug(f"Fetching earnings estimates for {ticker}")

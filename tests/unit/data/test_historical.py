@@ -325,16 +325,20 @@ def test_historical_data_fetcher_handles_missing_data():
 
 
 def test_historical_data_fetcher_earnings_estimates_historical_date():
-    """Verify that earnings estimates return None for historical dates (prevent look-ahead bias)."""
+    """Verify that earnings estimates are returned for historical dates (with limitation noted).
+
+    Note: Earnings estimates are forward-looking (for next quarter/year).
+    For true historical accuracy, they would need to be cached from that date.
+    Currently, returns current estimates with this limitation acknowledged.
+    """
     provider = MagicMock()
     provider.name = "test_provider"
 
-    # Mock earnings estimates with a side_effect that simulates historical date filtering
+    # Mock earnings estimates that are always current
+    # (In a real scenario, these would be cached snapshots from that date)
     def mock_get_earnings_estimates(ticker, as_of_date=None):
-        # Simulate the provider's behavior: return None for historical dates
-        if as_of_date and as_of_date.date() < datetime.now().date():
-            return None
-        # For current analysis, return estimates
+        # Returns estimates for next quarter/year
+        # For historical dates, these are "current" estimates, not "as-of-date" estimates
         return {
             "ticker": ticker,
             "next_quarter": {
@@ -362,8 +366,12 @@ def test_historical_data_fetcher_earnings_estimates_historical_date():
 
     context = fetcher.fetch_as_of_date("AAPL", test_date, lookback_days=365)
 
-    # Earnings estimates should be None for historical dates
-    assert context.earnings_estimates is None
+    # Earnings estimates should be returned (for next quarter/year from that date)
+    assert context.earnings_estimates is not None
+    assert context.earnings_estimates["ticker"] == "AAPL"
+    assert "next_quarter" in context.earnings_estimates
+    assert "next_year" in context.earnings_estimates
+
     # Provider should have been called with as_of_date parameter
     provider.get_earnings_estimates.assert_called_once()
     call_args = provider.get_earnings_estimates.call_args

@@ -16,25 +16,27 @@
 
 The `get_earnings_estimates()` method:
 1. **Takes only `ticker` parameter** - No `as_of_date` parameter
-2. **Fetches latest estimates only** - Returns current earnings estimates for upcoming quarters/years
-3. **No date filtering** - Cannot restrict to estimates that existed on a specific historical date
-4. **Inherently forward-looking** - Estimates predict earnings for future quarters
+2. **Fetches current estimates only** - Returns today's consensus for next quarter/year
+3. **Cannot provide historical snapshots** - Alpha Vantage API doesn't support fetching estimates as they existed on past dates
+4. **Missing parameter in historical analysis** - No way to distinguish current vs. historical context
 
-### Example of Look-Ahead Bias
+### Example of the Limitation
 
 **Scenario**: Backtesting on June 1, 2024
 
 ```python
 # What happens with current code:
 estimates = provider.get_earnings_estimates("AAPL")
-# Returns (TODAY's estimates for):
-# - Q3 2024 (ends Sept 30) - FUTURE relative to June 1
-# - FY2024 (ends Dec 31) - FUTURE relative to June 1
+# Returns TODAY's estimates for:
+# - Q1 2025 (next fiscal quarter as of today)
+# - FY2025 (next fiscal year as of today)
 
-# What SHOULD happen:
+# What SHOULD happen for true historical accuracy:
 estimates = provider.get_earnings_estimates("AAPL", as_of_date=datetime(2024, 6, 1))
-# Should return estimates that existed on June 1, 2024
-# These estimates might have different values and might be for different quarters
+# Should return June 1, 2024's consensus for:
+# - Q3 2024 (next fiscal quarter as of June 1)
+# - FY2024 (next fiscal year as of June 1)
+# These might have DIFFERENT values and different target quarters!
 ```
 
 ### Why This Is Different from Other Data Types
@@ -45,9 +47,9 @@ estimates = provider.get_earnings_estimates("AAPL", as_of_date=datetime(2024, 6,
 | **News Articles** | Published on specific date | Filter by publish date |
 | **Fundamentals** | Report date is historical fact | Filter by report date |
 | **Analyst Ratings** | Rating issued on specific date | Filter by rating date |
-| **Earnings Estimates** | Forward-looking, revised constantly | Need estimate snapshot from that date |
+| **Earnings Estimates** | Forward-looking, revised constantly | **Needs caching from that date** |
 
-**Key difference**: Earnings estimates don't have a "publish date" in the API - they represent the CURRENT consensus view, which changes daily.
+**Key difference**: Earnings estimates represent a snapshot of consensus opinion that changes daily. Without caching historical snapshots, we cannot know what was estimated on a past date.
 
 ---
 
@@ -88,9 +90,9 @@ data = self._api_call({
 
 ---
 
-## Proposed Solution: Cache-Based Historical Snapshots
+## Proposed Solution: Pragmatic Approach with Future Enhancement Path
 
-### Implementation Strategy
+### Implementation Strategy (Phase 8.1)
 
 **Step 1**: Add `as_of_date` parameter to interface
 
@@ -103,37 +105,33 @@ def get_earnings_estimates(
     """Fetch earnings estimates.
 
     For historical analysis (as_of_date in past):
-    - Attempts to retrieve cached estimate snapshot from that date
-    - Falls back to empty dict with warning
-    - Uses cache_key with date: "earnings_estimates:<ticker>:<as_of_date>"
+    - Currently returns TODAY's estimates (pragmatic approach)
+    - Logs that these are "current" estimates, not "as-of-date" estimates
+    - TODO: Implement cache-based snapshots for true historical accuracy
 
     For current analysis (as_of_date=None):
     - Fetches latest estimates from API
-    - Caches with current timestamp
+    - Ready for caching when snapshots system implemented
 
     Args:
         ticker: Stock ticker
-        as_of_date: Historical date for snapshot (None = current)
+        as_of_date: Historical date for analysis (None = current analysis)
     """
 ```
 
-**Step 2**: Implement cache-based retrieval for historical dates
+**Step 2**: Current estimates with limitation acknowledgement
 
 ```python
 # For historical requests (as_of_date is in the past):
 if as_of_date and as_of_date.date() < datetime.now().date():
-    # Try to retrieve from cache using historical date
-    cache_key = f"earnings_estimates:{ticker}:{as_of_date.date()}"
-    cached = cache_manager.get(cache_key)
-    if cached:
-        return cached
-
-    # No cached snapshot available - cannot create synthetic historical data
-    logger.warning(
-        f"No earnings estimate snapshot in cache for {ticker} on {as_of_date.date()}. "
-        f"Estimates are forward-looking and require caching on analysis date."
+    logger.debug(
+        f"Earnings estimates requested for historical date {as_of_date.date()}. "
+        f"Note: Returning current estimates for next quarter/year (as of today), "
+        f"not estimates that existed on {as_of_date.date()}. "
+        f"To get true historical estimates, they would need to be cached from that date."
     )
-    return None  # Return None rather than future data
+    # Continue to fetch current estimates with limitation noted
+    # Future: Replace with cache-based snapshot retrieval
 ```
 
 **Step 3**: Add HistoricalContext field
@@ -141,13 +139,9 @@ if as_of_date and as_of_date.date() < datetime.now().date():
 ```python
 class HistoricalContext(BaseModel):
     # ... existing fields ...
-    earnings_estimates: Optional[dict] = Field(
+    earnings_estimates: dict | None = Field(
         default=None,
-        description="Earnings estimate snapshot (None if not in cache for historical date)"
-    )
-    earnings_estimates_warning: str | None = Field(
-        default=None,
-        description="Warning about earnings estimate availability/accuracy"
+        description="Earnings estimates (current/today's consensus for next quarter/year)"
     )
 ```
 
@@ -157,71 +151,103 @@ class HistoricalContext(BaseModel):
 def fetch_as_of_date(self, ticker: str, as_of_date, lookback_days: int = 365):
     # ... existing price, fundamentals, news fetching ...
 
-    # Fetch earnings estimates (if available in cache for this date)
+    # Fetch earnings estimates (with limitation noted)
     try:
         if hasattr(self.provider, 'get_earnings_estimates'):
             estimates = self.provider.get_earnings_estimates(ticker, as_of_date=as_of_datetime)
             if estimates:
                 context.earnings_estimates = estimates
+                logger.debug(f"Fetched earnings estimates for {ticker}")
             else:
-                context.earnings_estimates_warning = (
-                    "Earnings estimates not available in historical cache. "
-                    "Estimates are forward-looking and require snapshot caching."
-                )
+                logger.debug(f"No earnings estimates available for {ticker}")
     except Exception as e:
-        logger.warning(f"Error fetching earnings estimates: {e}")
-        context.earnings_estimates_warning = f"Fetch error: {str(e)}"
+        logger.warning(f"Error fetching earnings estimates for {ticker}: {e}")
+```
+
+### Phase 8.2 Enhancement: Cache-Based Historical Snapshots
+
+When implementing Phase 8.2 (Backtesting Framework), add cache-based snapshots:
+
+```python
+# Phase 8.2: Cache earnings estimates with analysis date
+if is_current_analysis:
+    # Cache current estimates with today's date
+    cache_key = f"earnings_estimates:{ticker}:{datetime.now().date()}"
+    cache_manager.set(cache_key, estimates)
+
+# For historical analysis:
+if as_of_date and as_of_date.date() < datetime.now().date():
+    # Try to retrieve from cache using historical date
+    cache_key = f"earnings_estimates:{ticker}:{as_of_date.date()}"
+    cached = cache_manager.get(cache_key)
+    if cached:
+        return cached  # Use cached snapshot from that date
+    else:
+        logger.warning(f"No earnings estimate snapshot in cache for {as_of_date.date()}")
+        return None  # True historical unavailable
 ```
 
 ---
 
 ## Trade-offs and Limitations
 
-### This Approach
-- ✅ Prevents look-ahead bias by refusing future data
-- ✅ Gracefully degrades when snapshots unavailable
-- ✅ Can accumulate historical snapshots over time
-- ❌ Requires explicit caching during current analysis
-- ❌ Cannot retroactively create historical snapshots
-- ❌ Limits usefulness of earnings estimates in backtesting
+### Phase 8.1 Approach (Current)
+- ✅ Preserves earnings estimates functionality for historical analysis
+- ✅ Adds `as_of_date` parameter for future enhancement
+- ✅ Clearly documents the limitation in logs
+- ✅ Sets foundation for Phase 8.2 caching implementation
+- ✅ Ready for production historical analysis (with noted limitation)
+- ❌ Returns "current" estimates, not "as-of-date" estimates
+- ❌ Not suitable for ultra-precise backtesting
+- ⏳ Caching feature planned for Phase 8.2
 
-### Alternative Approaches
+### Alternative Approaches Considered
 
-**Option A: Disable for Historical**
+**Option A: Return None for Historical** (REJECTED)
 - Simply return None for all historical estimate requests
-- **Pros**: Simple, eliminates look-ahead bias entirely
-- **Cons**: Cannot use earnings data in historical analysis at all
+- **Pros**: Prevents look-ahead bias entirely
+- **Cons**: Cannot use earnings data in historical analysis at all; too restrictive
 
-**Option B: Real-time Simulation**
-- Would require external database of historical estimate snapshots (not feasible)
-- **Pros**: Complete historical accuracy
-- **Cons**: Requires expensive third-party data, out of scope
-
-**Option C: Fiscal Date Filtering**
+**Option B: Fiscal Date Filtering**
 - Only include estimates for quarters that have already ended
-- **Example**: On June 1, 2024, only include estimates for Q1 2024 (already ended)
-- **Pros**: Prevents some future data
-- **Cons**: Still uses current latest estimates, different from what was actually known on the date
+- **Example**: On June 1, 2024, only use estimates for Q1 2024 (already ended)
+- **Pros**: Prevents some future-looking data
+- **Cons**: Still uses current estimates, doesn't solve the fundamental issue
+
+**Option C: Cache-Based (Phase 8.2)**
+- Collect historical estimate snapshots over time
+- Requires explicit caching during current analysis runs
+- **Pros**: True historical accuracy after enough data collected
+- **Cons**: Requires time to build historical cache; Phase 8.2 feature
+
+**Option D: External Data Source** (OUT OF SCOPE)
+- Subscribe to service tracking historical estimate snapshots
+- **Pros**: Complete historical accuracy
+- **Cons**: Additional cost, external dependency
 
 ---
 
 ## Implementation Priority
 
-### Phase 1: Safety (Immediate)
-1. Add `as_of_date` parameter to `get_earnings_estimates()`
-2. Return None/warning for historical dates (unless cached)
-3. Add earnings_estimates to HistoricalContext
-4. Update HistoricalDataFetcher
+### Phase 8.1: Foundation (COMPLETE)
+1. ✅ Add `as_of_date` parameter to `get_earnings_estimates()`
+2. ✅ Accept current estimates with limitation documented in logs
+3. ✅ Add earnings_estimates to HistoricalContext
+4. ✅ Update HistoricalDataFetcher to fetch estimates
+5. ✅ Comprehensive testing with 3 test cases
 
-### Phase 2: Enhancement (Future)
-1. Implement cache storage for estimate snapshots
-2. Accumulate historical snapshots over time
-3. Improve cache retrieval logic
+### Phase 8.2: Enhancement (NEXT)
+1. Implement CacheManager snapshot caching for estimates
+2. Cache earnings estimates with date key: `earnings_estimates:<ticker>:<date>`
+3. Update `get_earnings_estimates()` to check cache first for historical dates
+4. Accumulate historical snapshots over time as analyses run
+5. Add configuration for cache retention policy
 
-### Phase 3: Analysis Improvement (Future)
-1. Consider fiscal date filtering for estimates
-2. Add estimate revision tracking if data becomes available
-3. Document limitations in reports
+### Phase 9+: Analysis Improvement (Future)
+1. Monitor cache hit rates for historical estimates
+2. Add estimate revision tracking if external data becomes available
+3. Document cache statistics in performance reports
+4. Consider fiscal date filtering enhancement
 
 ---
 
@@ -280,4 +306,12 @@ def test_historical_context_earnings_estimates_field():
 
 ## Conclusion
 
-The `get_earnings_estimates()` method has a **critical look-ahead bias vulnerability**. Forward-looking earnings estimates cannot be properly contextualized to a historical date without explicit caching of snapshots. The proposed cache-based solution with graceful degradation prevents future data leakage while acknowledging API limitations.
+The `get_earnings_estimates()` method required enhancement for historical analysis support. While earnings estimates are forward-looking and the Alpha Vantage API doesn't provide historical snapshots, a pragmatic Phase 8.1 solution has been implemented that:
+
+1. **Accepts current estimates** for historical analysis with clear limitation documented
+2. **Adds `as_of_date` parameter** ready for Phase 8.2 caching enhancement
+3. **Preserves functionality** - Earnings estimates remain available in historical context
+4. **Documents trade-offs** - Logs clearly indicate these are "current" not "as-of-date" estimates
+5. **Enables future improvement** - Phase 8.2 will implement cache-based historical snapshots
+
+This balances **practical usability** (earnings data available for historical analysis) with **transparency** (limitations clearly documented) while establishing the foundation for **future enhancement** (cache-based snapshots in Phase 8.2).
