@@ -467,7 +467,9 @@ class AlphaVantageProvider(DataProvider):
             logger.error(f"Error fetching company info for {ticker}: {e}")
             raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
 
-    def get_earnings_estimates(self, ticker: str) -> Optional[dict]:
+    def get_earnings_estimates(
+        self, ticker: str, as_of_date: Optional[datetime] = None
+    ) -> Optional[dict]:
         """Fetch earnings estimates from Alpha Vantage.
 
         Uses the EARNINGS_ESTIMATES endpoint to get:
@@ -475,11 +477,17 @@ class AlphaVantageProvider(DataProvider):
         - Revenue estimates
         - Analyst count and estimate revisions
 
+        For historical analysis (as_of_date in the past):
+        Earnings estimates are forward-looking data without explicit historical snapshots.
+        Returns None with warning to prevent look-ahead bias.
+
         Args:
             ticker: Stock ticker symbol
+            as_of_date: Optional historical date for snapshot. If None, fetches current estimates.
+                       For dates in the past, returns None to prevent future data leakage.
 
         Returns:
-            Dictionary with earnings estimates or None if not available
+            Dictionary with earnings estimates or None if not available (including historical dates)
 
         Raises:
             ValueError: If API key is not configured
@@ -487,6 +495,17 @@ class AlphaVantageProvider(DataProvider):
         """
         if not self.api_key:
             raise ValueError("Alpha Vantage API key is not configured")
+
+        # Prevent look-ahead bias for historical analysis
+        # Earnings estimates are forward-looking data that change daily.
+        # We cannot provide historical snapshots without explicit caching.
+        if as_of_date and as_of_date.date() < datetime.now().date():
+            logger.debug(
+                f"Earnings estimates requested for historical date {as_of_date.date()} "
+                f"(before today {datetime.now().date()}). "
+                f"Estimates are forward-looking and not available historically to prevent look-ahead bias."
+            )
+            return None
 
         try:
             logger.debug(f"Fetching earnings estimates for {ticker}")

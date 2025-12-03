@@ -177,6 +177,25 @@ class HistoricalDataFetcher:
         except Exception as e:
             logger.warning(f"Error fetching metadata for {ticker}: {e}")
 
+        # Fetch earnings estimates (if supported)
+        # Note: Earnings estimates are forward-looking data that change daily.
+        # For historical analysis, returns None to prevent look-ahead bias.
+        try:
+            if hasattr(self.provider, "get_earnings_estimates"):
+                estimates = self.provider.get_earnings_estimates(ticker, as_of_date=as_of_datetime)
+                if estimates:
+                    context.earnings_estimates = estimates
+                    logger.debug(f"Fetched earnings estimates for {ticker}")
+                else:
+                    logger.debug(
+                        f"No earnings estimates available for {ticker} "
+                        f"(None for historical dates to prevent look-ahead bias)"
+                    )
+        except NotImplementedError:
+            logger.debug(f"Provider {self.provider.name} does not support earnings estimates")
+        except Exception as e:
+            logger.warning(f"Error fetching earnings estimates for {ticker}: {e}")
+
         logger.debug(
             f"Historical context complete for {ticker}: "
             f"data_available={context.data_available}, "

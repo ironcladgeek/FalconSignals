@@ -129,6 +129,10 @@ class HistoricalContext(BaseModel):
         default=None, description="Most recent analyst ratings as of date"
     )
     metadata: InstrumentMetadata | None = Field(default=None, description="Instrument metadata")
+    earnings_estimates: dict | None = Field(
+        default=None,
+        description="Earnings estimates (None for historical dates to prevent look-ahead bias)",
+    )
     lookback_days: int = Field(default=365, description="Number of days of historical data")
     data_available: bool = Field(
         default=True, description="Whether sufficient data was available for analysis"

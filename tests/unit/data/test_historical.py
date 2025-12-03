@@ -322,3 +322,98 @@ def test_historical_data_fetcher_handles_missing_data():
     assert len(context.fundamentals) == 0
     assert len(context.news) == 0
     assert context.analyst_ratings is None
+
+
+def test_historical_data_fetcher_earnings_estimates_historical_date():
+    """Verify that earnings estimates return None for historical dates (prevent look-ahead bias)."""
+    provider = MagicMock()
+    provider.name = "test_provider"
+
+    # Mock earnings estimates with a side_effect that simulates historical date filtering
+    def mock_get_earnings_estimates(ticker, as_of_date=None):
+        # Simulate the provider's behavior: return None for historical dates
+        if as_of_date and as_of_date.date() < datetime.now().date():
+            return None
+        # For current analysis, return estimates
+        return {
+            "ticker": ticker,
+            "next_quarter": {
+                "date": "2024-09-30",
+                "horizon": "next quarter",
+                "eps_estimate_avg": 1.25,
+            },
+            "next_year": {
+                "date": "2024-12-31",
+                "horizon": "next year",
+                "eps_estimate_avg": 5.50,
+            },
+        }
+
+    provider.get_earnings_estimates.side_effect = mock_get_earnings_estimates
+
+    # Mock other required methods
+    provider.get_stock_prices.return_value = []
+    provider.get_financial_statements.return_value = []
+    provider.get_news.return_value = []
+    provider.get_analyst_ratings.return_value = None
+
+    fetcher = HistoricalDataFetcher(provider)
+    test_date = datetime(2024, 6, 1)  # Historical date (in the past)
+
+    context = fetcher.fetch_as_of_date("AAPL", test_date, lookback_days=365)
+
+    # Earnings estimates should be None for historical dates
+    assert context.earnings_estimates is None
+    # Provider should have been called with as_of_date parameter
+    provider.get_earnings_estimates.assert_called_once()
+    call_args = provider.get_earnings_estimates.call_args
+    # Verify as_of_date was passed
+    assert "as_of_date" in call_args.kwargs or len(call_args.args) > 1
+
+
+def test_historical_data_fetcher_earnings_estimates_missing_provider():
+    """Verify that missing get_earnings_estimates method is handled gracefully."""
+    provider = MagicMock()
+    provider.name = "test_provider"
+    # Simulate provider without get_earnings_estimates method
+    del provider.get_earnings_estimates
+
+    # Mock other required methods
+    provider.get_stock_prices.return_value = []
+    provider.get_financial_statements.return_value = []
+    provider.get_news.return_value = []
+    provider.get_analyst_ratings.return_value = None
+
+    fetcher = HistoricalDataFetcher(provider)
+    test_date = datetime(2024, 6, 1)
+
+    context = fetcher.fetch_as_of_date("TEST", test_date, lookback_days=365)
+
+    # Should handle missing method gracefully
+    assert context.earnings_estimates is None
+    assert context.data_available is False  # No price data
+
+
+def test_historical_data_fetcher_earnings_estimates_error_handling():
+    """Verify graceful error handling for earnings estimate fetch failures."""
+    provider = MagicMock()
+    provider.name = "test_provider"
+
+    # Simulate error in earnings estimates
+    provider.get_earnings_estimates.side_effect = RuntimeError("API error")
+
+    # Mock other required methods
+    provider.get_stock_prices.return_value = []
+    provider.get_financial_statements.return_value = []
+    provider.get_news.return_value = []
+    provider.get_analyst_ratings.return_value = None
+
+    fetcher = HistoricalDataFetcher(provider)
+    test_date = datetime(2024, 6, 1)
+
+    # Should not raise, should log warning
+    context = fetcher.fetch_as_of_date("TEST", test_date, lookback_days=365)
+
+    # Should have returned context with None estimates
+    assert context.earnings_estimates is None
+    assert context.data_available is False  # No price data
