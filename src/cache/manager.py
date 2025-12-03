@@ -342,23 +342,27 @@ class CacheManager:
                         if price_idx + 2 < len(parts):
                             start_date = parts[price_idx + 1]
                             end_date = parts[price_idx + 2]
-                            # Valid if end_date >= as_of_date (includes historical date)
+                            # Valid if end_date <= as_of_date (no future data)
+                            # This ensures we only use cache files that don't contain future data
                             if (
                                 len(start_date) == 10
                                 and len(end_date) == 10
-                                and end_date >= as_of_date
+                                and end_date <= as_of_date
                             ):
-                                # Use the earliest matching file (most complete data)
                                 valid_files.append((end_date, file_path))
                                 logger.debug(
                                     f"Price cache {file_path.name} covers {start_date} to {end_date}, "
-                                    f"includes as_of_date {as_of_date}"
+                                    f"valid for as_of_date {as_of_date}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"Price cache {file_path.name} end date {end_date} is after {as_of_date}, skipping"
                                 )
                     except (ValueError, IndexError):
                         pass
 
                 # For other data types, look for single date in filename
-                if not valid_files or "prices" not in parts:
+                elif "prices" not in parts:
                     for part in parts:
                         if len(part) == 10 and part[4] == "-" and part[7] == "-":
                             # For non-price data, use date <= as_of_date
@@ -430,13 +434,29 @@ class CacheManager:
                     params_parts.append(param)
 
             # Build filename: ticker_type_params.json
-            # For fundamental_enriched and news_sentiment, add today's date
-            if type_name in ["fundamental-enriched", "news-sentiment"] and not params_parts:
-                fetch_date = datetime.now().strftime("%Y-%m-%d")
-                if type_name == "fundamental-enriched":
+            # For fundamental_enriched, use date (historical or current)
+            if type_name == "fundamental-enriched":
+                if params_parts and len(params_parts[0]) == 10 and params_parts[0][4] == "-":
+                    # Date format (YYYY-MM-DD)
+                    filename = f"{ticker}_fundamental_{params_parts[0]}.json"
+                else:
+                    # Legacy fallback: use today's date
+                    fetch_date = datetime.now().strftime("%Y-%m-%d")
                     filename = f"{ticker}_fundamental_{fetch_date}.json"
-                else:  # news-sentiment
+            # For news_sentiment, use date range if available (like prices)
+            elif type_name == "news-sentiment":
+                if len(params_parts) >= 2:
+                    # Has date range: news_sentiment:TICKER:START_DATE:END_DATE
+                    params_str = "_".join(params_parts)
+                    filename = f"{ticker}_news_{params_str}.json"
+                elif not params_parts:
+                    # No date params, use today's date as fallback
+                    fetch_date = datetime.now().strftime("%Y-%m-%d")
                     filename = f"{ticker}_news_{fetch_date}.json"
+                else:
+                    # Single param (legacy)
+                    params_str = "_".join(params_parts)
+                    filename = f"{ticker}_news_{params_str}.json"
             elif params_parts:
                 params_str = "_".join(params_parts)
                 filename = f"{ticker}_{type_name}_{params_str}.json"

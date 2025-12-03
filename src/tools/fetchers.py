@@ -219,20 +219,26 @@ class FinancialDataFetcherTool(BaseTool):
             Dictionary with company info, news sentiment, analyst data, and metrics
         """
         try:
+            # Convert historical_date to datetime if needed
+            as_of_date = None
+            if self.historical_date:
+                as_of_date = datetime.combine(self.historical_date, datetime.max.time())
+                logger.info(f"Fetching fundamental data as of {self.historical_date} for {ticker}")
+
+            # Create cache key with date (historical or current)
+            if self.historical_date:
+                cache_key = f"fundamental_enriched:{ticker}:{self.historical_date}"
+            else:
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                cache_key = f"fundamental_enriched:{ticker}:{current_date}"
+
             # Check cache first
-            cache_key = f"fundamental_enriched:{ticker}"
             cached = self.cache_manager.get(cache_key)
             if cached:
                 logger.debug(f"Cache hit for {ticker} fundamental data")
                 return cached
 
             logger.debug(f"Fetching enriched fundamental data for {ticker}")
-
-            # Convert historical_date to datetime if needed
-            as_of_date = None
-            if self.historical_date:
-                as_of_date = datetime.combine(self.historical_date, datetime.max.time())
-                logger.info(f"Fetching fundamental data as of {self.historical_date} for {ticker}")
 
             # Fetch company overview (Alpha Vantage Premium)
             company_info = None
@@ -561,18 +567,27 @@ class NewsFetcherTool(BaseTool):
             if limit is None:
                 limit = get_config().data.news.max_articles
 
-            # Check cache first - use date-based key for consistent daily caching
-            cache_key = f"news_sentiment:{ticker}"
-            cached = self.cache_manager.get(cache_key)
-            if cached:
-                logger.debug(f"Cache hit for {ticker} news")
-                return cached
-
             # Convert historical_date to datetime if needed
             as_of_date = None
             if self.historical_date:
                 as_of_date = datetime.combine(self.historical_date, datetime.max.time())
                 logger.info(f"Fetching news as of {self.historical_date} for {ticker}")
+
+            # Try to find existing cache with matching date range
+            # Check for news cache files matching this ticker and date
+            if self.historical_date:
+                # Look for cache files with date range that includes our historical date
+                cache_pattern = f"news_sentiment:{ticker}:*:*"
+                # The cache manager doesn't support pattern matching, so we'll fetch and check
+                # the date range after retrieval
+                pass
+
+            # Check simple cache key first (for current/non-historical requests)
+            simple_cache_key = f"news_sentiment:{ticker}"
+            cached = self.cache_manager.get(simple_cache_key)
+            if cached and not self.historical_date:
+                logger.debug(f"Cache hit for {ticker} news")
+                return cached
 
             # Fetch news using Alpha Vantage Premium
             logger.debug(f"Fetching news with sentiment for {ticker}")
@@ -585,6 +600,27 @@ class NewsFetcherTool(BaseTool):
                     "count": 0,
                     "sentiment_summary": None,
                 }
+
+            # Calculate date range from articles for cache key
+            cache_key = simple_cache_key  # Default
+            if articles:
+                article_dates = []
+                for article in articles:
+                    pub_date_str = article.published_date
+                    if isinstance(pub_date_str, str):
+                        # Extract date portion (YYYY-MM-DD)
+                        date_part = (
+                            pub_date_str.split()[0] if " " in pub_date_str else pub_date_str[:10]
+                        )
+                        article_dates.append(date_part)
+                    elif isinstance(pub_date_str, datetime):
+                        article_dates.append(pub_date_str.strftime("%Y-%m-%d"))
+
+                if article_dates:
+                    min_date = min(article_dates)
+                    max_date = max(article_dates)
+                    cache_key = f"news_sentiment:{ticker}:{min_date}:{max_date}"
+                    logger.debug(f"News date range for {ticker}: {min_date} to {max_date}")
 
             # Calculate sentiment summary
             positive = sum(1 for a in articles if a.sentiment == "positive")
