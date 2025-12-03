@@ -68,6 +68,13 @@ class SentimentAgent(BaseAgent):
                     "sentiment_score": 0,
                 }
 
+            # Set historical date if provided in context
+            if "analysis_date" in context and hasattr(news_fetcher, "set_historical_date"):
+                news_fetcher.set_historical_date(context["analysis_date"])
+                logger.debug(
+                    f"Set historical date {context['analysis_date']} for sentiment analysis"
+                )
+
             news_data = news_fetcher.run(
                 ticker,
                 limit=get_config().data.news.max_articles,
