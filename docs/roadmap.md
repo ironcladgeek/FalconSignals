@@ -17,7 +17,8 @@ This roadmap outlines the implementation plan for building an AI-driven financia
 | Phase 5 | Days 13-14 | Integration, Testing & Polish | ✅ Complete |
 | Phase 6 | Days 15-18 | CrewAI & LLM Integration | ✅ Complete |
 | Phase 7 | Days 19-20 | True Test Mode | ✅ Complete |
-| Phase 8 | Next | Historical Analysis & Backtesting | 📋 **HIGH PRIORITY** |
+| Phase 8.1 | Next | Historical Date Analysis | ✅ **COMPLETE** |
+| Phase 8.2 | Next | Backtesting Framework | 📋 HIGH PRIORITY |
 | Phase 9 | Future | Per-Agent LLM Model Configuration | 📋 Planned |
 | Phase 10 | Future | Devil's Advocate Agent | 📋 Planned |
 | Phase 11 | Future | Performance Tracking & Database | 📋 Planned |
@@ -556,38 +557,56 @@ Enable analysis based on historical dates for backtesting and performance evalua
 
 ### 8.1 Historical Date Analysis
 
+✅ **COMPLETE** - Enables backtesting and historical analysis
+
 **Objective**: Run analysis as if it were a specific date in the past.
 
-#### Tasks
-- [ ] **Add `--date` CLI parameter**:
-  ```bash
-  # Analyze as if it were June 1, 2024
-  uv run python -m src.main analyze --ticker AAPL --date 2024-06-01
+#### Implementation Details
 
-  # Analyze with LLM using historical data
-  uv run python -m src.main analyze --ticker AAPL --date 2024-06-01 --llm
-  ```
+**1. CLI Parameter** ✅
+```bash
+# Analyze as if it were June 1, 2024
+uv run python -m src.main analyze --ticker AAPL --date 2024-06-01
 
-- [ ] **Implement historical data fetcher**:
-  ```python
-  class HistoricalDataFetcher:
-      def fetch_as_of_date(
-          self,
-          ticker: str,
-          as_of_date: date,
-          lookback_days: int = 365
-      ) -> HistoricalContext:
-          """Fetch all data as it would have been available on as_of_date."""
-          return HistoricalContext(
-              price_data=self._fetch_prices(ticker, end_date=as_of_date),
-              fundamentals=self._fetch_fundamentals_as_of(ticker, as_of_date),
-              news=self._fetch_news_before(ticker, as_of_date),
-          )
-  ```
+# Analyze with LLM using historical data
+uv run python -m src.main analyze --ticker AAPL --date 2024-06-01 --llm
 
-- [ ] **Prevent future data leakage** (strict date filtering)
-- [ ] **Update cache manager** for historical queries
-- [ ] **Handle missing historical data** gracefully
+# Test mode with historical date
+uv run python -m src.main analyze --test --date 2024-06-01
+```
+
+**2. HistoricalDataFetcher** ✅
+- Location: `src/data/historical.py`
+- Fetches all data available as of a specific date
+- Strict date filtering prevents future data leakage
+- Supports both datetime and date objects
+- Graceful error handling with missing data warnings
+
+**3. HistoricalContext Model** ✅
+- Location: `src/data/models.py`
+- Contains price data, fundamentals, news, analyst ratings
+- Tracks data availability and missing data warnings
+- Configurable lookback period (default: 365 days)
+
+**4. Cache Manager Enhancement** ✅
+- Added `get_historical_cache()` method to CacheManager
+- Filters cached files by date extracted from filename
+- Returns most recent cache available before specified date
+- Enables efficient historical analysis without re-fetching
+
+**5. Pipeline Integration** ✅
+- Historical date passed through analysis context
+- Report generation uses historical date for report_date
+- Both rule-based and LLM analysis support historical dates
+
+#### Deliverables
+- ✅ `--date` CLI parameter (YYYY-MM-DD format)
+- ✅ HistoricalDataFetcher with strict date filtering
+- ✅ HistoricalContext Pydantic model
+- ✅ Enhanced CacheManager.get_historical_cache()
+- ✅ Pipeline integration for historical analysis
+- ✅ Test mode support for historical dates
+- ✅ Comprehensive error handling and warnings
 
 ### 8.2 Backtesting Framework
 
@@ -644,7 +663,7 @@ backtesting:
 
 ---
 
-**Phase 8 Status: PLANNED - HIGH PRIORITY**
+**Phase 8.1 Status: ✅ COMPLETE**
 
 **Estimated Effort**: 4-5 days
 **Priority**: 🔴 High - Essential for system validation

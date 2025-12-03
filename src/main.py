@@ -436,6 +436,12 @@ def analyze(
         help="Path to configuration file (default: config/local.yaml or config/default.yaml)",
         exists=True,
     ),
+    date: str = typer.Option(
+        None,
+        "--date",
+        "-d",
+        help="Analyze as if it were a specific date in the past (YYYY-MM-DD format) for historical analysis",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -505,6 +511,10 @@ def analyze(
         # Analyze specific tickers
         analyze --ticker AAPL,MSFT,GOOGL
 
+        # Historical date analysis (backtesting)
+        analyze --ticker AAPL --date 2024-06-01
+        analyze --ticker AAPL --date 2024-06-01 --llm
+
         # Analyze US categories
         analyze --category us_tech_software
         analyze --category us_ai_ml,us_cybersecurity --limit 30
@@ -516,6 +526,19 @@ def analyze(
     start_time = time.time()
     run_log = None
     signals_count = 0
+    historical_date = None
+
+    # Parse and validate historical date if provided
+    if date:
+        try:
+            historical_date = datetime.strptime(date, "%Y-%m-%d").date()
+            typer.echo(f"📅 Historical date analysis mode: {historical_date}")
+        except ValueError:
+            typer.echo(
+                f"❌ Error: Invalid date format '{date}'. Use YYYY-MM-DD format (e.g., 2024-06-01)",
+                err=True,
+            )
+            raise typer.Exit(code=1)
 
     # Handle test mode (true test mode with fixtures)
     if test:
@@ -724,6 +747,35 @@ def analyze(
         else:
             analyzed_market = market
 
+        # Setup historical data fetcher if analyzing historical data
+        historical_context_data = {}
+        if historical_date:
+            from src.data.historical import HistoricalDataFetcher
+            from src.data.provider_manager import ProviderManager
+
+            typer.echo("\n📅 Preparing historical data fetcher...")
+            # Get the primary data provider
+            provider_manager = ProviderManager()
+            primary_provider = provider_manager.primary_provider
+            historical_fetcher = HistoricalDataFetcher(primary_provider)
+
+            # Fetch historical context for each ticker
+            typer.echo(f"  Fetching historical data as of {historical_date}...")
+            for tick in ticker_list:
+                try:
+                    context = historical_fetcher.fetch_as_of_date(
+                        tick, historical_date, lookback_days=365
+                    )
+                    historical_context_data[tick] = context
+                except Exception as e:
+                    typer.echo(f"  ⚠️  Error fetching historical data for {tick}: {e}")
+                    historical_context_data[tick] = None
+
+            if historical_context_data:
+                typer.echo(
+                    f"  ✓ Historical data fetched for {len(historical_context_data)} instruments"
+                )
+
         # Run analysis (LLM or rule-based)
         if use_llm:
             typer.echo("\n🤖 Using two-stage LLM-powered analysis")
@@ -772,7 +824,12 @@ def analyze(
             typer.echo(
                 "\n📊 Using rule-based analysis (technical indicators & fundamental metrics)"
             )
-            signals, portfolio_manager = pipeline.run_analysis(ticker_list)
+            # Pass historical context if available
+            analysis_context = {}
+            if historical_context_data:
+                analysis_context["historical_contexts"] = historical_context_data
+                analysis_context["analysis_date"] = historical_date
+            signals, portfolio_manager = pipeline.run_analysis(ticker_list, analysis_context)
             analysis_mode = "rule_based"
         signals_count = len(signals)
 
@@ -781,9 +838,12 @@ def analyze(
 
             # Generate report
             typer.echo("\n📋 Generating report...")
+            # Use historical date for report if provided
+            report_date = historical_date.strftime("%Y-%m-%d") if historical_date else None
             report = pipeline.generate_daily_report(
                 signals,
                 generate_allocation=True,
+                report_date=report_date,
                 analysis_mode=analysis_mode,
                 analyzed_category=analyzed_category,
                 analyzed_market=analyzed_market,

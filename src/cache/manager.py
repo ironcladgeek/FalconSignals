@@ -296,6 +296,64 @@ class CacheManager:
             logger.debug(f"Error fetching price cache for {ticker}: {e}")
             return None
 
+    def get_historical_cache(
+        self,
+        ticker: str,
+        as_of_date: str,
+    ) -> Optional[Any]:
+        """Get cached data for a ticker as of a specific date.
+
+        For historical analysis, tries to find cache files that were created
+        on or before the specified date.
+
+        Args:
+            ticker: Stock ticker symbol
+            as_of_date: Date string in YYYY-MM-DD format
+
+        Returns:
+            Cached data or None if not found
+        """
+        try:
+            # Search for cache files matching this ticker
+            pattern = f"{ticker.upper()}_*.json"
+            matching_files = list(self.cache_dir.glob(pattern))
+
+            if not matching_files:
+                logger.debug(f"No historical cache found for {ticker}")
+                return None
+
+            # Filter files with dates <= as_of_date
+            valid_files = []
+            for file_path in matching_files:
+                # Try to extract date from filename (YYYY-MM-DD format)
+                filename = file_path.stem  # Remove .json extension
+                parts = filename.split("_")
+                for part in parts:
+                    if len(part) == 10 and part[4] == "-" and part[7] == "-":
+                        if part <= as_of_date:  # String comparison works for YYYY-MM-DD
+                            valid_files.append((part, file_path))
+                        break
+
+            if not valid_files:
+                logger.debug(f"No historical cache found for {ticker} before {as_of_date}")
+                return None
+
+            # Use the most recent valid file
+            valid_files.sort(key=lambda x: x[0], reverse=True)
+            most_recent_date, most_recent_file = valid_files[0]
+
+            with open(most_recent_file, "r") as f:
+                cached = json.load(f)
+                logger.debug(
+                    f"Found historical cache for {ticker} as of {most_recent_date}: "
+                    f"{most_recent_file.name}"
+                )
+                return cached.get("data")
+
+        except Exception as e:
+            logger.debug(f"Error fetching historical cache for {ticker}: {e}")
+            return None
+
     def _get_file_path(self, key: str) -> Path:
         """Get file path for cache key.
 
