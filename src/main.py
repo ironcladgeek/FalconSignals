@@ -356,35 +356,40 @@ def _create_signal_from_llm_result(
 
         # Parse risk assessment with proper defaults
         risk_data = llm_result.get("risk", {})
-        risk_level = risk_data.get("level", "medium").lower()
+        risk_level = (risk_data.get("level") or "medium").lower()
         # Map 'moderate' to 'medium' for compatibility
         if risk_level == "moderate":
             risk_level = "medium"
 
         risk_assessment = RiskAssessment(
             level=risk_level,
-            volatility=risk_data.get("volatility", "normal"),
-            volatility_pct=risk_data.get("volatility_pct", 2.0),
-            liquidity=risk_data.get("liquidity", "normal"),
-            concentration_risk=risk_data.get("concentration_risk", False),
+            volatility=risk_data.get("volatility") or "normal",
+            volatility_pct=risk_data.get("volatility_pct") or 2.0,
+            liquidity=risk_data.get("liquidity") or "normal",
+            concentration_risk=risk_data.get("concentration_risk") or False,
             sector_risk=risk_data.get("sector_risk"),
-            flags=risk_data.get("flags", risk_data.get("factors", [])),
+            flags=risk_data.get("flags") or risk_data.get("factors") or [],
         )
 
         # Create signal with proper schema
         # Fetch actual current price and currency from cache
-        current_price = llm_result.get("current_price", 0.0)
+        # Handle None values from LLM result (e.g., "current_price": null in JSON)
+        current_price = llm_result.get("current_price") or 0.0
         currency = llm_result.get("currency", "USD")
         if cache_manager:
             try:
                 latest_price = cache_manager.get_latest_price(ticker)
-                if latest_price:
+                if latest_price and latest_price.close_price:
                     current_price = latest_price.close_price
                     currency = latest_price.currency
             except Exception as e:
                 logger.debug(
                     f"Could not fetch price for {ticker} from cache: {e}. Using LLM defaults."
                 )
+
+        # Ensure current_price is never None
+        if current_price is None:
+            current_price = 0.0
 
         signal = InvestmentSignal(
             ticker=ticker,
