@@ -5,7 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Field as SQLField
-from sqlmodel import SQLModel
+from sqlmodel import Relationship, SQLModel
 
 
 class Market(str, Enum):
@@ -146,17 +146,48 @@ class HistoricalContext(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class Ticker(SQLModel, table=True):
+    """Normalized ticker table for data consistency and relationships.
+
+    Stores unique ticker symbols and metadata. Used as a foreign key reference
+    by other tables (analyst_ratings, recommendations, price_tracking, etc.)
+    to avoid duplication and enable efficient queries.
+    """
+
+    __tablename__ = "tickers"
+
+    id: int | None = SQLField(default=None, primary_key=True)
+    symbol: str = SQLField(unique=True, index=True, description="Ticker symbol (e.g., AAPL)")
+    name: str = SQLField(description="Company or instrument name")
+    market: str = SQLField(default="us", description="Market: nordic, eu, us")
+    instrument_type: str = SQLField(default="stock", description="Type: stock, etf, fund")
+    created_at: datetime = SQLField(
+        default_factory=datetime.now, description="When ticker was first added"
+    )
+    last_updated: datetime = SQLField(
+        default_factory=datetime.now, description="Last update timestamp"
+    )
+
+    # Relationships
+    analyst_ratings: list["AnalystData"] = Relationship(back_populates="ticker_obj")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AnalystData(SQLModel, table=True):
     """Historical analyst ratings data stored in database.
 
     Stores monthly snapshots of analyst ratings. APIs typically only provide
     current + 3 months, so this table accumulates ratings over time.
+    References Ticker table for normalized ticker data.
     """
 
     __tablename__ = "analyst_ratings"
 
     id: int | None = SQLField(default=None, primary_key=True)
-    ticker: str = SQLField(index=True, description="Stock ticker symbol")
+    ticker_id: int = SQLField(
+        foreign_key="tickers.id", index=True, description="Foreign key to ticker"
+    )
     period: date = SQLField(index=True, description="First day of the month (e.g., 2025-09-01)")
     strong_buy: int = SQLField(description="Count of strong buy ratings")
     buy: int = SQLField(description="Count of buy ratings")
@@ -168,6 +199,9 @@ class AnalystData(SQLModel, table=True):
     fetched_at: datetime = SQLField(
         default_factory=datetime.now, description="Timestamp when data was fetched"
     )
+
+    # Relationships
+    ticker_obj: Ticker = Relationship(back_populates="analyst_ratings")
 
     def to_analyst_rating(self) -> AnalystRating:
         """Convert database record to AnalystRating model."""
@@ -182,8 +216,8 @@ class AnalystData(SQLModel, table=True):
         consensus = max(ratings, key=lambda x: x[1])[0] if self.total_analysts > 0 else None
 
         return AnalystRating(
-            ticker=self.ticker,
-            name="",  # Not stored in database
+            ticker=self.ticker_obj.symbol if self.ticker_obj else "",
+            name=self.ticker_obj.name if self.ticker_obj else "",
             rating_date=datetime.combine(self.period, datetime.min.time()),
             rating=consensus or "hold",
             price_target=None,

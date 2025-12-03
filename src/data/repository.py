@@ -11,7 +11,7 @@ from loguru import logger
 from sqlmodel import select
 
 from src.data.db import DatabaseManager
-from src.data.models import AnalystData, AnalystRating
+from src.data.models import AnalystData, AnalystRating, Ticker
 
 
 class AnalystRatingsRepository:
@@ -30,6 +30,36 @@ class AnalystRatingsRepository:
         # Create instance-specific database manager (not global) for better test isolation
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.initialize()
+
+    def _get_or_create_ticker(self, session, ticker_symbol: str, name: str = "") -> Ticker:
+        """Get existing ticker or create new one.
+
+        Args:
+            session: Database session.
+            ticker_symbol: Ticker symbol (e.g., 'AAPL').
+            name: Company name (optional, defaults to symbol).
+
+        Returns:
+            Ticker object.
+        """
+        ticker_symbol = ticker_symbol.upper()
+
+        # Check if ticker already exists
+        existing = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+        if existing:
+            return existing
+
+        # Create new ticker
+        new_ticker = Ticker(
+            symbol=ticker_symbol,
+            name=name or ticker_symbol,
+            market="us",  # Default, can be overridden later
+            instrument_type="stock",
+        )
+        session.add(new_ticker)
+        session.flush()  # Flush to get the ID without committing
+        return new_ticker
 
     def store_ratings(self, ratings: AnalystRating, data_source: str = "unknown") -> bool:
         """Store analyst ratings for a specific month.
@@ -54,44 +84,45 @@ class AnalystRatingsRepository:
             # Parse rating counts from consensus or use defaults
             strong_buy, buy, hold, sell, strong_sell = self._parse_ratings(ratings)
 
-            # Create database record
-            analyst_data = AnalystData(
-                ticker=ticker,
-                period=period,
-                strong_buy=strong_buy,
-                buy=buy,
-                hold=hold,
-                sell=sell,
-                strong_sell=strong_sell,
-                total_analysts=ratings.num_analysts or 0,
-                data_source=data_source,
-                fetched_at=datetime.now(),
-            )
-
             # Store in database (upsert pattern)
             session = self.db_manager.get_session()
             try:
+                # Get or create ticker (handles foreign key relationship)
+                ticker_obj = self._get_or_create_ticker(session, ticker, ratings.name)
+
                 # Check if record exists
                 existing = session.exec(
                     select(AnalystData).where(
-                        (AnalystData.ticker == analyst_data.ticker)
-                        & (AnalystData.period == analyst_data.period)
-                        & (AnalystData.data_source == analyst_data.data_source)
+                        (AnalystData.ticker_id == ticker_obj.id)
+                        & (AnalystData.period == period)
+                        & (AnalystData.data_source == data_source)
                     )
                 ).first()
 
                 if existing:
                     # Update existing record
-                    existing.strong_buy = analyst_data.strong_buy
-                    existing.buy = analyst_data.buy
-                    existing.hold = analyst_data.hold
-                    existing.sell = analyst_data.sell
-                    existing.strong_sell = analyst_data.strong_sell
-                    existing.total_analysts = analyst_data.total_analysts
+                    existing.strong_buy = strong_buy
+                    existing.buy = buy
+                    existing.hold = hold
+                    existing.sell = sell
+                    existing.strong_sell = strong_sell
+                    existing.total_analysts = ratings.num_analysts or 0
                     existing.fetched_at = datetime.now()
                     session.add(existing)
                 else:
-                    # Add new record
+                    # Create new record
+                    analyst_data = AnalystData(
+                        ticker_id=ticker_obj.id,
+                        period=period,
+                        strong_buy=strong_buy,
+                        buy=buy,
+                        hold=hold,
+                        sell=sell,
+                        strong_sell=strong_sell,
+                        total_analysts=ratings.num_analysts or 0,
+                        data_source=data_source,
+                        fetched_at=datetime.now(),
+                    )
                     session.add(analyst_data)
 
                 session.commit()
@@ -118,11 +149,18 @@ class AnalystRatingsRepository:
             AnalystRating object or None if not found.
         """
         try:
+            ticker = ticker.upper()
             session = self.db_manager.get_session()
             try:
+                # Find ticker first, then get analyst data
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return None
+
                 analyst_data = session.exec(
                     select(AnalystData).where(
-                        (AnalystData.ticker == ticker.upper()) & (AnalystData.period == period)
+                        (AnalystData.ticker_id == ticker_obj.id) & (AnalystData.period == period)
                     )
                 ).first()
 
@@ -145,11 +183,18 @@ class AnalystRatingsRepository:
             AnalystRating object or None if not found.
         """
         try:
+            ticker = ticker.upper()
             session = self.db_manager.get_session()
             try:
+                # Find ticker first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return None
+
                 analyst_data = session.exec(
                     select(AnalystData)
-                    .where(AnalystData.ticker == ticker.upper())
+                    .where(AnalystData.ticker_id == ticker_obj.id)
                     .order_by(AnalystData.period.desc())
                 ).first()
 
@@ -176,12 +221,19 @@ class AnalystRatingsRepository:
             List of AnalystRating objects, sorted by period ascending.
         """
         try:
+            ticker = ticker.upper()
             session = self.db_manager.get_session()
             try:
+                # Find ticker first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return []
+
                 analyst_data_list = session.exec(
                     select(AnalystData)
                     .where(
-                        (AnalystData.ticker == ticker.upper())
+                        (AnalystData.ticker_id == ticker_obj.id)
                         & (AnalystData.period >= start_period)
                         & (AnalystData.period <= end_period)
                     )
@@ -208,11 +260,19 @@ class AnalystRatingsRepository:
             True if successful, False otherwise.
         """
         try:
+            ticker = ticker.upper()
             session = self.db_manager.get_session()
             try:
+                # Find ticker first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    logger.warning(f"No ratings found for {ticker} (period: {period})")
+                    return False
+
                 analyst_data = session.exec(
                     select(AnalystData).where(
-                        (AnalystData.ticker == ticker.upper()) & (AnalystData.period == period)
+                        (AnalystData.ticker_id == ticker_obj.id) & (AnalystData.period == period)
                     )
                 ).first()
 
@@ -233,16 +293,19 @@ class AnalystRatingsRepository:
             return False
 
     def get_all_tickers_with_data(self) -> list[str]:
-        """Get all unique tickers in the database.
+        """Get all unique tickers with analyst rating data in the database.
 
         Returns:
-            List of unique tickers.
+            List of unique ticker symbols, sorted alphabetically.
         """
         try:
             session = self.db_manager.get_session()
             try:
-                tickers = session.exec(select(AnalystData.ticker).distinct()).all()
-                return sorted(list(set(tickers)))
+                # Get tickers that have at least one analyst rating
+                tickers_with_data = session.exec(
+                    select(Ticker.symbol).join(AnalystData).distinct()
+                ).all()
+                return sorted(list(set(tickers_with_data)))
 
             finally:
                 session.close()

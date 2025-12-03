@@ -315,8 +315,14 @@ class TestAnalystRatingsRepository:
 
     def test_analyst_data_to_rating_conversion(self):
         """Test conversion from AnalystData to AnalystRating."""
+        from src.data.models import Ticker
+
+        # Create a ticker first
+        ticker = Ticker(symbol="AAPL", name="Apple Inc.", market="us", instrument_type="stock")
+
         analyst_data = AnalystData(
-            ticker="AAPL",
+            ticker_id=1,  # Would be set by database
+            ticker_obj=ticker,  # Relationship object
             period=date(2024, 6, 1),
             strong_buy=5,
             buy=8,
@@ -330,6 +336,7 @@ class TestAnalystRatingsRepository:
         rating = analyst_data.to_analyst_rating()
 
         assert rating.ticker == "AAPL"
+        assert rating.name == "Apple Inc."
         assert rating.num_analysts == 20
         assert rating.consensus == "buy"  # Most common rating
 
@@ -417,8 +424,13 @@ class TestAnalystDataModel:
 
     def test_analyst_data_creation(self):
         """Test creating an AnalystData instance."""
+        from src.data.models import Ticker
+
+        ticker = Ticker(symbol="AAPL", name="Apple Inc.", market="us", instrument_type="stock")
+
         data = AnalystData(
-            ticker="AAPL",
+            ticker_id=1,  # Would be assigned by database
+            ticker_obj=ticker,  # Relationship
             period=date(2024, 6, 1),
             strong_buy=5,
             buy=8,
@@ -429,7 +441,8 @@ class TestAnalystDataModel:
             data_source="Finnhub",
         )
 
-        assert data.ticker == "AAPL"
+        assert data.ticker_id == 1
+        assert data.ticker_obj.symbol == "AAPL"
         assert data.total_analysts == 20
         assert data.fetched_at is not None
 
