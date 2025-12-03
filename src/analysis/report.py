@@ -352,11 +352,14 @@ class ReportGenerator:
 
         lines = [
             f"\n### {signal.ticker} - {signal.name}\n",
-            f"**Recommendation:** {signal.recommendation.value.upper()} "
-            f"| **Confidence:** {signal.confidence}%\n",
-            f"**Final Score:** {signal.final_score}/100 | **Price:** {currency_symbol}{signal.current_price:.2f}\n",
-            f"**Time Horizon:** {signal.time_horizon} "
-            f"| **Expected Return:** {signal.expected_return_min:.1f}% - {signal.expected_return_max:.1f}%\n\n",
+            "| | |\n",
+            "|---|---|\n",
+            f"| **Recommendation** | {signal.recommendation.value.upper()} |\n",
+            f"| **Confidence** | {signal.confidence}% |\n",
+            f"| **Final Score** | {signal.final_score}/100 |\n",
+            f"| **Price** | {currency_symbol}{signal.current_price:.2f} |\n",
+            f"| **Time Horizon** | {signal.time_horizon} |\n",
+            f"| **Expected Return** | {signal.expected_return_min:.1f}% - {signal.expected_return_max:.1f}% |\n\n",
             "**Component Scores:**\n",
             f"- Technical: {signal.scores.technical}/100\n",
             f"- Fundamental: {signal.scores.fundamental}/100\n",
