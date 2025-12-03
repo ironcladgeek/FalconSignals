@@ -292,15 +292,22 @@ class AlphaVantageProvider(DataProvider):
             }
 
             # Add time range for historical analysis (prevent look-ahead bias)
-            # Request more articles to ensure we get enough historical articles
-            # Note: Alpha Vantage's time_from returns articles >= that time
-            # For historical analysis, we'll request a larger range and filter in Python
+            # Alpha Vantage requires BOTH time_from and time_to for filtering to work
             if as_of_date:
-                # Use time_to to get articles up to this date (if API supports it)
-                # Format: YYYYMMDDTHHMM (example: 20240601T2359 for June 1, 2024 at 11:59 PM)
+                # Set time_to to the historical date (end of analysis date)
+                # Format: YYYYMMDDTHHMM (example: 20250902T2359 for Sept 2, 2025 at 11:59 PM)
                 time_to = as_of_date.strftime("%Y%m%dT2359")
+
+                # Set time_from to 365 days before as_of_date to get sufficient history
+                # This ensures we get news from the past year leading up to the analysis date
+                from datetime import timedelta
+
+                time_from_date = as_of_date - timedelta(days=365)
+                time_from = time_from_date.strftime("%Y%m%dT0000")
+
+                params["time_from"] = time_from
                 params["time_to"] = time_to
-                logger.debug(f"Filtering news up to {as_of_date}")
+                logger.debug(f"Filtering news from {time_from_date.date()} to {as_of_date.date()}")
 
             logger.debug(f"Alpha Vantage NEWS_SENTIMENT params: {params}")
             data = self._api_call(params)
