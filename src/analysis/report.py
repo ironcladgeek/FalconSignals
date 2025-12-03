@@ -209,17 +209,17 @@ class ReportGenerator:
 
         # Strong Signals
         all_displayed_signals = len(report.strong_signals) + len(report.moderate_signals)
-        md.append(f"## Investment Opportunities ({all_displayed_signals} signals)\n")
+        md.append(f"## 🎯 Investment Opportunities ({all_displayed_signals} signals)\n")
 
         # Strong signals section
         if report.strong_signals:
-            md.append("### Strong Buy Signals\n")
+            md.append("### 🚀 Strong Buy Signals\n")
             for signal in report.strong_signals:
                 md.append(self._format_signal_markdown(signal))
 
         # Moderate signals section
         if report.moderate_signals:
-            md.append("\n### Moderate Hold Signals\n")
+            md.append("\n### ⏸️ Moderate Hold Signals\n")
             for signal in report.moderate_signals:
                 md.append(self._format_signal_markdown(signal))
 
@@ -228,7 +228,7 @@ class ReportGenerator:
 
         # Allocation Suggestion
         if report.allocation_suggestion:
-            md.append("\n## Suggested Portfolio Allocation\n")
+            md.append("\n## 💼 Suggested Portfolio Allocation\n")
             md.append(f"- **Total Capital:** €{report.allocation_suggestion.total_capital:,.0f}\n")
             md.append(
                 f"- **Diversification Score:** {report.allocation_suggestion.diversification_score}%\n"
@@ -254,14 +254,14 @@ class ReportGenerator:
 
         # Portfolio Alerts
         if report.portfolio_alerts:
-            md.append("\n## Portfolio Alerts\n")
+            md.append("\n## 🚨 Portfolio Alerts\n")
             for alert in report.portfolio_alerts:
                 md.append(f"- **{alert.get('ticker', 'ALERT')}:** {alert.get('message', '')}\n")
             md.append("")
 
         # Key News
         if report.key_news:
-            md.append("\n## Key News & Events\n")
+            md.append("\n## 📰 Key News & Events\n")
             for item in report.key_news[:10]:  # Top 10 news items
                 ticker = item.get("ticker", "MARKET")
                 title = item.get("title", "")
@@ -270,7 +270,7 @@ class ReportGenerator:
             md.append("")
 
         # Watchlist Changes
-        md.append("\n## Watchlist Changes\n")
+        md.append("\n## 📋 Watchlist Changes\n")
         if report.watchlist_additions:
             md.append("**Add to watchlist:**\n")
             for ticker in report.watchlist_additions:
@@ -282,7 +282,7 @@ class ReportGenerator:
         md.append("")
 
         # Summary Statistics
-        md.append("\n## Summary\n")
+        md.append("\n## 📊 Summary\n")
         md.append(f"- **Signals Analyzed:** {report.total_signals_generated}\n")
         md.append(f"- **Strong Signals:** {report.strong_signals_count}\n")
         md.append(f"- **Moderate Signals:** {report.moderate_signals_count}\n")
@@ -290,7 +290,7 @@ class ReportGenerator:
 
         # Initial Instruments List (reference section)
         if report.initial_tickers:
-            md.append("\n## Initial Instruments List\n")
+            md.append("\n## 📑 Initial Instruments List\n")
             md.append(
                 f"Complete list of {len(report.initial_tickers)} instruments analyzed in this session:\n\n"
             )
@@ -304,13 +304,13 @@ class ReportGenerator:
 
         # Disclaimers
         if report.disclaimers:
-            md.append("\n## Important Disclaimers\n")
+            md.append("\n## ⚖️ Important Disclaimers\n")
             for disclaimer in report.disclaimers:
                 md.append(f"- {disclaimer}\n")
             md.append("")
 
         # Data Sources
-        md.append("\n## Data Sources\n")
+        md.append("\n## 📚 Data Sources\n")
         for source in report.data_sources:
             md.append(f"- {source}\n")
 
@@ -326,6 +326,46 @@ class ReportGenerator:
             Dictionary representation
         """
         return report.model_dump(mode="json")
+
+    @staticmethod
+    def _format_recommendation_with_color(recommendation: str) -> str:
+        """Format recommendation with emoji and color.
+
+        Args:
+            recommendation: Recommendation string
+
+        Returns:
+            Formatted recommendation with emoji
+        """
+        rec_upper = recommendation.upper()
+        if "BUY" in rec_upper:
+            emoji = "🟢"  # Green circle for BUY
+        elif "SELL" in rec_upper:
+            emoji = "🔴"  # Red circle for SELL
+        else:
+            emoji = "🟡"  # Yellow circle for HOLD
+        return f"{emoji} {rec_upper}"
+
+    @staticmethod
+    def _format_risk_level_with_color(level: str) -> str:
+        """Format risk level with emoji and color.
+
+        Args:
+            level: Risk level string
+
+        Returns:
+            Formatted risk level with emoji
+        """
+        level_lower = level.lower()
+        if "very_high" in level_lower or "very high" in level_lower:
+            emoji = "🔴"  # Red circle
+        elif "high" in level_lower:
+            emoji = "🟠"  # Orange circle
+        elif "medium" in level_lower:
+            emoji = "🔵"  # Blue circle
+        else:
+            emoji = "🟢"  # Green circle for low
+        return f"{emoji} {level}"
 
     @staticmethod
     def _format_signal_markdown(signal: InvestmentSignal) -> str:
@@ -350,36 +390,46 @@ class ReportGenerator:
         }
         currency_symbol = currency_symbols.get(signal.currency, signal.currency)
 
+        # Format recommendation with emoji
+        recommendation_formatted = ReportGenerator._format_recommendation_with_color(
+            signal.recommendation.value
+        )
+
+        # Format risk level with emoji
+        risk_level_formatted = ReportGenerator._format_risk_level_with_color(
+            signal.risk.level.value
+        )
+
         lines = [
             f"\n### {signal.ticker} - {signal.name}\n",
             "| | |\n",
             "|---|---|\n",
-            f"| **Recommendation** | {signal.recommendation.value.upper()} |\n",
+            f"| **Recommendation** | {recommendation_formatted} |\n",
             f"| **Confidence** | {signal.confidence}% |\n",
             f"| **Final Score** | {signal.final_score}/100 |\n",
             f"| **Price** | {currency_symbol}{signal.current_price:.2f} |\n",
             f"| **Time Horizon** | {signal.time_horizon} |\n",
             f"| **Expected Return** | {signal.expected_return_min:.1f}% - {signal.expected_return_max:.1f}% |\n",
-            f"| **Risk Level** | {signal.risk.level.value} |\n",
+            f"| **Risk Level** | {risk_level_formatted} |\n",
             f"| **Volatility** | {signal.risk.volatility} |\n\n",
-            "**Component Scores:**\n",
+            "📊 **Component Scores:**\n",
             f"- Technical: {signal.scores.technical:.2f}/100\n",
             f"- Fundamental: {signal.scores.fundamental:.2f}/100\n",
             f"- Sentiment: {signal.scores.sentiment:.2f}/100\n\n",
-            "**Key Reasons:**\n",
+            "💡 **Key Reasons:**\n",
         ]
 
         for reason in signal.key_reasons:
             lines.append(f"- {reason}\n")
 
         if signal.risk.flags:
-            lines.append("\n**Risk Flags:**\n")
+            lines.append("\n⚠️ **Risk Flags:**\n")
             for flag in signal.risk.flags:
                 lines.append(f"- {flag}\n")
 
         if signal.allocation:
             lines.append(
-                f"\n**Suggested Allocation:** €{signal.allocation.eur:,.0f} "
+                f"\n💰 **Suggested Allocation:** €{signal.allocation.eur:,.0f} "
                 f"({signal.allocation.percentage}%)\n"
             )
 
