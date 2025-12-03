@@ -40,6 +40,7 @@ class PriceFetcherTool(BaseTool):
         self.cache_manager = cache_manager or CacheManager()
         self.provider_name = provider_name or "yahoo_finance"
         self.fixture_path = fixture_path
+        self.historical_date = None  # Track historical date for backtesting
 
         # Create provider with fixture path if needed
         if self.provider_name == "fixture" and fixture_path:
@@ -48,6 +49,15 @@ class PriceFetcherTool(BaseTool):
             )
         else:
             self.provider = DataProviderFactory.create(self.provider_name)
+
+    def set_historical_date(self, historical_date):
+        """Set historical date for backtesting.
+
+        Args:
+            historical_date: date object for historical analysis
+        """
+        self.historical_date = historical_date
+        logger.debug(f"Historical date set to {historical_date} for PriceFetcherTool")
 
     def run(
         self,
@@ -61,16 +71,20 @@ class PriceFetcherTool(BaseTool):
         Args:
             ticker: Stock ticker symbol
             start_date: Start date (if None, uses days_back)
-            end_date: End date (defaults to today)
+            end_date: End date (defaults to today or historical_date if set)
             days_back: Days back from end_date if start_date is None
 
         Returns:
             Dictionary with prices and metadata
         """
         try:
-            # Set date range
+            # Set date range - use historical_date if set for backtesting
             if end_date is None:
-                end_date = datetime.now()
+                if self.historical_date:
+                    end_date = datetime.combine(self.historical_date, datetime.max.time())
+                    logger.debug(f"Using historical end_date: {end_date.date()} for {ticker}")
+                else:
+                    end_date = datetime.now()
 
             if start_date is None:
                 start_date = end_date - timedelta(days=days_back)
@@ -184,6 +198,16 @@ class FinancialDataFetcherTool(BaseTool):
         self.alpha_vantage_provider = DataProviderFactory.create("alpha_vantage")
         self.finnhub_provider = DataProviderFactory.create("finnhub")
         self.price_provider = DataProviderFactory.create("yahoo_finance")
+        self.historical_date = None  # Track historical date for backtesting
+
+    def set_historical_date(self, historical_date):
+        """Set historical date for backtesting.
+
+        Args:
+            historical_date: date object for historical analysis
+        """
+        self.historical_date = historical_date
+        logger.debug(f"Historical date set to {historical_date} for FinancialDataFetcherTool")
 
     def run(self, ticker: str) -> dict[str, Any]:
         """Fetch fundamental data for ticker using Alpha Vantage (primary) + fallbacks.
@@ -195,8 +219,20 @@ class FinancialDataFetcherTool(BaseTool):
             Dictionary with company info, news sentiment, analyst data, and metrics
         """
         try:
+            # Convert historical_date to datetime if needed
+            as_of_date = None
+            if self.historical_date:
+                as_of_date = datetime.combine(self.historical_date, datetime.max.time())
+                logger.info(f"Fetching fundamental data as of {self.historical_date} for {ticker}")
+
+            # Create cache key with date (historical or current)
+            if self.historical_date:
+                cache_key = f"fundamental_enriched:{ticker}:{self.historical_date}"
+            else:
+                current_date = datetime.now().strftime("%Y-%m-%d")
+                cache_key = f"fundamental_enriched:{ticker}:{current_date}"
+
             # Check cache first
-            cache_key = f"fundamental_enriched:{ticker}"
             cached = self.cache_manager.get(cache_key)
             if cached:
                 logger.debug(f"Cache hit for {ticker} fundamental data")
@@ -211,20 +247,24 @@ class FinancialDataFetcherTool(BaseTool):
             except Exception as e:
                 logger.warning(f"Could not fetch company info for {ticker}: {e}")
 
-            # Fetch earnings estimates (Alpha Vantage Premium)
+            # Fetch earnings estimates (Alpha Vantage Premium) with historical date
             earnings_estimates = None
             try:
                 if self.alpha_vantage_provider.is_available:
-                    earnings_estimates = self.alpha_vantage_provider.get_earnings_estimates(ticker)
+                    earnings_estimates = self.alpha_vantage_provider.get_earnings_estimates(
+                        ticker, as_of_date=as_of_date
+                    )
             except Exception as e:
                 logger.warning(f"Could not fetch earnings estimates for {ticker}: {e}")
 
-            # Fetch news with sentiment (Alpha Vantage Premium)
+            # Fetch news with sentiment (Alpha Vantage Premium) with historical date
             news_articles = []
             news_sentiment_summary = None
             try:
                 # Fetch latest news articles - limit provides sufficient filtering
-                news_articles = self.provider_manager.get_news(ticker, limit=50)
+                news_articles = self.provider_manager.get_news(
+                    ticker, limit=50, as_of_date=as_of_date
+                )
                 # Calculate sentiment summary from articles
                 if news_articles:
                     positive = sum(1 for a in news_articles if a.sentiment == "positive")
@@ -352,9 +392,16 @@ class FinancialDataFetcherTool(BaseTool):
             Dictionary with change_percent and trend
         """
         try:
-            # Get last 30 days of price data
+            # Get last 30 days of price data, respecting historical date if set
+            end_date = datetime.now()
+            if self.historical_date:
+                end_date = datetime.combine(self.historical_date, datetime.max.time())
+                logger.debug(f"Using historical end_date {end_date.date()} for price context")
+
+            start_date = end_date - timedelta(days=30)
+
             prices = self.price_provider.get_stock_prices(
-                ticker, start_date=datetime.now() - timedelta(days=30), end_date=datetime.now()
+                ticker, start_date=start_date, end_date=end_date
             )
 
             if len(prices) < 2:
@@ -490,6 +537,16 @@ class NewsFetcherTool(BaseTool):
             primary_provider="alpha_vantage",
             backup_providers=[],  # No backup for news - Alpha Vantage Premium only
         )
+        self.historical_date = None  # Track historical date for backtesting
+
+    def set_historical_date(self, historical_date):
+        """Set historical date for backtesting.
+
+        Args:
+            historical_date: date object for historical analysis
+        """
+        self.historical_date = historical_date
+        logger.debug(f"Historical date set to {historical_date} for NewsFetcherTool")
 
     def run(
         self,
@@ -510,16 +567,31 @@ class NewsFetcherTool(BaseTool):
             if limit is None:
                 limit = get_config().data.news.max_articles
 
-            # Check cache first - use date-based key for consistent daily caching
-            cache_key = f"news_sentiment:{ticker}"
-            cached = self.cache_manager.get(cache_key)
-            if cached:
+            # Convert historical_date to datetime if needed
+            as_of_date = None
+            if self.historical_date:
+                as_of_date = datetime.combine(self.historical_date, datetime.max.time())
+                logger.info(f"Fetching news as of {self.historical_date} for {ticker}")
+
+            # Try to find existing cache with matching date range
+            # Check for news cache files matching this ticker and date
+            if self.historical_date:
+                # Look for cache files with date range that includes our historical date
+                cache_pattern = f"news_sentiment:{ticker}:*:*"
+                # The cache manager doesn't support pattern matching, so we'll fetch and check
+                # the date range after retrieval
+                pass
+
+            # Check simple cache key first (for current/non-historical requests)
+            simple_cache_key = f"news_sentiment:{ticker}"
+            cached = self.cache_manager.get(simple_cache_key)
+            if cached and not self.historical_date:
                 logger.debug(f"Cache hit for {ticker} news")
                 return cached
 
             # Fetch news using Alpha Vantage Premium
             logger.debug(f"Fetching news with sentiment for {ticker}")
-            articles = self.provider_manager.get_news(ticker, limit)
+            articles = self.provider_manager.get_news(ticker, limit, as_of_date=as_of_date)
 
             if not articles:
                 return {
@@ -528,6 +600,27 @@ class NewsFetcherTool(BaseTool):
                     "count": 0,
                     "sentiment_summary": None,
                 }
+
+            # Calculate date range from articles for cache key
+            cache_key = simple_cache_key  # Default
+            if articles:
+                article_dates = []
+                for article in articles:
+                    pub_date_str = article.published_date
+                    if isinstance(pub_date_str, str):
+                        # Extract date portion (YYYY-MM-DD)
+                        date_part = (
+                            pub_date_str.split()[0] if " " in pub_date_str else pub_date_str[:10]
+                        )
+                        article_dates.append(date_part)
+                    elif isinstance(pub_date_str, datetime):
+                        article_dates.append(pub_date_str.strftime("%Y-%m-%d"))
+
+                if article_dates:
+                    min_date = min(article_dates)
+                    max_date = max(article_dates)
+                    cache_key = f"news_sentiment:{ticker}:{min_date}:{max_date}"
+                    logger.debug(f"News date range for {ticker}: {min_date} to {max_date}")
 
             # Calculate sentiment summary
             positive = sum(1 for a in articles if a.sentiment == "positive")

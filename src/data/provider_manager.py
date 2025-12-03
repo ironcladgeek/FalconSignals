@@ -177,14 +177,17 @@ class ProviderManager:
         self,
         ticker: str,
         limit: int = 50,
+        as_of_date: datetime | None = None,
     ) -> list[NewsArticle]:
         """Fetch news articles with automatic fallback.
 
         Prioritizes providers with sentiment analysis (Alpha Vantage, Finnhub).
+        Supports historical news fetching for backtesting.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles
+            as_of_date: Optional date for historical news (only fetch news before this date)
 
         Returns:
             List of NewsArticle objects
@@ -193,7 +196,8 @@ class ProviderManager:
             RuntimeError: If all providers fail
         """
         logger.debug(
-            f"ProviderManager: Fetching news for {ticker} from primary provider: {self.primary_provider_name}"
+            f"ProviderManager: Fetching news for {ticker} from primary provider: {self.primary_provider_name} "
+            f"(as_of_date={as_of_date})"
         )
         # Prioritize providers with news sentiment capabilities
         providers_to_try = [self.primary_provider] + self.backup_providers
@@ -206,7 +210,7 @@ class ProviderManager:
 
             try:
                 logger.debug(f"Fetching news for {ticker} using {provider.name}")
-                articles = provider.get_news(ticker, limit)
+                articles = provider.get_news(ticker, limit, as_of_date=as_of_date)
 
                 if articles:
                     logger.debug(

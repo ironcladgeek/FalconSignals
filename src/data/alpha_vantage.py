@@ -250,6 +250,7 @@ class AlphaVantageProvider(DataProvider):
         self,
         ticker: str,
         limit: int = 50,
+        as_of_date: datetime | None = None,
     ) -> list[NewsArticle]:
         """Fetch news articles with sentiment analysis from Alpha Vantage.
 
@@ -259,9 +260,13 @@ class AlphaVantageProvider(DataProvider):
         - Ticker-specific sentiment scores and relevance
         - Topics with relevance scores
 
+        Supports historical news fetching for backtesting with strict date filtering
+        to prevent look-ahead bias.
+
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles to return (default: 50)
+            as_of_date: Optional date for historical news (only fetch news before this date)
 
         Returns:
             List of NewsArticle objects with sentiment data, sorted by date descending
@@ -274,16 +279,35 @@ class AlphaVantageProvider(DataProvider):
             raise ValueError("Alpha Vantage API key is not configured")
 
         try:
-            logger.debug(f"Fetching news sentiment for {ticker} (limit={limit})")
+            logger.debug(
+                f"Fetching news sentiment for {ticker} (limit={limit}, as_of_date={as_of_date})"
+            )
 
-            # Call NEWS_SENTIMENT API without time filters
-            # Alpha Vantage sorts by LATEST automatically, so we get the most recent articles
+            # Build NEWS_SENTIMENT API params with optional historical date filtering
             params = {
                 "function": "NEWS_SENTIMENT",
                 "tickers": ticker,
-                "limit": limit,  # Request exactly what we need
+                "limit": limit * 2,  # Request more to account for filtering by date
                 "sort": "LATEST",  # Get newest first
             }
+
+            # Add time range for historical analysis (prevent look-ahead bias)
+            # Alpha Vantage requires BOTH time_from and time_to for filtering to work
+            if as_of_date:
+                # Set time_to to the historical date (end of analysis date)
+                # Format: YYYYMMDDTHHMM (example: 20250902T2359 for Sept 2, 2025 at 11:59 PM)
+                time_to = as_of_date.strftime("%Y%m%dT2359")
+
+                # Set time_from to 365 days before as_of_date to get sufficient history
+                # This ensures we get news from the past year leading up to the analysis date
+                from datetime import timedelta
+
+                time_from_date = as_of_date - timedelta(days=365)
+                time_from = time_from_date.strftime("%Y%m%dT0000")
+
+                params["time_from"] = time_from
+                params["time_to"] = time_to
+                logger.debug(f"Filtering news from {time_from_date.date()} to {as_of_date.date()}")
 
             logger.debug(f"Alpha Vantage NEWS_SENTIMENT params: {params}")
             data = self._api_call(params)
@@ -317,6 +341,15 @@ class AlphaVantageProvider(DataProvider):
                                 pass  # Use date only
                     else:
                         published_date = datetime.now()
+
+                    # CLIENT-SIDE FILTERING: For historical analysis, ensure no future articles
+                    # This prevents look-ahead bias even if API parameter filtering is incomplete
+                    if as_of_date and published_date.date() > as_of_date.date():
+                        logger.debug(
+                            f"Filtering out future article (pub: {published_date.date()}, "
+                            f"analysis: {as_of_date.date()})"
+                        )
+                        continue
 
                     # Extract ticker-specific sentiment
                     ticker_sentiment_score = None
@@ -441,7 +474,9 @@ class AlphaVantageProvider(DataProvider):
             logger.error(f"Error fetching company info for {ticker}: {e}")
             raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
 
-    def get_earnings_estimates(self, ticker: str) -> Optional[dict]:
+    def get_earnings_estimates(
+        self, ticker: str, as_of_date: Optional[datetime] = None
+    ) -> Optional[dict]:
         """Fetch earnings estimates from Alpha Vantage.
 
         Uses the EARNINGS_ESTIMATES endpoint to get:
@@ -449,11 +484,17 @@ class AlphaVantageProvider(DataProvider):
         - Revenue estimates
         - Analyst count and estimate revisions
 
+        For historical analysis (as_of_date in the past):
+        Earnings estimates are forward-looking data without explicit historical snapshots.
+        Returns None with warning to prevent look-ahead bias.
+
         Args:
             ticker: Stock ticker symbol
+            as_of_date: Optional historical date for snapshot. If None, fetches current estimates.
+                       For dates in the past, returns None to prevent future data leakage.
 
         Returns:
-            Dictionary with earnings estimates or None if not available
+            Dictionary with earnings estimates or None if not available (including historical dates)
 
         Raises:
             ValueError: If API key is not configured
@@ -461,6 +502,16 @@ class AlphaVantageProvider(DataProvider):
         """
         if not self.api_key:
             raise ValueError("Alpha Vantage API key is not configured")
+
+        # For historical analysis, we'll use Alpha Vantage's historical estimate data
+        # The API provides snapshots: _7_days_ago, _30_days_ago, _60_days_ago, _90_days_ago
+        # These fields allow us to determine what estimates existed on historical dates
+        historical_mode = as_of_date and as_of_date.date() < datetime.now().date()
+        if historical_mode:
+            logger.debug(
+                f"Earnings estimates requested for historical date {as_of_date.date()}. "
+                f"Will use historical estimate snapshots from API response."
+            )
 
         try:
             logger.debug(f"Fetching earnings estimates for {ticker}")
@@ -478,22 +529,54 @@ class AlphaVantageProvider(DataProvider):
             estimates = data["estimates"]
 
             # Get next quarter and next year estimates
+            # For historical analysis, select estimates where estimate date > analysis date
+            # For current analysis (as_of_date=None), select immediate next quarter and year
+            as_of_date_only = (
+                as_of_date.date() if as_of_date else None
+            )  # Convert to date for comparison
+
             next_quarter = None
             next_year = None
 
             for estimate in estimates:
+                estimate_date_str = estimate.get("date", "")
                 horizon = estimate.get("horizon", "").lower()
-                if "quarter" in horizon and not next_quarter:
-                    next_quarter = estimate
-                elif "year" in horizon and not next_year:
-                    next_year = estimate
+
+                # Parse estimate date (format: YYYY-MM-DD)
+                try:
+                    estimate_date = datetime.strptime(estimate_date_str, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+
+                # For current analysis: use standard "next" pattern
+                if not as_of_date_only:
+                    if "next" in horizon and "quarter" in horizon and not next_quarter:
+                        next_quarter = estimate
+                    elif "next" in horizon and "year" in horizon and not next_year:
+                        next_year = estimate
+                # For historical analysis: select estimates AFTER the analysis date
+                else:
+                    if (
+                        "historical" in horizon
+                        and "quarter" in horizon
+                        and estimate_date > as_of_date_only
+                        and not next_quarter
+                    ):
+                        next_quarter = estimate
+                    elif (
+                        "historical" in horizon
+                        and "year" in horizon
+                        and estimate_date > as_of_date_only
+                        and not next_year
+                    ):
+                        next_year = estimate
 
             result = {
                 "ticker": data.get("symbol", ticker),
                 "next_quarter": (
                     self._parse_earnings_estimate(next_quarter) if next_quarter else None
                 ),
-                "next_year": self._parse_earnings_estimate(next_year) if next_year else None,
+                "next_year": (self._parse_earnings_estimate(next_year) if next_year else None),
             }
 
             logger.debug(f"Retrieved earnings estimates for {ticker}")

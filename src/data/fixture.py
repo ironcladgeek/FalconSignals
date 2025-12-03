@@ -148,12 +148,14 @@ class FixtureDataProvider(DataProvider):
         self,
         ticker: str,
         limit: int = 10,
+        as_of_date: datetime | None = None,
     ) -> list[NewsArticle]:
         """Get news articles from fixture data.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles
+            as_of_date: Optional date for historical news (only fetch news before this date)
 
         Returns:
             List of NewsArticle objects

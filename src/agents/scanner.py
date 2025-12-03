@@ -75,6 +75,11 @@ class MarketScannerAgent(BaseAgent):
                     "instruments": [],
                 }
 
+            # Set historical date if provided in context
+            if "analysis_date" in context and hasattr(price_fetcher, "set_historical_date"):
+                price_fetcher.set_historical_date(context["analysis_date"])
+                logger.debug(f"Set historical date {context['analysis_date']} for market scanner")
+
             # Scan each ticker with progress bar
             with typer.progressbar(
                 tickers, label="🔍 Scanning instruments", show_pos=True, show_percent=True

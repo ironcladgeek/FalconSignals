@@ -312,3 +312,90 @@ class TestFinnhubProvider:
         # Should return None on API error, not raise exception
         result = finnhub_provider.get_recommendation_trends("AAPL")
         assert result is None
+
+    @patch("src.data.finnhub.requests.get")
+    def test_get_recommendation_trends_historical_date(self, mock_get, finnhub_provider):
+        """Test historical date filtering for recommendation trends."""
+        from datetime import datetime
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "period": "2025-09-01",
+                "strongBuy": 14,
+                "buy": 23,
+                "hold": 15,
+                "sell": 3,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-10-01",
+                "strongBuy": 15,
+                "buy": 23,
+                "hold": 16,
+                "sell": 2,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-11-01",
+                "strongBuy": 15,
+                "buy": 23,
+                "hold": 17,
+                "sell": 2,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-12-01",
+                "strongBuy": 15,
+                "buy": 23,
+                "hold": 16,
+                "sell": 2,
+                "strongSell": 0,
+            },
+        ]
+        mock_get.return_value = mock_response
+
+        # Test for 2025-09-12: should return September (2025-09-01) data
+        trends = finnhub_provider.get_recommendation_trends(
+            "AAPL", as_of_date=datetime(2025, 9, 12)
+        )
+
+        assert trends is not None
+        assert trends["period"] == "2025-09-01"
+        assert trends["strong_buy"] == 14
+        assert trends["buy"] == 23
+        assert trends["hold"] == 15
+        assert trends["sell"] == 3
+        assert trends["strong_sell"] == 0
+        assert trends["total_analysts"] == 55
+
+    @patch("src.data.finnhub.requests.get")
+    def test_get_recommendation_trends_historical_date_no_match(self, mock_get, finnhub_provider):
+        """Test historical date filtering when no recommendations available before date."""
+        from datetime import datetime
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "period": "2025-09-01",
+                "strongBuy": 14,
+                "buy": 23,
+                "hold": 15,
+                "sell": 3,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-10-01",
+                "strongBuy": 15,
+                "buy": 23,
+                "hold": 16,
+                "sell": 2,
+                "strongSell": 0,
+            },
+        ]
+        mock_get.return_value = mock_response
+
+        # Test for 2025-08-01: should return None (before any available data)
+        trends = finnhub_provider.get_recommendation_trends("AAPL", as_of_date=datetime(2025, 8, 1))
+
+        assert trends is None

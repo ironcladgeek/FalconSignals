@@ -69,6 +69,13 @@ class TechnicalAnalysisAgent(BaseAgent):
                     "technical_score": 0,
                 }
 
+            # Set historical date if provided in context
+            if "analysis_date" in context and hasattr(price_fetcher, "set_historical_date"):
+                price_fetcher.set_historical_date(context["analysis_date"])
+                logger.debug(
+                    f"Set historical date {context['analysis_date']} for technical analysis"
+                )
+
             price_data = price_fetcher.run(ticker, days_back=60)
 
             if "error" in price_data:
@@ -255,6 +262,13 @@ class FundamentalAnalysisAgent(BaseAgent):
                     "message": "Financial data fetcher unavailable",
                     "fundamental_score": 0,
                 }
+
+            # Set historical date if provided in context
+            if "analysis_date" in context and hasattr(fetcher, "set_historical_date"):
+                fetcher.set_historical_date(context["analysis_date"])
+                logger.debug(
+                    f"Set historical date {context['analysis_date']} for fundamental analysis"
+                )
 
             # Fetch fundamental data (free tier only)
             fundamental_data = fetcher.run(ticker)

@@ -97,12 +97,17 @@ class FinnhubProvider(DataProvider):
         self,
         ticker: str,
         limit: int = 50,
+        as_of_date: datetime | None = None,
     ) -> list[NewsArticle]:
         """Fetch news articles from Finnhub.
+
+        Supports historical news fetching for backtesting with strict date filtering
+        to prevent look-ahead bias.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles to return (default: 50)
+            as_of_date: Optional date for historical news (only fetch news before this date)
 
         Returns:
             List of NewsArticle objects sorted by date descending
@@ -115,11 +120,18 @@ class FinnhubProvider(DataProvider):
             raise ValueError("Finnhub API key is not configured")
 
         try:
-            logger.debug(f"Fetching news for {ticker} (limit={limit})")
+            logger.debug(f"Fetching news for {ticker} (limit={limit}, as_of_date={as_of_date})")
 
-            # Fetch recent news articles
-            to_date = datetime.now()
-            from_date = to_date - timedelta(days=30)
+            # Fetch news articles with historical support
+            if as_of_date:
+                # For historical analysis, fetch news up to the analysis date
+                to_date = as_of_date
+                from_date = to_date - timedelta(days=90)  # 90-day lookback for historical
+                logger.debug(f"Fetching historical news from {from_date} to {to_date}")
+            else:
+                # For current analysis, fetch recent news (30 days)
+                to_date = datetime.now()
+                from_date = to_date - timedelta(days=30)
 
             response = requests.get(
                 f"{FINNHUB_BASE_URL}/company-news",
@@ -144,6 +156,15 @@ class FinnhubProvider(DataProvider):
                 try:
                     # Convert Unix timestamp to datetime
                     published_date = datetime.fromtimestamp(item["datetime"])
+
+                    # CLIENT-SIDE FILTERING: For historical analysis, ensure no future articles
+                    # This prevents look-ahead bias even if API parameter filtering is incomplete
+                    if as_of_date and published_date.date() > as_of_date.date():
+                        logger.debug(
+                            f"Filtering out future article (pub: {published_date.date()}, "
+                            f"analysis: {as_of_date.date()})"
+                        )
+                        continue
 
                     article = NewsArticle(
                         ticker=ticker.upper(),
@@ -213,11 +234,17 @@ class FinnhubProvider(DataProvider):
             logger.error(f"Error fetching company info for {ticker}: {e}")
             raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
 
-    def get_recommendation_trends(self, ticker: str) -> Optional[dict]:
+    def get_recommendation_trends(
+        self, ticker: str, as_of_date: datetime | None = None
+    ) -> Optional[dict]:
         """Fetch analyst recommendation trends (FREE TIER endpoint).
+
+        Supports historical recommendation fetching for backtesting with strict date filtering
+        to prevent look-ahead bias.
 
         Args:
             ticker: Stock ticker symbol
+            as_of_date: Optional date for historical recommendations (only fetch recommendations before this date)
 
         Returns:
             Dictionary with analyst ratings distribution or None if not available
@@ -230,7 +257,7 @@ class FinnhubProvider(DataProvider):
             raise ValueError("Finnhub API key is not configured")
 
         try:
-            logger.debug(f"Fetching recommendation trends for {ticker}")
+            logger.debug(f"Fetching recommendation trends for {ticker} (as_of_date={as_of_date})")
 
             response = requests.get(
                 f"{FINNHUB_BASE_URL}/stock/recommendation",
@@ -255,8 +282,38 @@ class FinnhubProvider(DataProvider):
                 logger.debug(f"No recommendation trend data available for {ticker}")
                 return None
 
-            # Get most recent recommendation data
-            latest = data[-1]  # Last item is most recent
+            # For historical analysis: find most recent recommendation before as_of_date
+            # For current analysis: use most recent recommendation (current behavior)
+            if as_of_date:
+                as_of_date_only = as_of_date.date() if hasattr(as_of_date, "date") else as_of_date
+                logger.debug(
+                    f"Filtering recommendation trends for historical date {as_of_date_only}"
+                )
+
+                # Find most recent recommendation with period <= as_of_date
+                matching_trend = None
+                for trend in data:
+                    trend_period_str = trend.get("period", "")
+                    try:
+                        trend_date = datetime.strptime(trend_period_str, "%Y-%m-%d").date()
+                        if trend_date <= as_of_date_only:
+                            matching_trend = trend
+                            # Continue to find the most recent matching one
+                    except (ValueError, TypeError):
+                        logger.debug(f"Could not parse period: {trend_period_str}")
+                        continue
+
+                if not matching_trend:
+                    logger.debug(
+                        f"No recommendation trends available for {ticker} before {as_of_date_only}"
+                    )
+                    return None
+
+                latest = matching_trend
+            else:
+                # Current analysis: use most recent recommendation
+                latest = data[-1]  # Last item is most recent
+
             return {
                 "ticker": ticker,
                 "period": latest.get("period"),

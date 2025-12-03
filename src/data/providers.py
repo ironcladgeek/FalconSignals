@@ -89,13 +89,15 @@ class DataProvider(ABC):
     def get_news(
         self,
         ticker: str,
-        limit: int = 10,
+        limit: int = 50,
+        as_of_date: datetime | None = None,
     ) -> list[NewsArticle]:
         """Fetch news articles.
 
         Args:
             ticker: Stock ticker symbol
             limit: Maximum number of articles
+            as_of_date: Optional date for historical news fetching (only fetch news before this date)
 
         Returns:
             List of NewsArticle objects

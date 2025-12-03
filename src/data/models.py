@@ -106,3 +106,39 @@ class InstrumentMetadata(BaseModel):
     last_updated: datetime = Field(description="Last data update time")
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class HistoricalContext(BaseModel):
+    """Historical data context for a specific date.
+
+    Contains all data that would have been available for analysis on a given date.
+    """
+
+    ticker: str = Field(description="Stock ticker symbol")
+    as_of_date: datetime = Field(description="Date for which this context is valid")
+    price_data: list[StockPrice] = Field(
+        default_factory=list, description="Historical price data up to as_of_date"
+    )
+    fundamentals: list[FinancialStatement] = Field(
+        default_factory=list, description="Financial statements available as of date"
+    )
+    news: list[NewsArticle] = Field(
+        default_factory=list, description="News articles published before as_of_date"
+    )
+    analyst_ratings: AnalystRating | None = Field(
+        default=None, description="Most recent analyst ratings as of date"
+    )
+    metadata: InstrumentMetadata | None = Field(default=None, description="Instrument metadata")
+    earnings_estimates: dict | None = Field(
+        default=None,
+        description="Earnings estimates (None for historical dates to prevent look-ahead bias)",
+    )
+    lookback_days: int = Field(default=365, description="Number of days of historical data")
+    data_available: bool = Field(
+        default=True, description="Whether sufficient data was available for analysis"
+    )
+    missing_data_warnings: list[str] = Field(
+        default_factory=list, description="Warnings about missing or sparse data"
+    )
+
+    model_config = ConfigDict(use_enum_values=True)
