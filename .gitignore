@@ -216,3 +216,4 @@ logs/
 *.pdf
 *.parquet
 config/local.yaml
+data/nordinvest.db
