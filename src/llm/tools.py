@@ -68,12 +68,16 @@ def json_serial(obj):
 class CrewAIToolAdapter:
     """Adapts existing tools for use with CrewAI agents."""
 
-    def __init__(self):
-        """Initialize tool adapters."""
+    def __init__(self, db_path: str = None):
+        """Initialize tool adapters.
+
+        Args:
+            db_path: Optional path to database for storing analyst ratings
+        """
         self.price_fetcher = PriceFetcherTool()
         self.technical_tool = TechnicalIndicatorTool()
         self.news_fetcher = NewsFetcherTool()
-        self.fundamental_fetcher = FinancialDataFetcherTool()
+        self.fundamental_fetcher = FinancialDataFetcherTool(db_path=db_path)
         # Cache to store data between tool calls
         self._data_cache = {}
         # Initialize tools once

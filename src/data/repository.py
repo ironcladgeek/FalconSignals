@@ -356,8 +356,8 @@ class AnalystRatingsRepository:
     def _parse_ratings(ratings: AnalystRating) -> tuple[int, int, int, int, int]:
         """Parse rating counts from AnalystRating.
 
-        Attempts to extract rating distribution. If not available, uses consensus
-        to estimate the distribution.
+        Uses actual raw counts if available (e.g., from Finnhub).
+        Otherwise, estimates distribution from consensus.
 
         Args:
             ratings: AnalystRating object.
@@ -365,9 +365,25 @@ class AnalystRatingsRepository:
         Returns:
             Tuple of (strong_buy, buy, hold, sell, strong_sell) counts.
         """
+        # If we have raw counts from the provider (e.g., Finnhub), use them directly
+        if (
+            ratings.strong_buy is not None
+            or ratings.buy is not None
+            or ratings.hold is not None
+            or ratings.sell is not None
+            or ratings.strong_sell is not None
+        ):
+            return (
+                ratings.strong_buy or 0,
+                ratings.buy or 0,
+                ratings.hold or 0,
+                ratings.sell or 0,
+                ratings.strong_sell or 0,
+            )
+
+        # Fall back to estimation if only consensus is available
         total = ratings.num_analysts or 1
 
-        # If we only have consensus, estimate distribution
         if ratings.consensus:
             consensus = ratings.consensus.lower()
             # Simple distribution: 40% consensus, 15% each of neighbors, 10% other

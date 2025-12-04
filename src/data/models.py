@@ -92,6 +92,13 @@ class AnalystRating(BaseModel):
     num_analysts: int | None = Field(default=None, ge=1, description="Number of analysts")
     consensus: str | None = Field(default=None, description="Consensus rating from aggregates")
 
+    # Raw recommendation counts (optional, for providers like Finnhub that provide detailed breakdowns)
+    strong_buy: int | None = Field(default=None, ge=0, description="Number of strong buy ratings")
+    buy: int | None = Field(default=None, ge=0, description="Number of buy ratings")
+    hold: int | None = Field(default=None, ge=0, description="Number of hold ratings")
+    sell: int | None = Field(default=None, ge=0, description="Number of sell ratings")
+    strong_sell: int | None = Field(default=None, ge=0, description="Number of strong sell ratings")
+
     model_config = ConfigDict(use_enum_values=True)
 
 

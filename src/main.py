@@ -13,6 +13,7 @@ from src.analysis import InvestmentSignal
 from src.analysis.models import ComponentScores, RiskAssessment
 from src.cache.manager import CacheManager
 from src.config import load_config
+from src.data.db import init_db
 from src.data.portfolio import PortfolioState
 from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
@@ -166,6 +167,7 @@ def _run_llm_analysis(
             enable_fallback=config_obj.llm.enable_fallback,
             debug_dir=debug_dir,
             progress_callback=progress_callback,
+            db_path=config_obj.database.db_path if config_obj.database.enabled else None,
         )
 
         # Set historical date on all tools if provided
@@ -619,6 +621,11 @@ def analyze(
         # Setup logging
         setup_logging(config_obj.logging)
 
+        # Initialize database if enabled
+        if config_obj.database.enabled:
+            init_db(config_obj.database.db_path)
+            logger.debug(f"Database initialized at {config_obj.database.db_path}")
+
         # Check LLM configuration and warn if using fallback mode
         llm_configured = log_llm_status(config_obj.llm.provider)
 
@@ -673,6 +680,7 @@ def analyze(
             portfolio_manager,
             llm_provider=config_obj.llm.provider,
             test_mode_config=config_obj.test_mode if test else None,
+            db_path=config_obj.database.db_path if config_obj.database.enabled else None,
         )
 
         # Determine which tickers to analyze

@@ -6,7 +6,7 @@ from typing import Optional
 
 import requests
 
-from src.data.models import Market, NewsArticle, StockPrice
+from src.data.models import AnalystRating, Market, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.logging import get_logger
 
@@ -291,6 +291,7 @@ class FinnhubProvider(DataProvider):
                 )
 
                 # Find most recent recommendation with period <= as_of_date
+                # Data is ordered newest to oldest, so find first match
                 matching_trend = None
                 for trend in data:
                     trend_period_str = trend.get("period", "")
@@ -298,7 +299,8 @@ class FinnhubProvider(DataProvider):
                         trend_date = datetime.strptime(trend_period_str, "%Y-%m-%d").date()
                         if trend_date <= as_of_date_only:
                             matching_trend = trend
-                            # Continue to find the most recent matching one
+                            # Found most recent match (data is newest-first), stop searching
+                            break
                     except (ValueError, TypeError):
                         logger.debug(f"Could not parse period: {trend_period_str}")
                         continue
@@ -312,7 +314,7 @@ class FinnhubProvider(DataProvider):
                 latest = matching_trend
             else:
                 # Current analysis: use most recent recommendation
-                latest = data[-1]  # Last item is most recent
+                latest = data[0]  # First item is most recent (API returns newest-first)
 
             return {
                 "ticker": ticker,
@@ -331,6 +333,76 @@ class FinnhubProvider(DataProvider):
 
         except requests.exceptions.RequestException as e:
             logger.warning(f"Request error fetching recommendation trends for {ticker}: {e}")
+            return None
+
+    def get_analyst_ratings(
+        self, ticker: str, as_of_date: datetime | None = None
+    ) -> Optional[AnalystRating]:
+        """Fetch analyst ratings for a stock.
+
+        This wraps get_recommendation_trends() and converts to AnalystRating model.
+
+        Args:
+            ticker: Stock ticker symbol
+            as_of_date: Optional date for historical ratings
+
+        Returns:
+            AnalystRating object or None if not available
+        """
+        trends = self.get_recommendation_trends(ticker, as_of_date=as_of_date)
+        if not trends:
+            return None
+
+        try:
+            # Convert trends dict to AnalystRating model
+            # Determine consensus rating based on distribution
+            total = trends.get("total_analysts", 0)
+            if total == 0:
+                return None
+
+            strong_buy_pct = trends.get("strong_buy", 0) / total
+            buy_pct = trends.get("buy", 0) / total
+
+            if strong_buy_pct >= 0.4:
+                consensus = "strong_buy"
+                rating = "buy"
+            elif (strong_buy_pct + buy_pct) >= 0.5:
+                consensus = "buy"
+                rating = "buy"
+            elif trends.get("hold", 0) / total >= 0.4:
+                consensus = "hold"
+                rating = "hold"
+            elif trends.get("sell", 0) / total >= 0.3:
+                consensus = "sell"
+                rating = "sell"
+            else:
+                consensus = "hold"
+                rating = "hold"
+
+            # Parse period date
+            period_str = trends.get("period", "")
+            try:
+                rating_date = datetime.strptime(period_str, "%Y-%m-%d")
+            except (ValueError, TypeError):
+                rating_date = datetime.now()
+
+            return AnalystRating(
+                ticker=ticker,
+                name=trends.get("name", ticker),
+                rating_date=rating_date,
+                rating=rating,
+                price_target=None,  # Finnhub doesn't provide this in free tier
+                num_analysts=total,
+                consensus=consensus,
+                # Include raw recommendation counts from Finnhub
+                strong_buy=trends.get("strong_buy", 0),
+                buy=trends.get("buy", 0),
+                hold=trends.get("hold", 0),
+                sell=trends.get("sell", 0),
+                strong_sell=trends.get("strong_sell", 0),
+            )
+        except Exception as e:
+            logger.warning(f"Error converting recommendation trends to AnalystRating: {e}")
             return None
 
     @staticmethod

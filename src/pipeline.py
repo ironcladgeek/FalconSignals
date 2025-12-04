@@ -29,6 +29,7 @@ class AnalysisPipeline:
         portfolio_manager: PortfolioState | None = None,
         llm_provider: str | None = None,
         test_mode_config: Any | None = None,
+        db_path: str | None = None,
     ):
         """Initialize analysis pipeline.
 
@@ -38,6 +39,7 @@ class AnalysisPipeline:
             portfolio_manager: Optional portfolio state manager for position tracking
             llm_provider: Optional LLM provider to check configuration for
             test_mode_config: Optional test mode configuration for fixtures/mock LLM
+            db_path: Optional path to database for storing analyst ratings
         """
         self.config = config
         self.cache_manager = cache_manager
@@ -45,7 +47,9 @@ class AnalysisPipeline:
         self.test_mode_config = test_mode_config
 
         # Initialize components
-        self.crew = AnalysisCrew(llm_provider=llm_provider, test_mode_config=test_mode_config)
+        self.crew = AnalysisCrew(
+            llm_provider=llm_provider, test_mode_config=test_mode_config, db_path=db_path
+        )
         self.risk_assessor = RiskAssessor(
             volatility_threshold_high=config.get("risk_volatility_high", 3.0),
             volatility_threshold_very_high=config.get("risk_volatility_very_high", 5.0),
