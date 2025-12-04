@@ -246,7 +246,7 @@ class RunSession(SQLModel, table=True):
 
     __tablename__ = "run_sessions"
 
-    id: str = SQLField(primary_key=True, description="UUID for the run session")
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
     started_at: datetime = SQLField(
         default_factory=datetime.now, description="When analysis run started"
     )
@@ -304,11 +304,11 @@ class Recommendation(SQLModel, table=True):
 
     __tablename__ = "recommendations"
 
-    id: str = SQLField(primary_key=True, description="UUID for the recommendation")
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
     ticker_id: int = SQLField(
         foreign_key="tickers.id", index=True, description="Foreign key to ticker"
     )
-    run_session_id: str = SQLField(
+    run_session_id: int = SQLField(
         foreign_key="run_sessions.id", index=True, description="Foreign key to run session"
     )
 
@@ -377,7 +377,7 @@ class PriceTracking(SQLModel, table=True):
     __tablename__ = "price_tracking"
 
     id: int | None = SQLField(default=None, primary_key=True)
-    recommendation_id: str = SQLField(
+    recommendation_id: int = SQLField(
         foreign_key="recommendations.id", index=True, description="Foreign key to recommendation"
     )
     tracking_date: date = SQLField(index=True, description="Date when price was tracked")
