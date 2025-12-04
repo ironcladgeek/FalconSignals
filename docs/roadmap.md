@@ -616,12 +616,13 @@ uv run python -m src.main analyze --test --date 2024-06-01
 
 Implement a local file-based SQLite database for storing historical data that has limited availability from APIs (like analyst ratings which only cover current + 3 months), and for tracking recommendation performance over time.
 
-### 9.1 Historical Data Storage
+### 9.1 Historical Data Storage ✅
 
+**Status**: Completed
 **Objective**: Persist time-sensitive data that APIs don't retain historically.
 
 #### Tasks
-- [ ] **Create SQLite database** (`data/nordinvest.db`):
+- [x] **Create SQLite database** (`data/nordinvest.db`):
   ```sql
   -- Analyst ratings historical storage
   -- APIs only provide current + ~3 months, we need to accumulate over time
@@ -645,7 +646,7 @@ Implement a local file-based SQLite database for storing historical data that ha
   CREATE INDEX idx_analyst_ratings_ticker_period ON analyst_ratings(ticker, period);
   ```
 
-- [ ] **Create AnalystRatingsRepository class**:
+- [x] **Create AnalystRatingsRepository class**:
   ```python
   class AnalystRatingsRepository:
       """Repository for storing and retrieving historical analyst ratings."""
@@ -672,7 +673,7 @@ Implement a local file-based SQLite database for storing historical data that ha
           """Get the most recent ratings for a ticker."""
   ```
 
-- [ ] **Integrate with data fetching pipeline**:
+- [x] **Integrate with data fetching pipeline**:
   - Auto-store analyst ratings when fetched from API
   - Check database first for historical dates
   - Fall back to API for current data
@@ -693,69 +694,230 @@ class AnalystData(BaseModel):
     fetched_at: datetime | None = None
 ```
 
-### 9.2 Performance Tracking Database
+### 9.2 Performance Tracking Database & Enhanced Report Generation
 
-**Objective**: Persist recommendations and track their outcomes.
+**Status**: 🚧 IN PROGRESS
+**Objective**: Persist recommendations, track their outcomes, and enable partial report generation.
+
+#### Enhanced Scope
+
+**Original Problem Identified:**
+- Reports only generated when ALL tickers complete successfully
+- If ticker 3 of 5 fails, NO report is generated (even though tickers 1-2 succeeded)
+- All analysis results exist only in memory during execution
+- No persistence of partial results or individual signals
+
+**Enhanced Solution:**
+- Store investment signals to database immediately after creation
+- Enable report generation from database-stored signals
+- Support partial report generation when some tickers fail
+- Add run session tracking to group related signals
+- Maintain backward compatibility with existing flow
 
 #### Tasks
-- [ ] **Add recommendations table**:
+
+**9.2.1 Run Session Tracking**
+- [ ] **Add run_sessions table**:
   ```sql
-  CREATE TABLE recommendations (
-      id TEXT PRIMARY KEY,
-      ticker TEXT NOT NULL,
-      analysis_date DATE NOT NULL,
-      signal_type TEXT NOT NULL,  -- 'BUY', 'HOLD', 'SELL', 'AVOID'
-      score REAL NOT NULL,
-      confidence REAL NOT NULL,
-      technical_score REAL,
-      fundamental_score REAL,
-      sentiment_score REAL,
-      analysis_mode TEXT,  -- 'rule_based', 'llm', 'hybrid'
-      llm_model TEXT,
+  CREATE TABLE run_sessions (
+      id TEXT PRIMARY KEY,  -- UUID
+      started_at TIMESTAMP NOT NULL,
+      completed_at TIMESTAMP,
+
+      -- Run context
+      analysis_mode TEXT NOT NULL,  -- 'rule_based', 'llm'
+      analyzed_category TEXT,
+      analyzed_market TEXT,
+      analyzed_tickers_specified TEXT,  -- JSON array
+
+      -- Two-stage LLM tracking
+      initial_tickers_count INTEGER,
+      anomalies_count INTEGER,
+      force_full_analysis BOOLEAN DEFAULT FALSE,
+
+      -- Results
+      signals_generated INTEGER DEFAULT 0,
+      signals_failed INTEGER DEFAULT 0,
+
+      -- Status
+      status TEXT NOT NULL,  -- 'running', 'completed', 'failed', 'partial'
+      error_message TEXT,
+
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX idx_recommendations_ticker ON recommendations(ticker);
-  CREATE INDEX idx_recommendations_date ON recommendations(analysis_date);
+  CREATE INDEX idx_run_sessions_analysis_date ON run_sessions(DATE(started_at));
+  CREATE INDEX idx_run_sessions_status ON run_sessions(status);
   ```
 
+- [ ] **Create RunSessionRepository class**
+  - [ ] `create_session()` - Start new analysis run
+  - [ ] `complete_session()` - Mark run as completed/failed/partial
+  - [ ] `get_session()` - Retrieve session by ID
+
+**9.2.2 Enhanced Recommendations Storage**
+- [ ] **Add recommendations table** (enhanced schema):
+  ```sql
+  CREATE TABLE recommendations (
+      id TEXT PRIMARY KEY,  -- UUID
+      ticker_id INTEGER NOT NULL,
+      run_session_id TEXT NOT NULL,
+
+      -- Analysis metadata
+      analysis_date DATE NOT NULL,
+      analysis_mode TEXT NOT NULL,
+      llm_model TEXT,
+
+      -- Recommendation details
+      signal_type TEXT NOT NULL,  -- 'strong_buy', 'buy', 'hold', 'sell', 'avoid'
+      final_score REAL NOT NULL,
+      confidence REAL NOT NULL,
+
+      -- Component scores
+      technical_score REAL,
+      fundamental_score REAL,
+      sentiment_score REAL,
+
+      -- Pricing
+      current_price REAL NOT NULL,
+      currency TEXT NOT NULL,
+      expected_return_min REAL,
+      expected_return_max REAL,
+      time_horizon TEXT,
+
+      -- Risk assessment (JSON serialized)
+      risk_level TEXT,
+      risk_volatility TEXT,
+      risk_volatility_pct REAL,
+      risk_flags TEXT,  -- JSON array
+
+      -- Context (JSON serialized)
+      key_reasons TEXT,  -- JSON array
+      rationale TEXT,
+      caveats TEXT,  -- JSON array
+
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+      FOREIGN KEY(ticker_id) REFERENCES tickers(id),
+      FOREIGN KEY(run_session_id) REFERENCES run_sessions(id)
+  );
+
+  CREATE INDEX idx_recommendations_ticker_id ON recommendations(ticker_id);
+  CREATE INDEX idx_recommendations_analysis_date ON recommendations(analysis_date);
+  CREATE INDEX idx_recommendations_run_session ON recommendations(run_session_id);
+  CREATE INDEX idx_recommendations_signal_type ON recommendations(signal_type);
+  ```
+
+- [ ] **Create RecommendationsRepository class**
+  - [ ] `store_recommendation()` - Store InvestmentSignal to DB immediately
+  - [ ] `get_recommendations_by_session()` - Load signals for a run
+  - [ ] `get_recommendations_by_date()` - Load signals for a date
+  - [ ] `get_latest_recommendation()` - Most recent for a ticker
+  - [ ] `_to_investment_signal()` - DB model → Pydantic model conversion
+
+**9.2.3 Pipeline Integration**
+- [ ] **Update AnalysisPipeline constructor**
+  - [ ] Accept `db_path` and `run_session_id` parameters
+  - [ ] Initialize `RecommendationsRepository` if db_path provided
+
+- [ ] **Add signal storage after creation**
+  - [ ] In `src/pipeline.py` line 119 (rule-based mode)
+  - [ ] In `src/main.py` line 242 (LLM mode)
+  - [ ] Wrap in try/except to prevent DB errors from halting analysis
+
+- [ ] **Implement session management in main.py**
+  - [ ] Create session before analysis starts
+  - [ ] Pass session_id to pipeline
+  - [ ] Complete session after analysis finishes
+
+**9.2.4 Enhanced Report Generation**
+- [ ] **Update `generate_daily_report()` method**
+  - [ ] Make `signals` parameter optional
+  - [ ] Add `run_session_id` and `report_date` parameters
+  - [ ] Add database loading logic (priority: in-memory > session_id > report_date)
+  - [ ] Update report metadata to include data source
+
+- [ ] **Add historical report CLI command**
+  - [ ] `report --session-id <UUID>` - Generate from run session
+  - [ ] `report --date YYYY-MM-DD` - Generate for specific date
+
+**9.2.5 Price Tracking & Performance**
 - [ ] **Add price tracking table**:
   ```sql
   CREATE TABLE price_tracking (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recommendation_id TEXT REFERENCES recommendations(id),
+      recommendation_id TEXT NOT NULL,
       tracking_date DATE NOT NULL,
-      days_since_recommendation INTEGER,
+      days_since_recommendation INTEGER NOT NULL,
+
       price REAL NOT NULL,
       price_change_pct REAL,
-      benchmark_change_pct REAL,  -- vs SPY
+
+      benchmark_ticker TEXT DEFAULT 'SPY',
+      benchmark_price REAL,
+      benchmark_change_pct REAL,
+      alpha REAL,
+
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+      FOREIGN KEY(recommendation_id) REFERENCES recommendations(id),
       UNIQUE(recommendation_id, tracking_date)
   );
+
+  CREATE INDEX idx_price_tracking_recommendation ON price_tracking(recommendation_id);
+  CREATE INDEX idx_price_tracking_date ON price_tracking(tracking_date);
   ```
 
 - [ ] **Add performance summary table**:
   ```sql
   CREATE TABLE performance_summary (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      ticker TEXT,
+
+      ticker_id INTEGER,  -- NULL for overall summary
       signal_type TEXT,
       analysis_mode TEXT,
-      period_days INTEGER,
-      total_recommendations INTEGER,
+      period_days INTEGER NOT NULL,
+
+      total_recommendations INTEGER NOT NULL,
       avg_return REAL,
+      median_return REAL,
       win_rate REAL,
+      avg_alpha REAL,
+      sharpe_ratio REAL,
+      max_drawdown REAL,
+
+      avg_confidence REAL,
+      actual_win_rate REAL,
+      calibration_error REAL,
+
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(ticker, signal_type, analysis_mode, period_days)
+
+      FOREIGN KEY(ticker_id) REFERENCES tickers(id),
+      UNIQUE(ticker_id, signal_type, analysis_mode, period_days)
   );
+
+  CREATE INDEX idx_performance_summary_period ON performance_summary(period_days);
+  CREATE INDEX idx_performance_summary_signal ON performance_summary(signal_type);
   ```
 
-- [ ] **Create PerformanceTracker class**
+- [ ] **Create PerformanceRepository class**
+  - [ ] `track_price()` - Record daily price for performance tracking
+  - [ ] `update_performance_summary()` - Calculate aggregated metrics
+  - [ ] `get_performance_report()` - Generate performance report
+
 - [ ] **Automated daily price tracking job**
 - [ ] **Performance report generation**
 
 ### 9.3 CLI Commands
 
 ```bash
+# Analysis with automatic signal storage (existing command enhanced)
+uv run python -m src.main analyze --ticker AAPL,MSFT,GOOGL --llm
+
+# Generate historical report from database
+uv run python -m src.main report --session-id <UUID>
+uv run python -m src.main report --date 2024-12-04
+
 # Store current analyst ratings for all tracked tickers
 uv run python -m src.main store-analyst-ratings
 
@@ -773,31 +935,71 @@ uv run python -m src.main performance-report --period 30
 ```yaml
 database:
   enabled: true
-  path: "data/nordinvest.db"
+  db_path: "data/nordinvest.db"
 
-performance_tracking:
-  enabled: true
-  tracking_periods: [7, 30, 90, 180]
-  benchmark_ticker: "SPY"
-  auto_update: true
+  performance_tracking:
+    enabled: true
+    tracking_periods: [7, 30, 90, 180]
+    benchmark_ticker: "SPY"
+    auto_daily_update: false
+
+  storage:
+    store_signals_immediately: true
+    fail_on_storage_error: false  # Log warning, continue execution
 ```
 
 #### Deliverables
-- [ ] SQLite database schema (analyst_ratings, recommendations, price_tracking, performance_summary)
-- [ ] AnalystRatingsRepository implementation
-- [ ] PerformanceTracker implementation
-- [ ] Integration with data fetching pipeline
-- [ ] `store-analyst-ratings` CLI command
-- [ ] `analyst-history` CLI command
+
+**Must Have (MVP):**
+- [ ] SQLite database schema (run_sessions, recommendations, price_tracking, performance_summary)
+- [ ] RunSessionRepository implementation
+- [ ] RecommendationsRepository implementation
+- [ ] PerformanceRepository implementation (basic)
+- [ ] Integration with analysis pipeline (immediate signal storage)
+- [ ] Session management in analyze command
+- [ ] Enhanced report generation (database-backed)
+- [ ] Historical report CLI command (`report`)
+- [ ] Integration tests for partial failures
+- [ ] Documentation updates (CLAUDE.md, roadmap.md)
+
+**Should Have:**
 - [ ] `track-performance` CLI command
 - [ ] `performance-report` CLI command
+- [ ] Automated daily price tracking job
+
+**Nice to Have:**
+- [ ] Performance dashboard/analytics
+- [ ] Report comparison across runs
+- [ ] Export performance data to CSV
+
+#### Benefits
+
+**Immediate Value:**
+- ✅ Reports generated even when some tickers fail (partial results saved)
+- ✅ Historical analysis of past recommendations
+- ✅ Audit trail of all analysis runs
+- ✅ Foundation for performance tracking
+
+**Long-term Value:**
+- ✅ Performance tracking over time
+- ✅ Confidence calibration analysis
+- ✅ Backtesting support (Phase 14)
+- ✅ Data-driven strategy refinement
 
 ---
 
-**Phase 9 Status: PLANNED - HIGH PRIORITY**
+**Phase 9.2 Status: 🚧 IN PROGRESS**
 
-**Estimated Effort**: 4-5 days
-**Priority**: 🔴 High - Enables historical analysis with complete data
+**Estimated Effort**: 8 days
+**Priority**: 🔴 High - Enables partial report generation and performance tracking
+
+**Implementation Timeline:**
+- Day 1: Database schema & models
+- Days 2-3: Repository classes & unit tests
+- Day 4: Pipeline integration & session management
+- Day 5: Enhanced report generation
+- Days 6-7: Performance tracking (basic implementation)
+- Day 8: Integration tests & documentation
 
 ---
 
