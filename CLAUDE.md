@@ -94,7 +94,7 @@ uv run python -m src.main track-performance
 
 # Track with custom parameters
 uv run python -m src.main track-performance --max-age 90  # Track up to 90 days old
-uv run python -m src.main track-performance --signals buy,strong_buy  # Only buy signals
+uv run python -m src.main track-performance --signals buy,strong_buy,hold,hold_bullish  # Specify signal types
 uv run python -m src.main track-performance --benchmark QQQ  # Use QQQ as benchmark
 
 # Generate performance reports
@@ -111,6 +111,12 @@ uv run python -m src.main performance-report --format json  # JSON output
 - ✅ Returns, win rate, alpha, Sharpe ratio calculation
 - ✅ Confidence calibration analysis
 - ✅ Multiple time periods (7, 30, 90, 180 days)
+- ✅ **Bug Fixed**: Now correctly stores and tracks prices (see Bug Fixes section below)
+
+**Important Notes**:
+- Default signal filter is `buy,strong_buy` - add `hold,hold_bullish` if tracking those
+- Requires valid `current_price` in recommendations (fixed in December 2025)
+- Historical recommendations need historical prices (use `scripts/fix_historical_prices.py`)
 
 ### Project Configuration
 
@@ -439,6 +445,62 @@ The system is designed to maintain €50-90/month operational cost:
 - LLM API: €50-70/month
 - Financial Data APIs: €0-20/month (free tiers)
 - Compute: €0 (local execution)
+
+## Recent Critical Bug Fixes (December 2025)
+
+### Bug Fix #1: Recommendations Stored with current_price=0
+
+**Problem**: Recommendations were being stored with `current_price = 0.0`, breaking all performance tracking calculations.
+
+**Root Cause**: In `src/pipeline.py`, the `_create_investment_signal()` method defaulted to `current_price = 0.0` and only tried to fetch from cache. If the cache didn't have the price (common for new tickers), it would silently continue with 0.
+
+**Solution**:
+1. Added `ProviderManager` to `AnalysisPipeline` as a fallback for price fetching
+2. Modified price fetching logic to:
+   - Try cache first
+   - Fallback to provider if cache is empty
+   - Return `None` (skip signal creation) if no valid price available
+3. Updated `analyze` and `report` commands to initialize and pass provider_manager
+
+**Files Modified**:
+- [src/pipeline.py](src/pipeline.py): Added provider_manager parameter, improved price fetching
+- [src/main.py](src/main.py): Initialize provider_manager (lines 690-696, 1148-1154)
+
+**Impact**:
+- ✅ All new recommendations have valid `current_price > 0`
+- ✅ Signals without prices are skipped (no broken data)
+- ✅ Performance tracking metrics now calculate correctly
+
+### Bug Fix #2: Historical Price Fetching
+
+**Problem**: When analyzing historical data (`analysis_date` in the past), the code used current/latest price instead of the historical price at `analysis_date`.
+
+**Example**: KEYS analyzed on 2025-09-10 (price was $170.20) was stored with $209.07 (today's price), making historical analysis inaccurate.
+
+**Solution**:
+- Enhanced `_create_investment_signal()` to detect historical vs current analysis
+- If `analysis_date < today`, fetch historical price using `provider_manager.get_stock_prices(ticker, start_date, end_date)`
+- If `analysis_date == today`, fetch latest price as before
+
+**Files Modified**:
+- [src/pipeline.py](src/pipeline.py): Lines 338-437 (historical-aware price fetching)
+
+**Tool Created**:
+- [scripts/fix_historical_prices.py](scripts/fix_historical_prices.py): Script to fix existing recommendations
+
+**Fix Existing Data**:
+```bash
+# Dry run (shows what would be fixed)
+uv run python scripts/fix_historical_prices.py
+
+# Actually apply fixes
+uv run python scripts/fix_historical_prices.py --apply
+```
+
+**Impact**:
+- ✅ Historical analysis uses correct prices from `analysis_date`
+- ✅ Backtesting accuracy improved
+- ✅ Performance tracking baseline prices are accurate
 
 ## Common Troubleshooting
 
