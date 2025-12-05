@@ -156,22 +156,80 @@ class TestCLIReportCommand:
 
     @patch("src.main.load_config")
     @patch("src.main.setup_logging")
-    def test_report_command(self, mock_setup_logging, mock_load_config, runner, temp_config):
+    @patch("src.main.init_db")
+    @patch("src.data.provider_manager.ProviderManager")  # Mock at source location
+    @patch("src.main.AnalysisPipeline")
+    def test_report_command(
+        self,
+        mock_pipeline_class,
+        mock_provider_manager,
+        mock_init_db,
+        mock_setup_logging,
+        mock_load_config,
+        runner,
+        temp_config,
+        tmp_path,
+    ):
         """Test report command."""
+        # Use temp path for database to avoid creating test.db in project root
+        test_db_path = str(tmp_path / "test_report.db")
+
+        # Mock config
         mock_config = type(
             "Config",
             (),
             {
                 "logging": type("Logging", (), {"level": "INFO"})(),
                 "output": type("Output", (), {"report_format": "markdown"})(),
+                "database": type("Database", (), {"enabled": True, "db_path": test_db_path})(),
+                "capital": type(
+                    "Capital", (), {"starting_capital_eur": 2000, "monthly_deposit_eur": 500}
+                )(),
+                "llm": type("LLM", (), {"provider": "anthropic"})(),
+                "data": type(
+                    "Data",
+                    (),
+                    {
+                        "primary_provider": "yahoo_finance",
+                        "backup_providers": ["alpha_vantage", "finnhub"],
+                    },
+                )(),
             },
         )()
         mock_load_config.return_value = mock_config
 
-        result = runner.invoke(app, ["report", "--config", str(temp_config)])
+        # Mock pipeline and report
+        mock_pipeline = mock_pipeline_class.return_value
+        mock_report = type(
+            "Report",
+            (),
+            {
+                "report_date": "2025-12-04",
+                "strong_signals_count": 2,
+                "moderate_signals_count": 3,
+                "total_signals_generated": 5,
+                "allocation_suggestion": None,
+            },
+        )()
+        mock_pipeline.generate_daily_report.return_value = mock_report
+        mock_pipeline.report_generator.to_markdown.return_value = "# Test Report"
+
+        result = runner.invoke(
+            app, ["report", "--session-id", "1", "--config", str(temp_config), "--no-save"]
+        )
+
+        # Debug output
+        if result.exit_code != 0:
+            print(f"\n=== STDOUT ===\n{result.stdout}")
+            print(f"\n=== STDERR ===\n{result.stderr if hasattr(result, 'stderr') else 'N/A'}")
+            if result.exception:
+                print(f"\n=== EXCEPTION ===\n{result.exception}")
 
         assert result.exit_code == 0
-        assert "Report configuration loaded" in result.stdout
+        assert "Generating report from database" in result.stdout
+        assert "Report Summary" in result.stdout
+        # Check that pipeline was called
+        mock_pipeline.generate_daily_report.assert_called_once()
 
 
 @pytest.mark.integration
