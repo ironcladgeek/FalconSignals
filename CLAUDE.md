@@ -58,6 +58,66 @@ uv run python -m src.main analyze --market us --limit 20
 uv run python -m src.main analyze --group us_tech_software
 ```
 
+**Note**: When database is enabled (default), all analysis runs automatically:
+- Create a run session to track the analysis
+- Store investment signals immediately after creation (non-blocking)
+- Enable partial report generation even if some tickers fail
+- Track analysis metadata (mode, tickers, timestamps, status)
+
+### Report Generation Commands
+
+```bash
+# Generate report from a specific analysis session (using session ID)
+uv run python -m src.main report --session-id 1
+
+# Generate report for all signals from a specific date
+uv run python -m src.main report --date 2025-12-04
+
+# Generate JSON report instead of markdown
+uv run python -m src.main report --session-id 1 --format json
+
+# Preview report without saving to file
+uv run python -m src.main report --session-id 1 --no-save
+```
+
+**Database Benefits**:
+- ✅ Reports generated even when some tickers fail (partial results saved)
+- ✅ Historical report regeneration from stored data
+- ✅ Audit trail of all analysis runs
+- ✅ Foundation for performance tracking
+
+### Performance Tracking Commands
+
+```bash
+# Track prices for active recommendations (run daily)
+uv run python -m src.main track-performance
+
+# Track with custom parameters
+uv run python -m src.main track-performance --max-age 90  # Track up to 90 days old
+uv run python -m src.main track-performance --signals buy,strong_buy,hold,hold_bullish  # Specify signal types
+uv run python -m src.main track-performance --benchmark QQQ  # Use QQQ as benchmark
+
+# Generate performance reports
+uv run python -m src.main performance-report  # 30-day report (default)
+uv run python -m src.main performance-report --period 90  # 90-day report
+uv run python -m src.main performance-report --ticker AAPL  # Specific ticker
+uv run python -m src.main performance-report --signal buy --mode llm  # Filtered
+uv run python -m src.main performance-report --format json  # JSON output
+```
+
+**Performance Tracking Features**:
+- ✅ Daily price tracking for active recommendations
+- ✅ Benchmark comparison (default: SPY)
+- ✅ Returns, win rate, alpha, Sharpe ratio calculation
+- ✅ Confidence calibration analysis
+- ✅ Multiple time periods (7, 30, 90, 180 days)
+- ✅ **Bug Fixed**: Now correctly stores and tracks prices (see Bug Fixes section below)
+
+**Important Notes**:
+- Default signal filter is `buy,strong_buy` - add `hold,hold_bullish` if tracking those
+- Requires valid `current_price` in recommendations (fixed in December 2025)
+- Historical recommendations need historical prices (use `scripts/fix_historical_prices.py`)
+
 ### Project Configuration
 
 ```bash
@@ -91,7 +151,15 @@ Analysis Mode Selection (--llm flag)
         ├─ Fundamental Metrics (P/E, EV/EBITDA, margins)
         └─ Signal Scoring (weighted combination)
     ↓
+Database Storage (SQLite) ← Immediate signal persistence
+    ├─ Run Sessions (track each analysis run)
+    ├─ Recommendations (investment signals)
+    ├─ Price Tracking (performance monitoring)
+    └─ Analyst Ratings (historical data)
+    ↓
 Report Generation (Markdown/JSON)
+    ├─ From in-memory signals (during analysis)
+    └─ From database (historical regeneration)
     ↓
 Output (Files, Terminal, Cost Summary)
 ```
@@ -118,18 +186,29 @@ Output (Files, Terminal, Cost Summary)
   - Financial statements: 7 days
 - Minimizes API calls and costs
 
-**4. Analysis Modules (src/analysis/)**
+**4. Database Layer (src/data/db.py, src/data/repository.py)**
+- SQLite database (`data/nordinvest.db`) for persistent storage
+- **Auto-incrementing INTEGER primary keys** (migrated from UUID for performance)
+- Repository pattern for data access with session management
+- **Run Sessions**: Track each analysis run with metadata (mode, tickers, status, timestamps)
+- **Recommendations**: Store investment signals immediately after creation
+- **Price Tracking**: Monitor recommendation performance over time
+- **Analyst Ratings**: Accumulate historical analyst data (APIs only provide 3 months)
+- Non-blocking storage: DB failures logged as warnings, don't halt analysis
+- Enables partial report generation when some tickers fail
+
+**5. Analysis Modules (src/analysis/)**
 - Technical Analysis: Moving averages, RSI, MACD, ATR, volume analysis
 - Fundamental Analysis: Earnings growth, margins, debt ratios, valuation metrics
 - Signal Synthesis: Multi-factor scoring (35% fundamental, 35% technical, 30% sentiment)
 
-**5. LLM Integration (src/llm/)**
+**6. LLM Integration (src/llm/)**
 - Token tracking for cost monitoring
 - Prompt templates for consistent agent behavior
 - Tool adapters for CrewAI integration
 - High-level orchestrator for LLM analysis
 
-**6. Configuration System (src/config/)**
+**7. Configuration System (src/config/)**
 - YAML-based configuration for market preferences, risk tolerance, capital settings
 - LLM configuration (provider, model, temperature)
 - Environment variable support for API credentials
@@ -366,6 +445,62 @@ The system is designed to maintain €50-90/month operational cost:
 - LLM API: €50-70/month
 - Financial Data APIs: €0-20/month (free tiers)
 - Compute: €0 (local execution)
+
+## Recent Critical Bug Fixes (December 2025)
+
+### Bug Fix #1: Recommendations Stored with current_price=0
+
+**Problem**: Recommendations were being stored with `current_price = 0.0`, breaking all performance tracking calculations.
+
+**Root Cause**: In `src/pipeline.py`, the `_create_investment_signal()` method defaulted to `current_price = 0.0` and only tried to fetch from cache. If the cache didn't have the price (common for new tickers), it would silently continue with 0.
+
+**Solution**:
+1. Added `ProviderManager` to `AnalysisPipeline` as a fallback for price fetching
+2. Modified price fetching logic to:
+   - Try cache first
+   - Fallback to provider if cache is empty
+   - Return `None` (skip signal creation) if no valid price available
+3. Updated `analyze` and `report` commands to initialize and pass provider_manager
+
+**Files Modified**:
+- [src/pipeline.py](src/pipeline.py): Added provider_manager parameter, improved price fetching
+- [src/main.py](src/main.py): Initialize provider_manager (lines 690-696, 1148-1154)
+
+**Impact**:
+- ✅ All new recommendations have valid `current_price > 0`
+- ✅ Signals without prices are skipped (no broken data)
+- ✅ Performance tracking metrics now calculate correctly
+
+### Bug Fix #2: Historical Price Fetching
+
+**Problem**: When analyzing historical data (`analysis_date` in the past), the code used current/latest price instead of the historical price at `analysis_date`.
+
+**Example**: KEYS analyzed on 2025-09-10 (price was $170.20) was stored with $209.07 (today's price), making historical analysis inaccurate.
+
+**Solution**:
+- Enhanced `_create_investment_signal()` to detect historical vs current analysis
+- If `analysis_date < today`, fetch historical price using `provider_manager.get_stock_prices(ticker, start_date, end_date)`
+- If `analysis_date == today`, fetch latest price as before
+
+**Files Modified**:
+- [src/pipeline.py](src/pipeline.py): Lines 338-437 (historical-aware price fetching)
+
+**Tool Created**:
+- [scripts/fix_historical_prices.py](scripts/fix_historical_prices.py): Script to fix existing recommendations
+
+**Fix Existing Data**:
+```bash
+# Dry run (shows what would be fixed)
+uv run python scripts/fix_historical_prices.py
+
+# Actually apply fixes
+uv run python scripts/fix_historical_prices.py --apply
+```
+
+**Impact**:
+- ✅ Historical analysis uses correct prices from `analysis_date`
+- ✅ Backtesting accuracy improved
+- ✅ Performance tracking baseline prices are accurate
 
 ## Common Troubleshooting
 

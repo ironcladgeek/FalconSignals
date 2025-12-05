@@ -14,12 +14,18 @@ logger = get_logger(__name__)
 class AnalysisCrew:
     """Orchestrates multiple agents for comprehensive analysis."""
 
-    def __init__(self, llm_provider: Optional[str] = None, test_mode_config: Optional[Any] = None):
+    def __init__(
+        self,
+        llm_provider: Optional[str] = None,
+        test_mode_config: Optional[Any] = None,
+        db_path: Optional[str] = None,
+    ):
         """Initialize the analysis crew.
 
         Args:
             llm_provider: Optional LLM provider to check configuration for
             test_mode_config: Optional test mode configuration for fixtures/mock LLM
+            db_path: Optional path to database for storing analyst ratings
         """
         self.test_mode_config = test_mode_config
 
@@ -31,7 +37,7 @@ class AnalysisCrew:
             provider_name=provider_name, fixture_path=fixture_path
         )
         self.technical_agent = TechnicalAnalysisAgent()
-        self.fundamental_agent = FundamentalAnalysisAgent()
+        self.fundamental_agent = FundamentalAnalysisAgent(db_path=db_path)
         self.sentiment_agent = SentimentAgent()
         self.signal_synthesizer = SignalSynthesisAgent()
 

@@ -56,14 +56,26 @@ class TestSignalSynthesis:
         }
         portfolio_context = {}
 
-        signal = pipeline._create_investment_signal(analysis, portfolio_context)
+        # Mock the cache to return a price (required after bug fix)
+        from unittest.mock import Mock
 
-        assert signal is not None
-        assert signal.ticker == "TEST"
-        assert signal.final_score == 75
-        assert signal.confidence == 80
-        assert signal.recommendation == "buy"
-        assert signal.risk is not None
+        mock_price = Mock()
+        mock_price.close_price = 100.0
+        mock_price.currency = "USD"
+
+        # Patch get_latest_price to return mock price
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr(cache_manager, "get_latest_price", lambda ticker: mock_price)
+
+            signal = pipeline._create_investment_signal(analysis, portfolio_context)
+
+            assert signal is not None
+            assert signal.ticker == "TEST"
+            assert signal.final_score == 75
+            assert signal.confidence == 80
+            assert signal.recommendation == "buy"
+            assert signal.risk is not None
+            assert signal.current_price == 100.0
 
     def test_signal_to_dict_conversion(self):
         """Test conversion of signal to dictionary."""

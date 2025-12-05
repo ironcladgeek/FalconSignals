@@ -1,10 +1,12 @@
 """Provider manager with automatic fallback logic."""
 
-from datetime import datetime
+from datetime import date, datetime
+from pathlib import Path
 from typing import Optional
 
-from src.data.models import NewsArticle, StockPrice
+from src.data.models import AnalystRating, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
+from src.data.repository import AnalystRatingsRepository
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,12 +23,14 @@ class ProviderManager:
         self,
         primary_provider: str = "alpha_vantage",
         backup_providers: list[str] = None,
+        db_path: Path | str | None = None,
     ):
         """Initialize provider manager.
 
         Args:
             primary_provider: Primary provider name (default: alpha_vantage)
             backup_providers: List of backup provider names (default: [yahoo_finance, finnhub])
+            db_path: Optional path to database for storing analyst ratings
         """
         self.primary_provider_name = primary_provider
         self.backup_provider_names = backup_providers or ["yahoo_finance", "finnhub"]
@@ -37,6 +41,15 @@ class ProviderManager:
 
         # Track provider health
         self.provider_failures = {}
+
+        # Initialize repository for historical data storage
+        self.repository = None
+        if db_path:
+            try:
+                self.repository = AnalystRatingsRepository(db_path)
+                logger.debug(f"Analyst ratings repository initialized at {db_path}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize analyst ratings repository: {e}")
 
         logger.debug(
             f"Provider manager initialized: primary={primary_provider}, "
@@ -278,6 +291,99 @@ class ProviderManager:
 
         # All providers failed
         logger.warning(f"All providers failed for {ticker} company info")
+        return None
+
+    def get_analyst_ratings(
+        self,
+        ticker: str,
+        as_of_date: date | datetime | None = None,
+        auto_persist: bool = True,
+    ) -> Optional[AnalystRating]:
+        """Fetch analyst ratings with database caching.
+
+        Checks the database first for historical data, then falls back to APIs
+        for current data. Can optionally store fetched data in database.
+
+        Args:
+            ticker: Stock ticker symbol
+            as_of_date: Optional historical date to fetch ratings as of
+            auto_persist: If True, store fetched ratings in database
+
+        Returns:
+            AnalystRating object or None if not available
+
+        Example:
+            # Get latest ratings from API (and store in DB)
+            ratings = manager.get_analyst_ratings("AAPL")
+
+            # Get historical ratings from DB (if available)
+            ratings = manager.get_analyst_ratings("AAPL", as_of_date=date(2024, 6, 1))
+        """
+        ticker = ticker.upper()
+
+        # Check database first if historical date requested
+        if as_of_date and self.repository:
+            if isinstance(as_of_date, datetime):
+                as_of_date = as_of_date.date()
+
+            # Convert to period (first day of month)
+            period_date = as_of_date.replace(day=1)
+            db_ratings = self.repository.get_ratings(ticker, period_date)
+
+            if db_ratings:
+                logger.debug(
+                    f"Found analyst ratings for {ticker} in database (period: {period_date})"
+                )
+                return db_ratings
+            else:
+                logger.debug(
+                    f"No database ratings found for {ticker} (period: {period_date}), "
+                    f"skipping API fetch for historical date"
+                )
+                return None
+
+        # Fetch from APIs for current data
+        providers_to_try = [self.primary_provider] + self.backup_providers
+        errors = []
+
+        for provider in providers_to_try:
+            if not provider.is_available:
+                logger.debug(f"Skipping unavailable provider: {provider.name}")
+                continue
+
+            # Check if provider has get_analyst_ratings method
+            if not hasattr(provider, "get_analyst_ratings"):
+                logger.debug(f"Provider {provider.name} doesn't have get_analyst_ratings")
+                continue
+
+            try:
+                logger.debug(f"Fetching analyst ratings for {ticker} using {provider.name}")
+                ratings = provider.get_analyst_ratings(ticker)
+
+                if ratings:
+                    logger.debug(f"Successfully fetched analyst ratings from {provider.name}")
+
+                    # Store in database if enabled
+                    if auto_persist and self.repository:
+                        try:
+                            self.repository.store_ratings(ratings, data_source=provider.name)
+                            logger.debug(f"Stored analyst ratings for {ticker} in database")
+                        except Exception as e:
+                            logger.warning(f"Failed to store analyst ratings in database: {e}")
+
+                    self._record_success(provider.name)
+                    return ratings
+                else:
+                    logger.debug(f"No analyst ratings returned from {provider.name}")
+
+            except Exception as e:
+                logger.warning(f"Error fetching analyst ratings from {provider.name}: {e}")
+                self._record_failure(provider.name)
+                errors.append(f"{provider.name}: {str(e)}")
+                continue
+
+        # All providers failed
+        logger.warning(f"All providers failed for {ticker} analyst ratings")
         return None
 
     def _record_success(self, provider_name: str) -> None:

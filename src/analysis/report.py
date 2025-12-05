@@ -78,6 +78,11 @@ class ReportGenerator:
         if report_date is None:
             report_date = datetime.now().strftime("%Y-%m-%d")
 
+        # Extract analysis_date from first signal if available (for backtesting)
+        analysis_date = None
+        if signals:
+            analysis_date = signals[0].analysis_date
+
         portfolio_alerts = portfolio_alerts or []
         key_news = key_news or []
         analyzed_tickers_specified = analyzed_tickers_specified or []
@@ -104,6 +109,7 @@ class ReportGenerator:
         report = DailyReport(
             report_date=report_date,
             report_time=datetime.now(),
+            analysis_date=analysis_date,
             market_overview=market_overview or self._generate_market_overview(signals),
             market_indices={},  # Can be populated with actual index data
             strong_signals=top_signals,
@@ -148,7 +154,13 @@ class ReportGenerator:
 
         # Header
         md.append(f"# Investment Analysis Report - {report.report_date}")
-        md.append(f"*Generated: {report.report_time.strftime('%Y-%m-%d %H:%M:%S')}*\n")
+        md.append(f"*Generated: {report.report_time.strftime('%Y-%m-%d %H:%M:%S')}*")
+
+        # Add analysis date if present (for backtesting transparency)
+        if report.analysis_date:
+            md.append(f"*Analysis Date: {report.analysis_date}*\n")
+        else:
+            md.append("")  # Empty line for spacing
 
         # Add analysis mode indicator
         if report.analysis_mode == "llm":

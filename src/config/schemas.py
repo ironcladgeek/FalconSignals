@@ -276,6 +276,25 @@ class TestModeConfig(BaseModel):
     )
 
 
+class DatabaseConfig(BaseModel):
+    """Database configuration for historical data storage."""
+
+    enabled: bool = Field(default=True, description="Enable database storage of historical data")
+    db_path: str = Field(default="data/nordinvest.db", description="Path to SQLite database file")
+    auto_persist_analyst_ratings: bool = Field(
+        default=True, description="Automatically store analyst ratings when fetched from APIs"
+    )
+    check_db_first: bool = Field(
+        default=True, description="Check database first before calling APIs for historical dates"
+    )
+    auto_cleanup_old_data: bool = Field(
+        default=False, description="Automatically delete analyst ratings older than retention_days"
+    )
+    retention_days: int = Field(
+        default=730, ge=30, description="Keep analyst ratings for this many days (default: 2 years)"
+    )
+
+
 class Config(BaseModel):
     """Root configuration schema."""
 
@@ -302,4 +321,7 @@ class Config(BaseModel):
     )
     test_mode: TestModeConfig = Field(
         default_factory=TestModeConfig, description="Test mode configuration"
+    )
+    database: DatabaseConfig = Field(
+        default_factory=DatabaseConfig, description="Database configuration"
     )

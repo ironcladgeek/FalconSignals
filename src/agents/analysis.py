@@ -208,11 +208,12 @@ class TechnicalAnalysisAgent(BaseAgent):
 class FundamentalAnalysisAgent(BaseAgent):
     """Agent for fundamental analysis of companies."""
 
-    def __init__(self, tools: list = None):
+    def __init__(self, tools: list = None, db_path: str = None):
         """Initialize Fundamental Analysis agent.
 
         Args:
             tools: Optional list of tools
+            db_path: Optional path to database for storing analyst ratings
         """
         config = AgentConfig(
             role="Fundamental Analyst",
@@ -224,7 +225,7 @@ class FundamentalAnalysisAgent(BaseAgent):
                 "companies with strong business models and reasonable prices."
             ),
         )
-        default_tools = [FinancialDataFetcherTool()]
+        default_tools = [FinancialDataFetcherTool(db_path=db_path)]
         super().__init__(config, tools or default_tools)
 
     def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:

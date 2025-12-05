@@ -172,11 +172,12 @@ class FinancialDataFetcherTool(BaseTool):
     - Finnhub: analyst recommendations only
     """
 
-    def __init__(self, cache_manager: CacheManager = None):
+    def __init__(self, cache_manager: CacheManager = None, db_path: str = None):
         """Initialize financial data fetcher.
 
         Args:
             cache_manager: Optional cache manager for caching data
+            db_path: Optional path to database for storing analyst ratings
         """
         super().__init__(
             name="FinancialDataFetcher",
@@ -192,6 +193,7 @@ class FinancialDataFetcherTool(BaseTool):
         self.provider_manager = ProviderManager(
             primary_provider="alpha_vantage",
             backup_providers=["yahoo_finance", "finnhub"],
+            db_path=db_path,
         )
 
         # Keep direct access to specialized providers
@@ -295,11 +297,32 @@ class FinancialDataFetcherTool(BaseTool):
             except Exception as e:
                 logger.warning(f"Could not fetch news for {ticker}: {e}")
 
-            # Fetch analyst recommendations (Finnhub only)
+            # Fetch analyst recommendations (Finnhub only) + store in database
             analyst_data = None
             try:
                 if self.finnhub_provider.is_available:
-                    analyst_data = self.finnhub_provider.get_recommendation_trends(ticker)
+                    # Get recommendation trends dict for immediate use (with historical date)
+                    analyst_data = self.finnhub_provider.get_recommendation_trends(
+                        ticker, as_of_date=as_of_date
+                    )
+
+                    # Also fetch as AnalystRating object and store in database
+                    if analyst_data and self.provider_manager.repository:
+                        try:
+                            analyst_rating_obj = self.finnhub_provider.get_analyst_ratings(
+                                ticker, as_of_date=as_of_date
+                            )
+                            if analyst_rating_obj:
+                                stored = self.provider_manager.repository.store_ratings(
+                                    analyst_rating_obj, data_source="finnhub"
+                                )
+                                logger.debug(
+                                    f"Stored analyst ratings for {ticker} in database: {stored}"
+                                )
+                        except Exception as store_error:
+                            logger.warning(
+                                f"Could not store analyst ratings in database: {store_error}"
+                            )
             except Exception as e:
                 logger.warning(f"Could not fetch analyst data for {ticker}: {e}")
 

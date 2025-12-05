@@ -269,15 +269,8 @@ class TestFinnhubProvider:
     def test_get_recommendation_trends_success(self, mock_get, finnhub_provider):
         """Test successful recommendation trends retrieval."""
         mock_response = MagicMock()
+        # Finnhub returns data newest-first
         mock_response.json.return_value = [
-            {
-                "period": "2024-01-01",
-                "strongBuy": 10,
-                "buy": 5,
-                "hold": 2,
-                "sell": 1,
-                "strongSell": 0,
-            },
             {
                 "period": "2024-01-02",
                 "strongBuy": 8,
@@ -286,12 +279,20 @@ class TestFinnhubProvider:
                 "sell": 0,
                 "strongSell": 1,
             },
+            {
+                "period": "2024-01-01",
+                "strongBuy": 10,
+                "buy": 5,
+                "hold": 2,
+                "sell": 1,
+                "strongSell": 0,
+            },
         ]
         mock_get.return_value = mock_response
 
         trends = finnhub_provider.get_recommendation_trends("AAPL")
 
-        assert trends["strong_buy"] == 8  # Latest period (2024-01-02)
+        assert trends["strong_buy"] == 8  # Latest period (2024-01-02, first in list)
         assert trends["buy"] == 7
         assert trends["hold"] == 3
         assert trends["sell"] == 0
@@ -319,17 +320,10 @@ class TestFinnhubProvider:
         from datetime import datetime
 
         mock_response = MagicMock()
+        # Finnhub returns data newest-first
         mock_response.json.return_value = [
             {
-                "period": "2025-09-01",
-                "strongBuy": 14,
-                "buy": 23,
-                "hold": 15,
-                "sell": 3,
-                "strongSell": 0,
-            },
-            {
-                "period": "2025-10-01",
+                "period": "2025-12-01",
                 "strongBuy": 15,
                 "buy": 23,
                 "hold": 16,
@@ -345,11 +339,19 @@ class TestFinnhubProvider:
                 "strongSell": 0,
             },
             {
-                "period": "2025-12-01",
+                "period": "2025-10-01",
                 "strongBuy": 15,
                 "buy": 23,
                 "hold": 16,
                 "sell": 2,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-09-01",
+                "strongBuy": 14,
+                "buy": 23,
+                "hold": 15,
+                "sell": 3,
                 "strongSell": 0,
             },
         ]
@@ -375,21 +377,22 @@ class TestFinnhubProvider:
         from datetime import datetime
 
         mock_response = MagicMock()
+        # Finnhub returns data newest-first
         mock_response.json.return_value = [
-            {
-                "period": "2025-09-01",
-                "strongBuy": 14,
-                "buy": 23,
-                "hold": 15,
-                "sell": 3,
-                "strongSell": 0,
-            },
             {
                 "period": "2025-10-01",
                 "strongBuy": 15,
                 "buy": 23,
                 "hold": 16,
                 "sell": 2,
+                "strongSell": 0,
+            },
+            {
+                "period": "2025-09-01",
+                "strongBuy": 14,
+                "buy": 23,
+                "hold": 15,
+                "sell": 3,
                 "strongSell": 0,
             },
         ]

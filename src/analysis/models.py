@@ -149,6 +149,10 @@ class DailyReport(BaseModel):
 
     report_date: str = Field(description="Report date (YYYY-MM-DD)")
     report_time: datetime = Field(description="Report generation time")
+    analysis_date: str | None = Field(
+        default=None,
+        description="Analysis date (YYYY-MM-DD) - for backtesting, may differ from report_date",
+    )
 
     # Market overview
     market_overview: str = Field(description="Summary of market conditions")

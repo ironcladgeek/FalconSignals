@@ -2,6 +2,8 @@
 
 AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes global markets to generate daily investment signals with confidence scores.
 
+📖 **[Complete CLI Documentation](docs/CLI_GUIDE.md)**
+
 ## Overview
 
 NordInvest is designed to help investors make informed decisions by providing daily, data-driven investment analysis. The system combines fundamental analysis, technical indicators, and news sentiment to generate actionable investment signals with confidence scores.
@@ -66,7 +68,7 @@ ALPHA_VANTAGE_API_KEY=your_key
 > **💡 Note on Analysis Modes:**
 > - **LLM Mode** (`--llm` flag): AI-powered analysis with enhanced sentiment and qualitative insights
 > - **Rule-Based Mode** (default): Technical indicators and quantitative methods
-> - Both modes generate valid trading signals - see [LLM Configuration](docs/LLM_CONFIGURATION.md) for details
+> - Both modes generate valid trading signals
 
 ## Usage
 
@@ -278,9 +280,7 @@ nordinvest/
     ├── architecture.mermaid     # System architecture
     ├── analyze_workflow.mermaid # Analyze command workflow
     ├── roadmap.md               # Implementation plan
-    ├── llm_integration.md       # LLM integration guide
-    ├── llm_cli_guide.md         # LLM CLI usage guide
-    └── LLM_CONFIGURATION.md     # LLM configuration guide
+    └── CLI_GUIDE.md             # CLI guide
 ```
 
 ## Development
@@ -334,7 +334,10 @@ uv run poe lint
 
 ## Documentation
 
-TBD
+- **[CLI Guide](docs/CLI_GUIDE.md)** - Complete command reference with examples
+- **[Configuration Guide](config/README.md)** - Configuration options and best practices
+- **[Architecture](docs/architecture.mermaid)** - System architecture diagrams
+- **[Roadmap](docs/roadmap.md)** - Development roadmap and completed features
 
 ## Technology Stack
 

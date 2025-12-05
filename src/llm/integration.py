@@ -31,6 +31,7 @@ class LLMAnalysisOrchestrator:
         enable_fallback: bool = True,
         debug_dir: Optional[Path] = None,
         progress_callback: Optional[callable] = None,
+        db_path: Optional[str] = None,
     ):
         """Initialize analysis orchestrator.
 
@@ -40,12 +41,14 @@ class LLMAnalysisOrchestrator:
             enable_fallback: Enable fallback to rule-based analysis
             debug_dir: Directory to save debug outputs (inputs/outputs from LLM)
             progress_callback: Optional callback function(message: str) for progress updates
+            db_path: Optional path to database for storing analyst ratings
         """
         self.llm_config = llm_config or LLMConfig()
         self.token_tracker = token_tracker
         self.enable_fallback = enable_fallback
         self.debug_dir = debug_dir
         self.progress_callback = progress_callback
+        self.db_path = db_path
 
         # Create debug directory if needed
         if self.debug_dir:
@@ -55,7 +58,7 @@ class LLMAnalysisOrchestrator:
         # Initialize CrewAI components
         self.agent_factory = CrewAIAgentFactory(self.llm_config)
         self.task_factory = CrewAITaskFactory()
-        self.tool_adapter = CrewAIToolAdapter()
+        self.tool_adapter = CrewAIToolAdapter(db_path=db_path)
 
         # Initialize hybrid agents with fallback
         self.hybrid_agents = self._create_hybrid_agents()
@@ -82,7 +85,7 @@ class LLMAnalysisOrchestrator:
         # Create fallback rule-based agents
         market_scanner_fallback = MarketScannerAgent()
         technical_fallback = TechnicalAnalysisAgent()
-        fundamental_fallback = FundamentalAnalysisAgent()
+        fundamental_fallback = FundamentalAnalysisAgent(db_path=self.db_path)
         sentiment_fallback = SentimentAgent()
 
         # Wrap in hybrid agents

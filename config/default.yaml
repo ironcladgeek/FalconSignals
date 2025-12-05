@@ -65,11 +65,9 @@ data:
     - yahoo_finance # Yahoo Finance: reliable price data
     - finnhub # Finnhub: analyst recommendations only
 
-# API Credentials (use environment variables in production)
-# Export these as environment variables:
-# export ANTHROPIC_API_KEY=your_key
-# export FINNHUB_API_KEY=your_key
-# export OPENAI_API_KEY=your_key (optional, if using OpenAI instead of Anthropic)
+database:
+  enabled: true
+  db_path: data/nordinvest.db
 
 api:
   # Set these via environment variables
