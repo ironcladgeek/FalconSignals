@@ -1,6 +1,6 @@
 """End-to-end analysis pipeline orchestration."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from src.agents import AnalysisCrew
@@ -13,6 +13,7 @@ from src.analysis import (
 )
 from src.cache.manager import CacheManager
 from src.data.portfolio import PortfolioState
+from src.data.provider_manager import ProviderManager
 from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
@@ -31,6 +32,7 @@ class AnalysisPipeline:
         test_mode_config: Any | None = None,
         db_path: str | None = None,
         run_session_id: int | None = None,
+        provider_manager: ProviderManager | None = None,
     ):
         """Initialize analysis pipeline.
 
@@ -42,12 +44,14 @@ class AnalysisPipeline:
             test_mode_config: Optional test mode configuration for fixtures/mock LLM
             db_path: Optional path to database for storing analyst ratings and recommendations
             run_session_id: Optional integer ID linking signals to a specific analysis run session
+            provider_manager: Optional provider manager for fetching current prices
         """
         self.config = config
         self.cache_manager = cache_manager
         self.portfolio_manager = portfolio_manager
         self.test_mode_config = test_mode_config
         self.run_session_id = run_session_id
+        self.provider_manager = provider_manager
 
         # Initialize database repositories if db_path provided
         self.recommendations_repo = None
@@ -124,7 +128,7 @@ class AnalysisPipeline:
             portfolio_context = self.portfolio_manager.to_dict() if self.portfolio_manager else {}
 
             for analysis in analysis_results:
-                signal = self._create_investment_signal(analysis, portfolio_context)
+                signal = self._create_investment_signal(analysis, portfolio_context, context)
                 if signal:
                     signals.append(signal)
 
@@ -268,16 +272,55 @@ class AnalysisPipeline:
                 data_sources=self.report_generator.DATA_SOURCES,
             )
 
+    @staticmethod
+    def _get_analysis_date(context: dict[str, Any] | None) -> str:
+        """Get analysis date from context, handling both date objects and strings.
+
+        Args:
+            context: Optional context dictionary
+
+        Returns:
+            Analysis date as string in YYYY-MM-DD format
+        """
+        if not context:
+            logger.debug("No context provided, using current date")
+            return datetime.now().strftime("%Y-%m-%d")
+
+        analysis_date = context.get("analysis_date")
+        if not analysis_date:
+            logger.debug(
+                f"No analysis_date in context (keys: {list(context.keys())}), using current date"
+            )
+            return datetime.now().strftime("%Y-%m-%d")
+
+        # Handle date object
+        if isinstance(analysis_date, date):
+            result = analysis_date.strftime("%Y-%m-%d")
+            logger.debug(f"Using analysis_date from context (date object): {result}")
+            return result
+
+        # Handle datetime object
+        if isinstance(analysis_date, datetime):
+            result = analysis_date.strftime("%Y-%m-%d")
+            logger.debug(f"Using analysis_date from context (datetime object): {result}")
+            return result
+
+        # Already a string
+        logger.debug(f"Using analysis_date from context (string): {analysis_date}")
+        return str(analysis_date)
+
     def _create_investment_signal(
         self,
         analysis: dict[str, Any],
         portfolio_context: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> InvestmentSignal | None:
         """Convert analysis result to investment signal with risk assessment.
 
         Args:
             analysis: Analysis result from crew
             portfolio_context: Current portfolio state
+            context: Optional context with analysis_date for backtesting
 
         Returns:
             Investment signal or None if creation failed
@@ -294,16 +337,106 @@ class AnalysisPipeline:
             fundamental_score = analysis_data.get("fundamental", {}).get("fundamental_score", 50)
             sentiment_score = analysis_data.get("sentiment", {}).get("sentiment_score", 50)
 
-            # Fetch actual current price and currency from cache
-            current_price = 0.0
+            # Get analysis date to determine if we need historical or current price
+            analysis_date_str = self._get_analysis_date(context)
+            analysis_date = datetime.strptime(analysis_date_str, "%Y-%m-%d").date()
+            is_historical = analysis_date < date.today()
+
+            # Fetch actual current price and currency from cache or provider
+            current_price = None
             currency = "USD"
-            try:
-                latest_price = self.cache_manager.get_latest_price(ticker)
-                if latest_price:
-                    current_price = latest_price.close_price
-                    currency = latest_price.currency
-            except Exception as e:
-                logger.warning(f"Could not fetch price for {ticker}: {e}. Using fallback.")
+
+            if is_historical:
+                # For historical analysis, fetch price as of analysis_date
+                logger.debug(
+                    f"Historical analysis for {ticker} on {analysis_date}, "
+                    f"fetching price as of that date"
+                )
+
+                # Try cache first (historical data might be cached)
+                try:
+                    # Cache might have historical prices - look for price data around that date
+                    latest_price = self.cache_manager.get_latest_price(ticker)
+                    if latest_price:
+                        # This is current price from cache, not historical
+                        # We'll need to fetch historical from provider
+                        logger.debug(
+                            f"Cache has current price, but we need historical for {analysis_date}"
+                        )
+                except Exception as e:
+                    logger.debug(f"Cache lookup failed for {ticker}: {e}")
+
+                # Fetch historical price from provider
+                if current_price is None and self.provider_manager:
+                    try:
+                        # Fetch prices for a small window around analysis_date
+                        from datetime import timedelta
+
+                        start_date = datetime.combine(analysis_date, datetime.min.time())
+                        end_date = datetime.combine(
+                            analysis_date + timedelta(days=1), datetime.min.time()
+                        )
+
+                        prices = self.provider_manager.get_stock_prices(
+                            ticker, start_date, end_date
+                        )
+                        if prices:
+                            # Get the price closest to analysis_date
+                            for price in prices:
+                                if price.date == analysis_date:
+                                    current_price = price.close_price
+                                    currency = price.currency
+                                    logger.debug(
+                                        f"Got historical price for {ticker} on {analysis_date}: "
+                                        f"${current_price}"
+                                    )
+                                    break
+                            # If exact date not found, use the closest one
+                            if current_price is None and prices:
+                                current_price = prices[0].close_price
+                                currency = prices[0].currency
+                                logger.warning(
+                                    f"Exact price for {ticker} on {analysis_date} not found, "
+                                    f"using closest: ${current_price}"
+                                )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to fetch historical price for {ticker} on {analysis_date}: {e}"
+                        )
+            else:
+                # For current analysis, use latest price
+                logger.debug(f"Current analysis for {ticker}, fetching latest price")
+
+                # Try cache first
+                try:
+                    latest_price = self.cache_manager.get_latest_price(ticker)
+                    if latest_price:
+                        current_price = latest_price.close_price
+                        currency = latest_price.currency
+                        logger.debug(f"Got price for {ticker} from cache: ${current_price}")
+                except Exception as e:
+                    logger.debug(f"Cache lookup failed for {ticker}: {e}")
+
+                # If cache didn't have it, try provider
+                if current_price is None and self.provider_manager:
+                    try:
+                        price_obj = self.provider_manager.get_latest_price(ticker)
+                        if price_obj:
+                            current_price = price_obj.close_price
+                            currency = price_obj.currency
+                            logger.debug(f"Got price for {ticker} from provider: ${current_price}")
+                    except Exception as e:
+                        logger.warning(f"Provider lookup failed for {ticker}: {e}")
+
+            # If we still don't have a price, we cannot create a valid signal
+            if current_price is None or current_price <= 0:
+                logger.error(
+                    f"Cannot create signal for {ticker}: no valid current price available "
+                    f"for {analysis_date}. Ensure price data is cached or provider_manager is configured."
+                )
+                return None
+
+            current_price = float(current_price)
 
             # Assess risks
             signal_dict = {
@@ -355,7 +488,7 @@ class AnalysisPipeline:
                 ],
                 risk=risk_assessment,
                 generated_at=datetime.now(),
-                analysis_date=datetime.now().strftime("%Y-%m-%d"),
+                analysis_date=self._get_analysis_date(context),
             )
 
             logger.debug(f"Created signal for {ticker}: {recommendation} ({confidence}%)")
