@@ -86,6 +86,32 @@ uv run python -m src.main report --session-id 1 --no-save
 - ✅ Audit trail of all analysis runs
 - ✅ Foundation for performance tracking
 
+### Performance Tracking Commands
+
+```bash
+# Track prices for active recommendations (run daily)
+uv run python -m src.main track-performance
+
+# Track with custom parameters
+uv run python -m src.main track-performance --max-age 90  # Track up to 90 days old
+uv run python -m src.main track-performance --signals buy,strong_buy  # Only buy signals
+uv run python -m src.main track-performance --benchmark QQQ  # Use QQQ as benchmark
+
+# Generate performance reports
+uv run python -m src.main performance-report  # 30-day report (default)
+uv run python -m src.main performance-report --period 90  # 90-day report
+uv run python -m src.main performance-report --ticker AAPL  # Specific ticker
+uv run python -m src.main performance-report --signal buy --mode llm  # Filtered
+uv run python -m src.main performance-report --format json  # JSON output
+```
+
+**Performance Tracking Features**:
+- ✅ Daily price tracking for active recommendations
+- ✅ Benchmark comparison (default: SPY)
+- ✅ Returns, win rate, alpha, Sharpe ratio calculation
+- ✅ Confidence calibration analysis
+- ✅ Multiple time periods (7, 30, 90, 180 days)
+
 ### Project Configuration
 
 ```bash
