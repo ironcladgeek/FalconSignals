@@ -13,6 +13,8 @@ from src.agents.crewai_agents import CrewAIAgentFactory, CrewAITaskFactory
 from src.agents.hybrid import HybridAnalysisAgent, HybridAnalysisCrew
 from src.agents.scanner import MarketScannerAgent
 from src.agents.sentiment import SentimentAgent
+from src.analysis.models import UnifiedAnalysisResult
+from src.analysis.normalizer import AnalysisResultNormalizer
 from src.config.schemas import LLMConfig
 from src.llm.token_tracker import TokenTracker
 from src.llm.tools import CrewAIToolAdapter
@@ -153,7 +155,7 @@ class LLMAnalysisOrchestrator:
         ticker: str,
         context: dict[str, Any] = None,
         progress_callback: Optional[callable] = None,
-    ) -> dict[str, Any]:
+    ) -> UnifiedAnalysisResult | None:
         """Perform comprehensive analysis of a single instrument.
 
         Args:
@@ -162,7 +164,7 @@ class LLMAnalysisOrchestrator:
             progress_callback: Optional callback for progress updates
 
         Returns:
-            Analysis results from all agents including synthesis
+            UnifiedAnalysisResult with normalized data or None if analysis failed
         """
         context = context or {}
         context["ticker"] = ticker
@@ -237,6 +239,21 @@ class LLMAnalysisOrchestrator:
 
             # Add synthesis to results
             analysis_results["results"]["synthesis"] = synthesis_result
+
+            # Normalize to unified structure for consistent output
+            try:
+                unified_result = AnalysisResultNormalizer.normalize_llm_result(
+                    ticker=ticker,
+                    technical_result=technical_results.get("result", {}),
+                    fundamental_result=fundamental_results.get("result", {}),
+                    sentiment_result=sentiment_results.get("result", {}),
+                    synthesis_result=synthesis_result,
+                )
+                logger.info(f"Analysis complete for {ticker}, normalized to unified structure")
+                return unified_result
+            except Exception as e:
+                logger.error(f"Failed to normalize LLM results for {ticker}: {e}", exc_info=True)
+                return None
         else:
             logger.warning(
                 f"Skipping synthesis for {ticker} - not all analyses succeeded. "
@@ -244,14 +261,7 @@ class LLMAnalysisOrchestrator:
                 f"Fundamental: {fundamental_results.get('status')}, "
                 f"Sentiment: {sentiment_results.get('status')}"
             )
-            analysis_results["results"]["synthesis"] = {
-                "status": "skipped",
-                "reason": "prerequisite analyses failed",
-            }
-
-        logger.info(f"Analysis complete for {ticker}")
-
-        return analysis_results
+            return None
 
     def synthesize_signal(
         self,
