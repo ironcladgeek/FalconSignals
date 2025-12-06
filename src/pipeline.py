@@ -383,7 +383,13 @@ class AnalysisPipeline:
                         if prices:
                             # Get the price closest to analysis_date
                             for price in prices:
-                                if price.date == analysis_date:
+                                # Compare date parts only (price.date is datetime, analysis_date is date)
+                                price_date = (
+                                    price.date.date()
+                                    if isinstance(price.date, datetime)
+                                    else price.date
+                                )
+                                if price_date == analysis_date:
                                     current_price = price.close_price
                                     currency = price.currency
                                     logger.debug(
@@ -391,13 +397,13 @@ class AnalysisPipeline:
                                         f"${current_price}"
                                     )
                                     break
-                            # If exact date not found, use the closest one
+                            # If exact date not found, use the last price (most recent)
                             if current_price is None and prices:
-                                current_price = prices[0].close_price
-                                currency = prices[0].currency
+                                current_price = prices[-1].close_price
+                                currency = prices[-1].currency
                                 logger.warning(
                                     f"Exact price for {ticker} on {analysis_date} not found, "
-                                    f"using closest: ${current_price}"
+                                    f"using most recent in range: ${current_price} from {prices[-1].date}"
                                 )
                     except Exception as e:
                         logger.warning(
