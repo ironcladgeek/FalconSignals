@@ -58,14 +58,23 @@ class AnalysisResultNormalizer:
         synthesis_data = synthesis_result.get("result", {})
         if hasattr(synthesis_data, "raw"):
             synthesis_data = synthesis_data.raw
-        elif isinstance(synthesis_data, str):
+
+        # Convert string to dict
+        if isinstance(synthesis_data, str):
             import json
 
             try:
                 synthesis_data = json.loads(synthesis_data)
+                # Ensure result is a dict
+                if not isinstance(synthesis_data, dict):
+                    synthesis_data = {}
             except json.JSONDecodeError:
                 logger.warning(f"Failed to parse synthesis result for {ticker}")
                 synthesis_data = {}
+
+        # Ensure we have a dict
+        if not isinstance(synthesis_data, dict):
+            synthesis_data = {}
 
         # Extract risk assessment from synthesis
         risk_data = synthesis_data.get("risk", {})
@@ -174,6 +183,26 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_technical_llm(tech_result: dict[str, Any]) -> AnalysisComponentResult:
         """Extract technical analysis component from LLM output."""
+        # Handle CrewOutput objects
+        if hasattr(tech_result, "raw"):
+            tech_result = tech_result.raw
+
+        # Convert string to dict
+        if isinstance(tech_result, str):
+            import json
+
+            try:
+                tech_result = json.loads(tech_result)
+                # Ensure result is a dict
+                if not isinstance(tech_result, dict):
+                    tech_result = {}
+            except json.JSONDecodeError:
+                tech_result = {}
+
+        # Ensure we have a dict
+        if not isinstance(tech_result, dict):
+            tech_result = {}
+
         # LLM technical agent returns detailed indicators in its output
         # Extract and structure them
         indicators_data = tech_result.get("indicators", {})
@@ -203,6 +232,26 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_fundamental_llm(fund_result: dict[str, Any]) -> AnalysisComponentResult:
         """Extract fundamental analysis component from LLM output."""
+        # Handle CrewOutput objects
+        if hasattr(fund_result, "raw"):
+            fund_result = fund_result.raw
+
+        # Convert string to dict
+        if isinstance(fund_result, str):
+            import json
+
+            try:
+                fund_result = json.loads(fund_result)
+                # Ensure result is a dict
+                if not isinstance(fund_result, dict):
+                    fund_result = {}
+            except json.JSONDecodeError:
+                fund_result = {}
+
+        # Ensure we have a dict
+        if not isinstance(fund_result, dict):
+            fund_result = {}
+
         metrics_data = fund_result.get("metrics", {})
         analyst_data = fund_result.get("analyst_ratings", {})
 
@@ -250,6 +299,26 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_sentiment_llm(sent_result: dict[str, Any]) -> AnalysisComponentResult:
         """Extract sentiment analysis component from LLM output."""
+        # Handle CrewOutput objects
+        if hasattr(sent_result, "raw"):
+            sent_result = sent_result.raw
+
+        # Convert string to dict
+        if isinstance(sent_result, str):
+            import json
+
+            try:
+                sent_result = json.loads(sent_result)
+                # Ensure result is a dict
+                if not isinstance(sent_result, dict):
+                    sent_result = {}
+            except json.JSONDecodeError:
+                sent_result = {}
+
+        # Ensure we have a dict
+        if not isinstance(sent_result, dict):
+            sent_result = {}
+
         sentiment_info = SentimentInfo(
             news_count=sent_result.get("news_count"),
             sentiment_score=sent_result.get("sentiment_score"),
