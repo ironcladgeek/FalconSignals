@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -58,6 +59,79 @@ class AllocationSuggestion(BaseModel):
     )
 
 
+class TechnicalIndicators(BaseModel):
+    """Technical analysis indicator values."""
+
+    rsi: float | None = Field(default=None, ge=0, le=100, description="RSI (14-period)")
+    macd: float | None = Field(default=None, description="MACD value")
+    macd_signal: float | None = Field(default=None, description="MACD signal line")
+    sma_20: float | None = Field(default=None, ge=0, description="20-day SMA")
+    sma_50: float | None = Field(default=None, ge=0, description="50-day SMA")
+    sma_200: float | None = Field(default=None, ge=0, description="200-day SMA")
+    volume_avg: int | None = Field(default=None, ge=0, description="Average volume (20-day)")
+    atr: float | None = Field(default=None, ge=0, description="Average True Range")
+
+
+class FundamentalMetrics(BaseModel):
+    """Fundamental analysis metric values."""
+
+    pe_ratio: float | None = Field(default=None, description="Price-to-Earnings ratio")
+    pb_ratio: float | None = Field(default=None, description="Price-to-Book ratio")
+    ps_ratio: float | None = Field(default=None, description="Price-to-Sales ratio")
+    peg_ratio: float | None = Field(default=None, description="PEG ratio")
+    ev_ebitda: float | None = Field(default=None, description="EV/EBITDA")
+    profit_margin: float | None = Field(default=None, description="Profit margin %")
+    operating_margin: float | None = Field(default=None, description="Operating margin %")
+    roe: float | None = Field(default=None, description="Return on Equity %")
+    roa: float | None = Field(default=None, description="Return on Assets %")
+    debt_to_equity: float | None = Field(default=None, description="Debt-to-Equity ratio")
+    current_ratio: float | None = Field(default=None, description="Current ratio")
+    revenue_growth: float | None = Field(default=None, description="Revenue growth %")
+    earnings_growth: float | None = Field(default=None, description="Earnings growth %")
+
+
+class AnalystInfo(BaseModel):
+    """Analyst ratings and consensus information."""
+
+    num_analysts: int | None = Field(default=None, ge=0, description="Number of analysts")
+    consensus_rating: str | None = Field(
+        default=None, description="Consensus: strong_buy, buy, hold, sell, strong_sell"
+    )
+    strong_buy: int | None = Field(default=None, ge=0, description="Strong buy count")
+    buy: int | None = Field(default=None, ge=0, description="Buy count")
+    hold: int | None = Field(default=None, ge=0, description="Hold count")
+    sell: int | None = Field(default=None, ge=0, description="Sell count")
+    strong_sell: int | None = Field(default=None, ge=0, description="Strong sell count")
+    price_target: float | None = Field(default=None, ge=0, description="Average price target")
+    price_target_high: float | None = Field(default=None, ge=0, description="High price target")
+    price_target_low: float | None = Field(default=None, ge=0, description="Low price target")
+
+
+class SentimentInfo(BaseModel):
+    """News and sentiment information."""
+
+    news_count: int | None = Field(default=None, ge=0, description="Number of recent news articles")
+    sentiment_score: float | None = Field(
+        default=None, ge=-1, le=1, description="Sentiment score (-1 to 1)"
+    )
+    positive_news: int | None = Field(default=None, ge=0, description="Positive news count")
+    negative_news: int | None = Field(default=None, ge=0, description="Negative news count")
+    neutral_news: int | None = Field(default=None, ge=0, description="Neutral news count")
+
+
+class AnalysisMetadata(BaseModel):
+    """Comprehensive analysis metadata for display and assessment."""
+
+    technical_indicators: TechnicalIndicators | None = Field(
+        default=None, description="Technical indicator values"
+    )
+    fundamental_metrics: FundamentalMetrics | None = Field(
+        default=None, description="Fundamental metric values"
+    )
+    analyst_info: AnalystInfo | None = Field(default=None, description="Analyst ratings info")
+    sentiment_info: SentimentInfo | None = Field(default=None, description="News/sentiment info")
+
+
 class InvestmentSignal(BaseModel):
     """Complete investment signal with all analysis data."""
 
@@ -101,6 +175,91 @@ class InvestmentSignal(BaseModel):
         default=None, description="Detailed rationale for the recommendation"
     )
     caveats: list[str] = Field(default_factory=list, description="Important caveats or limitations")
+
+    # Enhanced metadata for display and quality assessment
+    metadata: AnalysisMetadata | None = Field(
+        default=None,
+        description="Comprehensive analysis metadata (technical, fundamental, analyst, sentiment)",
+    )
+
+
+class AnalysisComponentResult(BaseModel):
+    """Unified result structure for any analysis component (technical, fundamental, sentiment).
+
+    This model preserves all detailed metrics from both LLM and rule-based modes,
+    enabling consistent metadata extraction and signal creation.
+    """
+
+    component: str = Field(description="Component name: 'technical', 'fundamental', or 'sentiment'")
+    score: float = Field(ge=0, le=100, description="Component score 0-100")
+
+    # Raw analysis data (preserved for debugging and flexibility)
+    raw_data: dict[str, Any] | None = Field(
+        default=None, description="Raw component data from agent"
+    )
+
+    # Structured metadata (extracted and normalized)
+    technical_indicators: TechnicalIndicators | None = Field(
+        default=None, description="Technical indicators (if component is technical)"
+    )
+    fundamental_metrics: FundamentalMetrics | None = Field(
+        default=None, description="Fundamental metrics (if component is fundamental)"
+    )
+    analyst_info: AnalystInfo | None = Field(
+        default=None, description="Analyst ratings (if component is fundamental)"
+    )
+    sentiment_info: SentimentInfo | None = Field(
+        default=None, description="Sentiment info (if component is sentiment)"
+    )
+
+    # Optional analysis reasoning/explanation
+    reasoning: str | None = Field(default=None, description="Component analysis reasoning")
+    confidence: float | None = Field(default=None, ge=0, le=100, description="Component confidence")
+
+
+class UnifiedAnalysisResult(BaseModel):
+    """Unified analysis result structure for both LLM and rule-based modes.
+
+    This model serves as the single source of truth for analysis results,
+    ensuring both modes produce identical data structures.
+    """
+
+    ticker: str = Field(description="Stock ticker symbol")
+    mode: str = Field(description="Analysis mode: 'llm' or 'rule_based'")
+
+    # Component results with full detail (same structure for both modes)
+    technical: AnalysisComponentResult = Field(description="Technical analysis results")
+    fundamental: AnalysisComponentResult = Field(description="Fundamental analysis results")
+    sentiment: AnalysisComponentResult = Field(description="Sentiment analysis results")
+
+    # Synthesis (final recommendation and scores)
+    final_score: float = Field(ge=0, le=100, description="Final composite score 0-100")
+    recommendation: str = Field(description="Investment recommendation")
+    confidence: float = Field(ge=0, le=100, description="Overall confidence 0-100")
+
+    # Metadata for signal creation
+    company_name: str | None = Field(default=None, description="Company name")
+    market: str | None = Field(default=None, description="Market classification")
+    sector: str | None = Field(default=None, description="Business sector")
+
+    # Risk assessment
+    risk_assessment: RiskAssessment | None = Field(
+        default=None, description="Risk assessment details"
+    )
+
+    # Reasoning and context
+    key_reasons: list[str] = Field(
+        default_factory=list, description="Main reasons for recommendation"
+    )
+    rationale: str | None = Field(default=None, description="Detailed investment thesis")
+    caveats: list[str] = Field(default_factory=list, description="Important caveats or limitations")
+
+    # Expected returns
+    expected_return_min: float = Field(description="Expected return minimum %")
+    expected_return_max: float = Field(description="Expected return maximum %")
+
+    # Time horizon
+    time_horizon: str = Field(default="3M", description="Time horizon: 1W, 1M, 3M, 6M, 1Y")
 
 
 class PortfolioAllocation(BaseModel):

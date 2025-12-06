@@ -647,6 +647,13 @@ class RecommendationsRepository:
                 key_reasons_json = json.dumps(signal.key_reasons) if signal.key_reasons else None
                 caveats_json = json.dumps(signal.caveats) if signal.caveats else None
 
+                # Serialize metadata to JSON
+                metadata_json = None
+                if signal.metadata:
+                    metadata_json = json.dumps(
+                        signal.metadata.model_dump(mode="json", exclude_none=True)
+                    )
+
                 # Create recommendation record
                 recommendation = Recommendation(
                     ticker_id=ticker_obj.id,
@@ -672,6 +679,7 @@ class RecommendationsRepository:
                     key_reasons=key_reasons_json,
                     rationale=signal.rationale,
                     caveats=caveats_json,
+                    metadata_json=metadata_json,
                 )
 
                 session.add(recommendation)
@@ -701,13 +709,24 @@ class RecommendationsRepository:
         import json
 
         from src.analysis import InvestmentSignal
-        from src.analysis.models import ComponentScores, RiskAssessment, RiskLevel
+        from src.analysis.models import AnalysisMetadata, ComponentScores, RiskAssessment, RiskLevel
         from src.analysis.models import Recommendation as RecommendationType
 
         # Deserialize JSON fields
         risk_flags = json.loads(recommendation.risk_flags) if recommendation.risk_flags else []
         key_reasons = json.loads(recommendation.key_reasons) if recommendation.key_reasons else []
         caveats = json.loads(recommendation.caveats) if recommendation.caveats else []
+
+        # Deserialize metadata
+        metadata = None
+        if recommendation.metadata_json:
+            try:
+                metadata_dict = json.loads(recommendation.metadata_json)
+                metadata = AnalysisMetadata(**metadata_dict)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to deserialize metadata for recommendation {recommendation.id}: {e}"
+                )
 
         # Create ComponentScores
         scores = ComponentScores(
@@ -749,6 +768,7 @@ class RecommendationsRepository:
             analysis_date=recommendation.analysis_date.strftime("%Y-%m-%d"),
             rationale=recommendation.rationale,
             caveats=caveats,
+            metadata=metadata,
         )
 
     def get_recommendations_by_session(self, run_session_id: int) -> list:

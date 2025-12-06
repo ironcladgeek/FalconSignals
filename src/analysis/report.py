@@ -439,6 +439,12 @@ class ReportGenerator:
             for flag in signal.risk.flags:
                 lines.append(f"- {flag}\n")
 
+        # Add metadata tables if available
+        metadata_tables = format_metadata_tables(signal)
+        if metadata_tables:
+            lines.append("\n## Analysis Details\n\n")
+            lines.append(metadata_tables)
+
         if signal.allocation:
             lines.append(
                 f"\n💰 **Suggested Allocation:** €{signal.allocation.eur:,.0f} "
@@ -503,3 +509,147 @@ class ReportGenerator:
             return next_date.strftime("%Y-%m-%d 08:00 UTC")
         except Exception:
             return "Next trading day 08:00 UTC"
+
+
+def format_metadata_tables(signal: InvestmentSignal) -> str:
+    """Format signal metadata as markdown tables.
+
+    Args:
+        signal: Investment signal with metadata
+
+    Returns:
+        Markdown-formatted tables string
+    """
+    if not signal.metadata:
+        return ""
+
+    sections = []
+
+    # Technical Indicators Table
+    if signal.metadata.technical_indicators:
+        tech = signal.metadata.technical_indicators
+        sections.append("### Technical Indicators\n")
+        sections.append("| Indicator | Value |")
+        sections.append("|-----------|-------|")
+
+        if tech.rsi is not None:
+            sections.append(f"| RSI (14) | {tech.rsi:.2f} |")
+        if tech.macd is not None and tech.macd_signal is not None:
+            sections.append(f"| MACD | {tech.macd:.2f} / {tech.macd_signal:.2f} |")
+        if tech.sma_20 is not None:
+            sections.append(f"| SMA (20) | ${tech.sma_20:.2f} |")
+        if tech.sma_50 is not None:
+            sections.append(f"| SMA (50) | ${tech.sma_50:.2f} |")
+        if tech.sma_200 is not None:
+            sections.append(f"| SMA (200) | ${tech.sma_200:.2f} |")
+        if tech.volume_avg is not None:
+            sections.append(f"| Avg Volume (20d) | {tech.volume_avg:,} |")
+        if tech.atr is not None:
+            sections.append(f"| ATR | ${tech.atr:.2f} |")
+
+        sections.append("")
+
+    # Fundamental Metrics Table
+    if signal.metadata.fundamental_metrics:
+        fund = signal.metadata.fundamental_metrics
+        sections.append("### Fundamental Metrics\n")
+        sections.append("| Metric | Value |")
+        sections.append("|--------|-------|")
+
+        if fund.pe_ratio is not None:
+            sections.append(f"| P/E Ratio | {fund.pe_ratio:.2f} |")
+        if fund.pb_ratio is not None:
+            sections.append(f"| P/B Ratio | {fund.pb_ratio:.2f} |")
+        if fund.ps_ratio is not None:
+            sections.append(f"| P/S Ratio | {fund.ps_ratio:.2f} |")
+        if fund.peg_ratio is not None:
+            sections.append(f"| PEG Ratio | {fund.peg_ratio:.2f} |")
+        if fund.ev_ebitda is not None:
+            sections.append(f"| EV/EBITDA | {fund.ev_ebitda:.2f} |")
+        if fund.profit_margin is not None:
+            sections.append(f"| Profit Margin | {fund.profit_margin:.1f}% |")
+        if fund.operating_margin is not None:
+            sections.append(f"| Operating Margin | {fund.operating_margin:.1f}% |")
+        if fund.roe is not None:
+            sections.append(f"| ROE | {fund.roe:.1f}% |")
+        if fund.roa is not None:
+            sections.append(f"| ROA | {fund.roa:.1f}% |")
+        if fund.debt_to_equity is not None:
+            sections.append(f"| Debt/Equity | {fund.debt_to_equity:.2f} |")
+        if fund.current_ratio is not None:
+            sections.append(f"| Current Ratio | {fund.current_ratio:.2f} |")
+        if fund.revenue_growth is not None:
+            sections.append(f"| Revenue Growth | {fund.revenue_growth:+.1f}% |")
+        if fund.earnings_growth is not None:
+            sections.append(f"| Earnings Growth | {fund.earnings_growth:+.1f}% |")
+
+        sections.append("")
+
+    # Analyst Info Table
+    if signal.metadata.analyst_info:
+        analyst = signal.metadata.analyst_info
+        sections.append("### Analyst Ratings\n")
+        sections.append("| Metric | Value |")
+        sections.append("|--------|-------|")
+
+        if analyst.num_analysts is not None:
+            sections.append(f"| Number of Analysts | {analyst.num_analysts} |")
+        if analyst.consensus_rating:
+            sections.append(f"| Consensus | {analyst.consensus_rating.replace('_', ' ').title()} |")
+
+        # Rating distribution
+        if any([analyst.strong_buy, analyst.buy, analyst.hold, analyst.sell, analyst.strong_sell]):
+            ratings = []
+            if analyst.strong_buy:
+                ratings.append(f"Strong Buy: {analyst.strong_buy}")
+            if analyst.buy:
+                ratings.append(f"Buy: {analyst.buy}")
+            if analyst.hold:
+                ratings.append(f"Hold: {analyst.hold}")
+            if analyst.sell:
+                ratings.append(f"Sell: {analyst.sell}")
+            if analyst.strong_sell:
+                ratings.append(f"Strong Sell: {analyst.strong_sell}")
+            sections.append(f"| Distribution | {' / '.join(ratings)} |")
+
+        if analyst.price_target is not None:
+            sections.append(f"| Avg Price Target | ${analyst.price_target:.2f} |")
+        if analyst.price_target_low is not None and analyst.price_target_high is not None:
+            sections.append(
+                f"| Price Target Range | ${analyst.price_target_low:.2f} - ${analyst.price_target_high:.2f} |"
+            )
+
+        sections.append("")
+
+    # Sentiment Info Table
+    if signal.metadata.sentiment_info:
+        sent = signal.metadata.sentiment_info
+        sections.append("### News & Sentiment\n")
+        sections.append("| Metric | Value |")
+        sections.append("|--------|-------|")
+
+        if sent.news_count is not None:
+            sections.append(f"| News Articles | {sent.news_count} |")
+        if sent.sentiment_score is not None:
+            sentiment_label = (
+                "Positive"
+                if sent.sentiment_score > 0.1
+                else "Negative"
+                if sent.sentiment_score < -0.1
+                else "Neutral"
+            )
+            sections.append(f"| Sentiment | {sentiment_label} ({sent.sentiment_score:+.2f}) |")
+
+        if any([sent.positive_news, sent.negative_news, sent.neutral_news]):
+            breakdown = []
+            if sent.positive_news:
+                breakdown.append(f"Positive: {sent.positive_news}")
+            if sent.neutral_news:
+                breakdown.append(f"Neutral: {sent.neutral_news}")
+            if sent.negative_news:
+                breakdown.append(f"Negative: {sent.negative_news}")
+            sections.append(f"| News Breakdown | {' / '.join(breakdown)} |")
+
+        sections.append("")
+
+    return "\n".join(sections)

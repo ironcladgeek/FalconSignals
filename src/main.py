@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 
 from src.analysis import InvestmentSignal
+from src.analysis.metadata_extractor import extract_analysis_metadata
 from src.analysis.models import ComponentScores, RiskAssessment
 from src.cache.manager import CacheManager
 from src.config import load_config
@@ -426,6 +427,9 @@ def _create_signal_from_llm_result(
             "sentiment": scores_dict.get("sentiment") or 50.0,
         }
 
+        # Extract metadata from LLM result for enhanced recommendations
+        metadata = extract_analysis_metadata(llm_result)
+
         signal = InvestmentSignal(
             ticker=ticker,
             name=llm_result.get("name", ticker),
@@ -449,6 +453,7 @@ def _create_signal_from_llm_result(
             else datetime.now().strftime("%Y-%m-%d"),
             rationale=llm_result.get("rationale"),
             caveats=llm_result.get("caveats", []),
+            metadata=metadata,
         )
 
         return signal

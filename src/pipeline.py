@@ -11,6 +11,7 @@ from src.analysis import (
     ReportGenerator,
     RiskAssessor,
 )
+from src.analysis.metadata_extractor import extract_analysis_metadata
 from src.cache.manager import CacheManager
 from src.data.portfolio import PortfolioState
 from src.data.provider_manager import ProviderManager
@@ -465,6 +466,9 @@ class AnalysisPipeline:
             expected_return_min = (final_score - 50) * 0.2  # -10% to +10%
             expected_return_max = expected_return_min + 10
 
+            # Extract metadata for enhanced recommendations
+            metadata = extract_analysis_metadata(analysis)
+
             # Create signal
             signal = InvestmentSignal(
                 ticker=ticker,
@@ -495,6 +499,7 @@ class AnalysisPipeline:
                 risk=risk_assessment,
                 generated_at=datetime.now(),
                 analysis_date=self._get_analysis_date(context),
+                metadata=metadata,
             )
 
             logger.debug(f"Created signal for {ticker}: {recommendation} ({confidence}%)")

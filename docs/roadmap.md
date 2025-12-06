@@ -19,11 +19,12 @@ This roadmap outlines the implementation plan for building an AI-driven financia
 | Phase 7 | Days 19-20 | True Test Mode | ✅ Complete |
 | Phase 8 | Complete | Historical Date Analysis | ✅ Complete |
 | Phase 9 | Complete | Historical Database & Performance Tracking | ✅ **COMPLETE** |
-| Phase 10 | Future | Per-Agent LLM Model Configuration | 📋 Planned |
-| Phase 11 | Future | Devil's Advocate Agent | 📋 Planned |
-| Phase 12 | Future | Enhanced Technical Analysis | 📋 Planned |
-| Phase 13 | Future | Advanced Features & Integrations | 📋 Planned |
-| Phase 14 | Future | Backtesting Framework | 📋 Planned |
+| Phase 10 | December 2025 | Architecture Refactoring: Unified Analysis Pipeline | 🔄 **IN PROGRESS** |
+| Phase 11 | Future | Per-Agent LLM Model Configuration | 📋 Planned |
+| Phase 12 | Future | Devil's Advocate Agent | 📋 Planned |
+| Phase 13 | Future | Enhanced Technical Analysis | 📋 Planned |
+| Phase 14 | Future | Advanced Features & Integrations | 📋 Planned |
+| Phase 15 | Future | Backtesting Framework | 📋 Planned |
 
 ---
 
@@ -1261,10 +1262,200 @@ Enable users to maintain a watchlist of tickers they're interested in tracking, 
 
 ---
 
-## Phase 10: Per-Agent LLM Model Configuration
+## Phase 10: Architecture Refactoring - Unified Analysis Pipeline
+
+### 🔥 **CRITICAL** - DRY Principle & Maintainability
+
+### Overview
+
+**Date**: December 6, 2025
+**Status**: 🔄 IN PROGRESS
+**Objective**: Refactor LLM and rule-based analysis modes to use a single source of truth, eliminating code duplication and enabling consistent behavior across both modes.
+
+**Problem Identified**: Current architecture has two completely separate execution paths for LLM and rule-based modes, with ~380 lines of duplicated logic for signal creation, price fetching, and metadata extraction. This makes maintenance difficult and causes bugs (e.g., metadata extraction only working in rule-based mode).
+
+**See**: `REFACTORING_PLAN.md` for complete detailed plan.
+
+### 10.1 Current Architecture Issues
+
+#### Duplicate Execution Paths
+- **LLM Mode**: `_run_llm_analysis()` → `LLMAnalysisOrchestrator` → CrewAI agents → `_create_signal_from_llm_result()`
+- **Rule-Based Mode**: `AnalysisPipeline` → Rule-based agents → `_create_investment_signal()`
+
+#### Different Data Structures
+- **LLM synthesis output**: Flat JSON with only aggregate scores (no detailed metrics)
+- **Rule-based output**: Nested structure with detailed technical/fundamental/sentiment metrics
+- **Result**: Metadata extraction works in rule-based but fails in LLM mode
+
+#### Duplicate Code (~380 lines)
+- `_create_signal_from_llm_result()` in `src/main.py` (~180 lines)
+- `_create_investment_signal()` in `src/pipeline.py` (~200 lines)
+- Both implement same logic for price fetching, signal creation, metadata extraction
+
+### 10.2 Unified Architecture Design
+
+#### Core Principle
+**One unified pipeline with mode as a parameter, not two separate code paths.**
+
+#### Unified Flow
+
+```
+Configuration & CLI
+    ↓
+Unified AnalysisPipeline (mode: llm | rule_based)
+    ↓
+1. Data Collection (shared)
+    ↓
+2. Agent Execution (mode-aware)
+    ↓
+3. Result Normalization (NEW!) ← Convert to unified structure
+    ↓
+4. Signal Synthesis (shared)
+    ↓
+5. Signal Creation (SINGLE function) ← Replaces 2 functions
+    ↓
+Database Storage & Report Generation
+```
+
+### 10.3 Implementation Tasks
+
+#### 10.3.1 Define Unified Data Models ✅ Phase 1 (COMPLETE)
+- [x] Create `AnalysisComponentResult` model (technical/fundamental/sentiment with full detail)
+- [x] Create `UnifiedAnalysisResult` model (contains all three components + synthesis)
+- [x] Models preserve detailed metrics from both modes
+- [x] **File**: `src/analysis/models.py`
+
+#### 10.3.2 Create Result Normalizer ✅ Phase 2 (COMPLETE)
+- [x] Create `AnalysisResultNormalizer` class
+- [x] `normalize_llm_result()` - Convert LLM agent outputs to unified structure
+- [x] `normalize_rule_based_result()` - Convert rule-based outputs to unified structure
+- [x] Extract detailed metrics from individual agent outputs (not synthesis)
+- [x] **New File**: `src/analysis/normalizer.py`
+
+#### 10.3.3 Refactor Metadata Extractor ✅ Phase 3 (COMPLETE)
+- [x] Add `extract_metadata_from_unified_result()` for new unified approach
+- [x] Keep legacy `extract_analysis_metadata()` for backward compatibility
+- [x] Work with structured Pydantic models
+- [x] **File**: `src/analysis/metadata_extractor.py`
+
+#### 10.3.4 Create Unified Signal Creator ✅ Phase 4 (COMPLETE)
+- [x] Create `SignalCreator` class
+- [x] Single `create_signal()` method for both modes
+- [x] Unified price fetching (historical-aware)
+- [x] Single metadata extraction call
+- [x] **New File**: `src/analysis/signal_creator.py`
+
+#### 10.3.5 Refactor LLM Integration 📋 Phase 5
+- [ ] Update `LLMAnalysisOrchestrator.analyze_instrument()` to return `UnifiedAnalysisResult`
+- [ ] Store individual analysis results (with detailed metrics)
+- [ ] Pass detailed results to normalizer
+- [ ] Use `SignalCreator` instead of creating signal in main.py
+- [ ] **File**: `src/llm/integration.py`
+
+#### 10.3.6 Refactor Analysis Pipeline 📋 Phase 6
+- [ ] Update `AnalysisPipeline.analyze_ticker()` to return `UnifiedAnalysisResult`
+- [ ] Add normalization step
+- [ ] Remove `_create_investment_signal()` method
+- [ ] **File**: `src/pipeline.py`
+
+#### 10.3.7 Update Main Entry Point 📋 Phase 7
+- [ ] Remove `_create_signal_from_llm_result()` function
+- [ ] Remove `_run_llm_analysis()` function
+- [ ] Use `SignalCreator` for both modes
+- [ ] Unified signal creation in analyze command
+- [ ] **File**: `src/main.py`
+
+#### 10.3.8 Testing & Validation 📋 Phase 8
+- [ ] Unit tests for `AnalysisResultNormalizer`
+- [ ] Unit tests for `SignalCreator`
+- [ ] Integration tests for LLM mode end-to-end
+- [ ] Integration tests for rule-based mode end-to-end
+- [ ] Verify metadata appears in both modes
+- [ ] Verify identical signal structure from both modes
+
+### 10.4 Migration Strategy
+
+1. **Add New Code** (no breaking changes)
+   - Create new models, normalizer, signal creator
+   - Run alongside old code
+
+2. **Integrate New Code**
+   - Update LLM orchestrator and pipeline to use new components
+   - Keep old functions temporarily for fallback
+
+3. **Switch Over**
+   - Update main.py to use new unified path
+   - Run extensive integration tests
+
+4. **Clean Up**
+   - Remove old duplicate functions
+   - Update all imports
+   - Remove dead code
+
+### 10.5 Expected Benefits
+
+#### Code Quality
+- ✅ **-380 lines** of duplicate code removed
+- ✅ **Single source of truth** for signal creation
+- ✅ **Easier maintenance**: Changes apply to both modes automatically
+- ✅ **Easier to add features**: New risk metrics, indicators auto-work in both modes
+
+#### Consistency
+- ✅ **Identical InvestmentSignal** structure from both modes
+- ✅ **Metadata works in both modes** (currently broken in LLM mode)
+- ✅ **Risk assessment** consistent across modes
+
+#### Debugging
+- ✅ **Single function** to debug for signal creation issues
+- ✅ **Unified logging** for both modes
+- ✅ **Easier to trace** data flow
+
+### 10.6 Files Modified
+
+#### New Files (2)
+- `src/analysis/normalizer.py` - Result normalization
+- `src/analysis/signal_creator.py` - Unified signal creation
+
+#### Modified Files (6)
+- `src/analysis/models.py` - Add `UnifiedAnalysisResult`
+- `src/analysis/metadata_extractor.py` - Update for new input type
+- `src/llm/integration.py` - Return `UnifiedAnalysisResult`
+- `src/pipeline.py` - Return `UnifiedAnalysisResult`, remove old signal creation
+- `src/main.py` - Use `SignalCreator`, remove duplicate functions
+
+#### Removed Code
+- `src/main.py::_create_signal_from_llm_result()` (~180 lines)
+- `src/pipeline.py::_create_investment_signal()` (~200 lines)
+- `src/main.py::_run_llm_analysis()` (~85 lines)
+
+**Net Result**: -465 lines, +300 lines = **-165 lines total** 🎉
+
+### 10.7 Success Criteria
+
+- [x] Refactoring plan created and approved
+- [ ] Both modes use `SignalCreator` for signal creation
+- [ ] Both modes populate metadata correctly in reports
+- [ ] `_create_signal_from_llm_result` and `_create_investment_signal` removed
+- [ ] All tests pass (unit + integration)
+- [ ] LLM mode and rule-based mode produce identical signal schemas
+- [ ] No duplicate logic for price fetching, signal creation, or metadata extraction
+
+### 10.8 Timeline
+
+- **Phase 1-2**: 2-3 hours (Models + Normalizer)
+- **Phase 3-4**: 2 hours (Metadata + SignalCreator)
+- **Phase 5-6**: 3-4 hours (LLM integration + Pipeline)
+- **Phase 7**: 2 hours (Main entry point)
+- **Phase 8**: 2-3 hours (Testing)
+- **Total**: ~12-15 hours of focused work
+
+---
+
+## Phase 11: Per-Agent LLM Model Configuration
 
 ### Overview - Cost Optimization
 
+**Status**: 📋 Planned (Future)
 **Objective**: Allow different LLM models for different agents based on task complexity and cost optimization.
 
 #### Tasks
@@ -1347,7 +1538,7 @@ Enable users to maintain a watchlist of tickers they're interested in tracking, 
 
 ---
 
-## Phase 11: Devil's Advocate Agent
+## Phase 12: Devil's Advocate Agent
 
 ### Overview
 
@@ -1497,7 +1688,7 @@ agents:
 
 ---
 
-## Phase 12: Enhanced Technical Analysis
+## Phase 13: Enhanced Technical Analysis
 
 ### Overview
 
@@ -1531,7 +1722,7 @@ Expand technical analysis with advanced indicators and candlestick patterns.
 
 ---
 
-## Phase 13: Advanced Features & Integrations
+## Phase 14: Advanced Features & Integrations
 
 ### Overview
 
@@ -1584,7 +1775,7 @@ Additional advanced features for power users and system integration.
 
 ---
 
-## Phase 14: Backtesting Framework
+## Phase 15: Backtesting Framework
 
 ### Overview
 
@@ -1770,13 +1961,21 @@ backtesting:
 - [x] MockLLMClient for offline testing
 - [x] Historical date analysis (`--date`) working
 
-### Phase 9 Targets (HIGH PRIORITY)
-- [ ] Historical database with analyst_ratings table
-- [ ] AnalystRatingsRepository implementation
-- [ ] Performance tracking database (recommendations, price_tracking tables)
-- [ ] CLI commands for analyst data management
+### Phase 9 Targets (HIGH PRIORITY) ✅
+- [x] Historical database with analyst_ratings table
+- [x] AnalystRatingsRepository implementation
+- [x] Performance tracking database (recommendations, price_tracking tables)
+- [x] CLI commands for analyst data management
 
-### Phase 10-14 Targets
+### Phase 10 Targets (IN PROGRESS) 🔄
+- [x] Refactoring plan created and approved
+- [ ] Unified data models (AnalysisComponentResult, UnifiedAnalysisResult)
+- [ ] Result normalizer for both modes
+- [ ] Single SignalCreator class
+- [ ] Metadata extraction working in both modes
+- [ ] ~380 lines of duplicate code removed
+
+### Phase 11-15 Targets
 - [ ] Per-agent model configuration
 - [ ] Devil's Advocate agent integrated
 - [ ] Enhanced technical indicators

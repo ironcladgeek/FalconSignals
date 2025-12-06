@@ -355,6 +355,12 @@ class Recommendation(SQLModel, table=True):
     rationale: str | None = SQLField(default=None, description="Investment rationale text")
     caveats: str | None = SQLField(default=None, description="JSON array of caveats")
 
+    # Enhanced metadata (JSON serialized AnalysisMetadata)
+    metadata_json: str | None = SQLField(
+        default=None,
+        description="JSON-serialized AnalysisMetadata (technical indicators, fundamental metrics, analyst info, sentiment info)",
+    )
+
     created_at: datetime = SQLField(
         default_factory=datetime.now, description="When recommendation was created"
     )
