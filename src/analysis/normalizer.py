@@ -208,10 +208,19 @@ class AnalysisResultNormalizer:
         indicators_data = tech_result.get("indicators", {})
         components_data = tech_result.get("components", {})
 
+        # Extract MACD values (handle both dict and float formats)
+        macd_data = indicators_data.get("macd")
+        if isinstance(macd_data, dict):
+            macd_value = macd_data.get("line")
+            macd_signal_value = macd_data.get("signal")
+        else:
+            macd_value = macd_data
+            macd_signal_value = indicators_data.get("macd_signal")
+
         technical_indicators = TechnicalIndicators(
             rsi=indicators_data.get("rsi"),
-            macd=indicators_data.get("macd"),
-            macd_signal=indicators_data.get("macd_signal"),
+            macd=macd_value,
+            macd_signal=macd_signal_value,
             sma_20=indicators_data.get("sma_20"),
             sma_50=indicators_data.get("sma_50"),
             sma_200=indicators_data.get("sma_200"),
@@ -342,10 +351,19 @@ class AnalysisResultNormalizer:
         indicators = tech_data.get("indicators", {})
         components = tech_data.get("components", {})
 
+        # Extract MACD values (handle both dict and float formats)
+        macd_data = indicators.get("macd")
+        if isinstance(macd_data, dict):
+            macd_value = macd_data.get("line")
+            macd_signal_value = macd_data.get("signal")
+        else:
+            macd_value = macd_data
+            macd_signal_value = indicators.get("macd_signal")
+
         technical_indicators = TechnicalIndicators(
             rsi=indicators.get("rsi"),
-            macd=indicators.get("macd"),
-            macd_signal=indicators.get("macd_signal"),
+            macd=macd_value,
+            macd_signal=macd_signal_value,
             sma_20=indicators.get("sma_20"),
             sma_50=indicators.get("sma_50"),
             sma_200=indicators.get("sma_200"),
