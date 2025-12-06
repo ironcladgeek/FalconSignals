@@ -1,7 +1,6 @@
 """NordInvest CLI interface."""
 
 import json
-import re
 import sys
 import time
 from datetime import date, datetime
@@ -10,8 +9,7 @@ from pathlib import Path
 import typer
 
 from src.analysis import InvestmentSignal
-from src.analysis.metadata_extractor import extract_analysis_metadata
-from src.analysis.models import ComponentScores, RiskAssessment
+from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
 from src.config import load_config
 from src.data.db import init_db
@@ -125,6 +123,7 @@ def _run_llm_analysis(
     debug_llm: bool = False,
     is_filtered: bool = False,
     cache_manager=None,
+    provider_manager=None,
     historical_date=None,
     run_session_id: int | None = None,
     recommendations_repo=None,
@@ -220,48 +219,46 @@ def _run_llm_analysis(
                             typer_instance.echo(f"  → {agent_name} ({current}/{total})", nl=False)
                             typer_instance.echo("\r", nl=False)  # Carriage return to overwrite
 
-                    result = orchestrator.analyze_instrument(
+                    # Analyze instrument - returns UnifiedAnalysisResult or None
+                    unified_result = orchestrator.analyze_instrument(
                         ticker, progress_callback=agent_progress_callback
                     )
 
-                    # Extract signal from result if successful
-                    if result.get("status") == "complete":
-                        # Use the synthesis result if available
-                        synthesis_result = result.get("results", {}).get("synthesis", {})
-                        if synthesis_result.get("status") == "success":
-                            signal_data = synthesis_result.get("result", {})
+                    # Create signal from unified result using SignalCreator
+                    if unified_result:
+                        # Initialize SignalCreator with required dependencies
+                        signal_creator = SignalCreator(
+                            cache_manager=cache_manager,
+                            provider_manager=provider_manager,
+                            risk_assessor=None,  # Risk assessment already in unified_result
+                        )
 
-                            # Handle CrewOutput object - extract the raw output
-                            if hasattr(signal_data, "raw"):
-                                signal_text = signal_data.raw
-                            elif hasattr(signal_data, "result"):
-                                signal_text = signal_data.result
-                            else:
-                                signal_text = str(signal_data)
+                        # Create signal from unified analysis result
+                        signal = signal_creator.create_signal(
+                            result=unified_result,
+                            portfolio_context={},
+                            analysis_date=historical_date,
+                        )
 
-                            # Create InvestmentSignal from LLM result
-                            signal = _create_signal_from_llm_result(
-                                ticker, signal_text, cache_manager, historical_date
-                            )
-                            if signal:
-                                signals.append(signal)
+                        if signal:
+                            signals.append(signal)
 
-                                # Store signal to database if enabled
-                                if recommendations_repo and run_session_id:
-                                    try:
-                                        recommendations_repo.store_recommendation(
-                                            signal=signal,
-                                            run_session_id=run_session_id,
-                                            analysis_mode="llm",
-                                            llm_model=config_obj.llm.model,
-                                        )
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"Failed to store recommendation for {ticker} to database: {e}"
-                                        )
-                                        # Continue execution - DB failures don't halt pipeline
-                        else:
-                            logger.warning(f"Synthesis failed for {ticker}, skipping")
+                            # Store signal to database if enabled
+                            if recommendations_repo and run_session_id:
+                                try:
+                                    recommendations_repo.store_recommendation(
+                                        signal=signal,
+                                        run_session_id=run_session_id,
+                                        analysis_mode="llm",
+                                        llm_model=config_obj.llm.model,
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to store recommendation for {ticker} to database: {e}"
+                                    )
+                                    # Continue execution - DB failures don't halt pipeline
+                    else:
+                        logger.warning(f"Analysis failed for {ticker}, skipping")
 
                 except Exception as e:
                     logger.error(f"Error analyzing {ticker} with LLM: {e}")
@@ -282,185 +279,6 @@ def _run_llm_analysis(
         logger.error(f"Error in LLM analysis: {e}", exc_info=True)
         typer_instance.echo(f"❌ LLM Analysis Error: {e}", err=True)
         return [], None
-
-
-def _create_signal_from_llm_result(
-    ticker: str,
-    llm_result: dict | str,
-    cache_manager=None,
-    historical_date: date | None = None,
-) -> InvestmentSignal | None:
-    """Convert LLM analysis result to InvestmentSignal.
-
-    Args:
-        ticker: Stock ticker
-        llm_result: LLM analysis result (dict or JSON string)
-        cache_manager: Optional cache manager for fetching current price
-        historical_date: Optional historical date for backtesting
-
-    Returns:
-        InvestmentSignal or None if conversion fails
-    """
-    try:
-        # Parse LLM result if it's a string
-        if isinstance(llm_result, str):
-            # Clean up common formatting issues
-            llm_result = llm_result.strip()
-
-            # Try to extract JSON from markdown code blocks
-            json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", llm_result, re.DOTALL)
-            if json_match:
-                llm_result = json.loads(json_match.group(1))
-            else:
-                # Try to find the first complete JSON object in the text
-                # Strategy: Start from first { and try to parse incrementally until we get valid JSON
-                first_brace = llm_result.find("{")
-
-                if first_brace != -1:
-                    # Try to find a complete JSON object by parsing with increasing end positions
-                    brace_count = 0
-                    in_string = False
-                    escape_next = False
-                    json_end = -1
-
-                    for i in range(first_brace, len(llm_result)):
-                        char = llm_result[i]
-
-                        if escape_next:
-                            escape_next = False
-                            continue
-
-                        if char == "\\":
-                            escape_next = True
-                            continue
-
-                        if char == '"' and not escape_next:
-                            in_string = not in_string
-                            continue
-
-                        if not in_string:
-                            if char == "{":
-                                brace_count += 1
-                            elif char == "}":
-                                brace_count -= 1
-                                if brace_count == 0:
-                                    json_end = i + 1
-                                    break
-
-                    if json_end != -1:
-                        json_str = llm_result[first_brace:json_end]
-                        try:
-                            llm_result = json.loads(json_str)
-                            logger.debug("Successfully extracted JSON from LLM response")
-                        except json.JSONDecodeError as e:
-                            logger.warning(f"Could not parse extracted JSON: {e}")
-                            logger.debug(f"Attempted to parse: {json_str[:500]}")
-                            return None
-                    else:
-                        logger.warning("Could not find complete JSON object (unbalanced braces)")
-                        logger.debug(f"Response preview: {llm_result[:200]}")
-                        return None
-                else:
-                    logger.warning("No JSON object found in LLM result")
-                    logger.debug(f"Response preview: {llm_result[:200]}")
-                    return None
-
-        # Map recommendation to enum values
-        recommendation = llm_result.get("recommendation", "hold").lower()
-        recommendation_map = {
-            "strong_buy": "strong_buy",
-            "buy": "buy",
-            "hold_bullish": "hold_bullish",
-            "hold": "hold",
-            "hold_bearish": "hold_bearish",
-            "sell": "sell",
-            "strong_sell": "strong_sell",
-        }
-        recommendation = recommendation_map.get(recommendation, "hold")
-
-        # Parse risk assessment with proper defaults
-        risk_data = llm_result.get("risk", {})
-        risk_level = (risk_data.get("level") or "medium").lower()
-        # Map 'moderate' to 'medium' for compatibility
-        if risk_level == "moderate":
-            risk_level = "medium"
-
-        risk_assessment = RiskAssessment(
-            level=risk_level,
-            volatility=risk_data.get("volatility") or "normal",
-            volatility_pct=risk_data.get("volatility_pct") or 2.0,
-            liquidity=risk_data.get("liquidity") or "normal",
-            concentration_risk=risk_data.get("concentration_risk") or False,
-            sector_risk=risk_data.get("sector_risk"),
-            flags=risk_data.get("flags") or risk_data.get("factors") or [],
-        )
-
-        # Create signal with proper schema
-        # Fetch actual current price and currency from cache
-        # Handle None values from LLM result (e.g., "current_price": null in JSON)
-        current_price = llm_result.get("current_price") or 0.0
-        currency = llm_result.get("currency", "USD")
-        if cache_manager:
-            try:
-                latest_price = cache_manager.get_latest_price(ticker)
-                if latest_price and latest_price.close_price:
-                    current_price = latest_price.close_price
-                    currency = latest_price.currency
-            except Exception as e:
-                logger.debug(
-                    f"Could not fetch price for {ticker} from cache: {e}. Using LLM defaults."
-                )
-
-        # Ensure current_price is never None
-        if current_price is None:
-            current_price = 0.0
-
-        # Parse scores with None-safe defaults
-        scores_dict = llm_result.get("scores", {})
-        if not isinstance(scores_dict, dict):
-            scores_dict = {}
-
-        # Ensure all score values are valid floats (handle None values)
-        safe_scores = {
-            "technical": scores_dict.get("technical") or 50.0,
-            "fundamental": scores_dict.get("fundamental") or 50.0,
-            "sentiment": scores_dict.get("sentiment") or 50.0,
-        }
-
-        # Extract metadata from LLM result for enhanced recommendations
-        metadata = extract_analysis_metadata(llm_result)
-
-        signal = InvestmentSignal(
-            ticker=ticker,
-            name=llm_result.get("name", ticker),
-            market=llm_result.get("market", "Global"),
-            sector=llm_result.get("sector"),
-            current_price=current_price,
-            currency=currency,
-            scores=ComponentScores(**safe_scores),
-            final_score=llm_result.get("final_score", 50.0),
-            recommendation=recommendation,
-            confidence=llm_result.get("confidence", 50.0),
-            time_horizon=llm_result.get("time_horizon", "3M"),
-            expected_return_min=llm_result.get("expected_return_min", 0.0),
-            expected_return_max=llm_result.get("expected_return_max", 10.0),
-            key_reasons=llm_result.get("key_reasons", []),
-            risk=risk_assessment,
-            allocation=None,  # Will be calculated later
-            generated_at=datetime.now(),
-            analysis_date=historical_date.strftime("%Y-%m-%d")
-            if historical_date
-            else datetime.now().strftime("%Y-%m-%d"),
-            rationale=llm_result.get("rationale"),
-            caveats=llm_result.get("caveats", []),
-            metadata=metadata,
-        )
-
-        return signal
-
-    except Exception as e:
-        logger.error(f"Error creating signal from LLM result: {e}")
-        return None
 
 
 @app.command()
@@ -923,6 +741,7 @@ def analyze(
                 debug_llm,
                 is_filtered=True,
                 cache_manager=cache_manager,
+                provider_manager=provider_manager,
                 historical_date=historical_date,
                 run_session_id=run_session_id,
                 recommendations_repo=recommendations_repo,
