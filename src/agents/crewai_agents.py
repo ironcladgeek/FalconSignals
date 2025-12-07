@@ -4,6 +4,12 @@ from typing import Any, Optional
 
 from crewai import Agent, Task
 
+from src.agents.output_models import (
+    FundamentalAnalysisOutput,
+    SentimentAnalysisOutput,
+    SignalSynthesisOutput,
+    TechnicalAnalysisOutput,
+)
 from src.config.llm import initialize_llm_client
 from src.config.schemas import LLMConfig
 from src.utils.logging import get_logger
@@ -13,6 +19,18 @@ logger = get_logger(__name__)
 
 class CrewAIAgentFactory:
     """Factory for creating CrewAI-based agents."""
+
+    # Explicit instruction to use correct tool format (prevents <function_calls> format)
+    TOOL_FORMAT_INSTRUCTION = (
+        "\n\nCRITICAL: When using tools, you MUST use the exact format:\n"
+        "```\n"
+        "Thought: your reasoning\n"
+        "Action: tool name\n"
+        'Action Input: {"param": "value"}\n'
+        "```\n"
+        "NEVER use <function_calls> tags or any other format. "
+        "Wait for the Observation before continuing."
+    )
 
     def __init__(self, llm_config: Optional[LLMConfig] = None):
         """Initialize the factory with LLM configuration.
@@ -45,7 +63,7 @@ class CrewAIAgentFactory:
                 "patterns, and price movements that signal potential trading opportunities. "
                 "Your keen eye for detail helps identify instruments that deserve deeper analysis. "
                 "You consider both daily and weekly price movements, volume anomalies, and positions "
-                "at technical extremes."
+                "at technical extremes." + self.TOOL_FORMAT_INSTRUCTION
             ),
             tools=tools or [],
             llm=self.llm_client,
@@ -79,6 +97,7 @@ class CrewAIAgentFactory:
                 "You understand how different indicators complement each other and provide "
                 "holistic technical insights. Note: The mathematical calculations are already done - "
                 "your job is to interpret the signals and provide trading insights."
+                + self.TOOL_FORMAT_INSTRUCTION
             ),
             tools=tools or [],
             llm=self.llm_client,
@@ -108,7 +127,7 @@ class CrewAIAgentFactory:
                 "and valuation metrics (P/E, EV/EBITDA, P/B, PEG). "
                 "You can identify high-quality companies at reasonable valuations and weak "
                 "companies even if they appear cheap. You understand industry dynamics and "
-                "competitive positioning."
+                "competitive positioning." + self.TOOL_FORMAT_INSTRUCTION
             ),
             tools=tools or [],
             llm=self.llm_client,
@@ -140,6 +159,7 @@ class CrewAIAgentFactory:
                 "You understand how different types of news affect company valuations and stock prices, "
                 "and can identify whether sentiment represents rational analysis or emotional overreaction. "
                 "You excel at identifying key themes, catalysts, and sentiment trends from news coverage."
+                + self.TOOL_FORMAT_INSTRUCTION
             ),
             tools=tools or [],
             llm=self.llm_client,
@@ -263,6 +283,7 @@ class CrewAITaskFactory:
                 "Technical analysis interpretation with trend assessment, momentum analysis, "
                 "signal interpretation, and technical score (0-100)"
             ),
+            output_pydantic=TechnicalAnalysisOutput,
         )
 
     @staticmethod
@@ -312,6 +333,7 @@ class CrewAITaskFactory:
                 "Fundamental analysis based on real data: analyst consensus interpretation, "
                 "sentiment analysis, momentum assessment, and fundamental score (0-100)"
             ),
+            output_pydantic=FundamentalAnalysisOutput,
         )
 
     @staticmethod
@@ -358,6 +380,7 @@ class CrewAITaskFactory:
                 "Sentiment analysis with article-level sentiment scores, key themes, event classification, "
                 "overall sentiment distribution, and final sentiment score (0-100)"
             ),
+            output_pydantic=SentimentAnalysisOutput,
         )
 
     @staticmethod
@@ -455,4 +478,5 @@ class CrewAITaskFactory:
             expected_output=(
                 "Valid JSON object matching the InvestmentSignal schema with all required fields populated"
             ),
+            output_pydantic=SignalSynthesisOutput,
         )
