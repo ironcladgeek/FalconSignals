@@ -231,10 +231,11 @@ This roadmap outlines the implementation plan for building an AI-driven financia
 - ✅ **Single source of truth** for each data structure or algorithm
 
 **Current Status** (as of December 2025):
-- ❌ **VIOLATION**: Two separate execution paths exist (see Issue #1 below)
+- ❌ **VIOLATION**: Two separate execution paths exist (LLM vs rule-based flows in `pipeline.py` and `main.py`)
 - ❌ **VIOLATION**: Duplicate signal creation in `pipeline.py` and `main.py`
 - ❌ **VIOLATION**: Duplicate database storage in `pipeline.py` and `main.py`
 - ⚠️ **ACTION REQUIRED**: Refactoring to eliminate duplication (see [ARCHITECTURE_ANALYSIS.md](./ARCHITECTURE_ANALYSIS.md))
+- ℹ️ **Note**: Issue #1 (LLM agents not completing) was resolved via Pydantic structured output; architectural duplication remains separate concern
 
 **Why This Matters**:
 - 🐛 **Bug risk**: Bugs must be fixed in multiple places (often missed)
@@ -2005,184 +2006,159 @@ See detailed guides:
 
 ---
 
-### Issue #2: Data Accuracy and Consistency Issues (December 2025)
+### Issue #2: Data Quality Investigation & Missing Fundamental Metrics (December 2025)
 
-**Status**: 🔴 **OPEN** - Multiple data discrepancies detected
+**Status**: 🔴 **OPEN** - Investigation and feature additions required
 **Discovered**: 2025-12-08
 **Affects**: Both LLM and rule-based modes
-**Impact**: Reports may show incorrect or inconsistent data across different sources
+**Impact**: Missing fundamental metrics in reports; requires investigation of data flow
+**Note**: Technical indicator, news, and sentiment issues moved to Issue #3 (architectural improvements)
 
 #### Problem Description
 
-Multiple inconsistencies found between cached data, LLM outputs, and generated reports for TSLA analysis:
+**1. Fundamental Metrics Missing** 🔴 **Critical**
 
-**1. Technical Indicators Discrepancies**
-
-| Source | RSI (14) | MACD | ATR (14) |
-|--------|----------|------|----------|
-| TradingView (reference) | 61.01 | ? | 17.26 |
-| Report (2025-12-07 23:37) | 77.04 | **Missing** | 16.22 |
-| Database | 77.04 | **Missing** | 16.22 |
-
-**Issues**:
-- ❌ MACD values completely missing from report and database
-- ⚠️ RSI discrepancy: 77.04 vs 61.01 (26% difference from TradingView reference)
-- ⚠️ ATR discrepancy: 16.22 vs 17.26 (6% difference from TradingView reference)
-
-**2. News Article Count Discrepancies**
-
-| Source | Article Count |
-|--------|---------------|
-| `TSLA_fundamental_2025-12-07.json` | 50 |
-| `TSLA_news_2025-12-04_2025-12-06.json` | 20 |
-| `TSLA_news_2025-12-05_2025-12-06.json` | 10 |
-| Report (2025-12-07 23:37) | 20 |
-
-**Issues**:
-- ⚠️ Inconsistent article counts across different cache files
-- ❓ Unclear which data source is used for final report
-- ❓ Why do overlapping date ranges have different counts?
-
-**3. Sentiment Distribution Inconsistencies**
-
-| Source | Positive | Negative | Neutral |
-|--------|----------|----------|---------|
-| Report (2025-12-07 23:37) | ? | ? | 10 |
-| `TSLA_news_2025-12-04_2025-12-06.json` | ? | ? | 13 |
-
-**Issues**:
-- ⚠️ Neutral article count mismatch (10 vs 13)
-- ❓ Sentiment calculation method unclear: Is LLM/agent assigning sentiment or using Alpha Vantage scores?
-- ❓ No documentation on sentiment scoring algorithm
-
-**4. Fundamental Metrics Missing**
-
-**Issues**:
-- ❌ No fundamental metrics in generated reports (P/E ratio, EPS, revenue, profit margins)
+**Current State**:
+- ❌ No fundamental metrics in generated reports (P/E ratio, EPS, revenue, profit margins, debt ratios)
 - ❌ No fundamental metrics in database despite analyst ratings being present
-- ⚠️ FundamentalAnalysisOutput Pydantic model doesn't include financial metrics fields
+- ⚠️ `FundamentalAnalysisOutput` Pydantic model focuses only on analyst ratings
+- ✅ Analyst ratings ARE working correctly (analyst counts, consensus, ratings distribution)
+
+**Missing Financial Metrics**:
+- P/E ratio (Price-to-Earnings)
+- EPS (Earnings Per Share)
+- Revenue and revenue growth
+- Profit margins (gross, operating, net)
+- Debt-to-Equity ratio
+- Book value, cash flow metrics
+
+**Impact**: Reports lack critical financial data needed for fundamental analysis
+
+**2. Technical Indicators & News Data** ℹ️ **Moved to Issue #3**
+
+> **Note**: Technical indicator discrepancies (MACD missing, RSI/ATR differences), news count inconsistencies, and sentiment calculation clarity have been moved to **Issue #3** as they will be comprehensively resolved by the proposed architecture improvements (CSV storage with pandas-ta, unified news collection, and configurable sentiment scoring).
+>
+> See **Issue #3** for:
+> - Technical indicator accuracy improvements (Solution 1 & 2)
+> - News collection standardization (Solution 3)
+> - Sentiment scoring transparency (Solution 4)
 
 #### Root Cause Analysis
 
-**Technical Indicator Issues**:
-1. **MACD missing**: Possible causes:
-   - Pydantic model extraction not capturing MACD from LLM output
-   - LLM not including MACD in structured output
-   - Technical analysis tool not providing MACD data
+**Fundamental Metrics Missing**:
+1. **Pydantic Model Scope**: `FundamentalAnalysisOutput` designed for analyst ratings only:
+   ```python
+   class FundamentalAnalysisOutput(BaseModel):
+       analyst_count: int
+       consensus: str
+       buy_count: int
+       hold_count: int
+       sell_count: int
+       # ❌ No fields for P/E, EPS, revenue, margins, etc.
+   ```
 
-2. **RSI/ATR discrepancies**: Possible causes:
-   - Different calculation windows or data sources
-   - Timing differences (TradingView real-time vs cached historical data)
-   - Yahoo Finance vs TradingView calculation differences
+2. **Data Source**: Fundamental data tools likely fetch financial metrics but aren't included in agent prompts or output models
 
-**News Count Issues**:
-1. Multiple cache files with overlapping date ranges
-2. No clear documentation of which cache file is authoritative
-3. Possible race conditions or concurrent caching
+3. **Pipeline Gap**: Even if tools provide data, normalizer doesn't extract financial metrics because output model doesn't include them
 
-**Sentiment Issues**:
-1. No clear specification of sentiment source (LLM-assigned vs API-provided)
-2. Missing sentiment calculation algorithm documentation
-3. Possible data source mixing (some from Alpha Vantage, some from LLM)
-
-**Fundamental Metrics Issues**:
-1. `FundamentalAnalysisOutput` model focuses on analyst ratings only
-2. No fields for financial metrics (P/E, EPS, revenue, margins, etc.)
-3. Fundamental data tools may not be returning metrics to agents
+4. **Report Template**: Report generator may not have section for fundamental metrics table
 
 #### Investigation Steps
 
-**Immediate (High Priority)**:
-- [ ] Check MACD extraction in normalizer - verify Pydantic model includes MACD
-- [ ] Verify LLM agents receive MACD data from technical analysis tools
-- [ ] Review technical indicator calculation source (Yahoo Finance implementation)
-- [ ] Compare calculation methods with TradingView reference
-- [ ] Document which news cache file should be authoritative for reports
-- [ ] Add sentiment calculation method to documentation
-- [ ] Clarify if sentiment comes from LLM analysis or Alpha Vantage API
+**Phase 1: Verify Data Availability** (High Priority):
+- [ ] Check if fundamental data tools (`AlphaVantageClient`, `FinnhubClient`) fetch financial metrics
+- [ ] Review tool responses - do they include P/E, EPS, revenue, margins?
+- [ ] Check if fundamental agent prompts request financial metrics
+- [ ] Verify if metrics are in LLM output but not extracted
 
-**Medium Priority**:
-- [ ] Add fundamental metrics fields to `FundamentalAnalysisOutput` Pydantic model:
-  - P/E ratio, EPS, revenue, profit margins, debt ratios
-- [ ] Update fundamental analysis tools to fetch and return financial metrics
-- [ ] Update normalizer to extract fundamental metrics to database
-- [ ] Add fundamental metrics section to report template
+**Phase 2: Implementation** (High Priority):
+- [ ] Extend `FundamentalAnalysisOutput` Pydantic model with financial metrics fields
+- [ ] Update fundamental analysis agent prompts to include financial metrics analysis
+- [ ] Ensure fundamental data tools fetch these metrics (or add new tool if needed)
+- [ ] Update normalizer to extract financial metrics to `FundamentalMetrics` dataclass
+- [ ] Add fundamental metrics table to report template
 
-**Long-term**:
-- [ ] Implement validation checks comparing our calculations vs reference sources
-- [ ] Add data quality warnings in reports when discrepancies detected
-- [ ] Standardize caching strategy to avoid overlapping date range files
-- [ ] Add metadata tracking which data source/version used for each metric
+**Phase 3: Validation** (Medium Priority):
+- [ ] Compare extracted metrics vs reference sources (Yahoo Finance, MarketWatch)
+- [ ] Add data quality warnings if critical metrics missing
+- [ ] Document which data source provides each financial metric
 
 #### Recommended Actions
 
-**Fix MACD Missing** (Critical):
-1. Verify `TechnicalAnalysisOutput` model includes `macd` and `macd_signal` fields ✅ (Already present)
-2. Check technical analysis tools return MACD values
-3. Add debug logging to track MACD through entire pipeline
-4. Verify report template includes MACD in technical indicators table
+**Add Fundamental Metrics to Pydantic Model** 🎯 **High Priority**:
 
-**Fix Fundamental Metrics Missing** (High Priority):
-1. Extend `FundamentalAnalysisOutput` with financial metrics:
+1. **Extend `FundamentalAnalysisOutput`** with financial metrics:
    ```python
+   # src/agents/output_models.py
    class FundamentalAnalysisOutput(BaseModel):
-       # ... existing analyst fields ...
+       # Existing analyst rating fields
+       analyst_count: int = Field(..., description="Number of analysts covering the stock")
+       consensus: str = Field(..., description="Analyst consensus recommendation")
+       buy_count: int
+       hold_count: int
+       sell_count: int
+       strong_buy_count: int = 0
+       strong_sell_count: int = 0
 
-       # Add financial metrics
-       pe_ratio: float | None = Field(None, description="Price-to-Earnings ratio")
-       eps: float | None = Field(None, description="Earnings Per Share")
+       # NEW: Financial metrics
+       pe_ratio: float | None = Field(None, description="Price-to-Earnings ratio (TTM)")
+       forward_pe: float | None = Field(None, description="Forward P/E ratio")
+       eps: float | None = Field(None, description="Earnings Per Share (TTM)")
+       revenue: float | None = Field(None, description="Revenue (TTM, in millions)")
        revenue_growth: float | None = Field(None, description="YoY revenue growth %")
        profit_margin: float | None = Field(None, description="Net profit margin %")
+       operating_margin: float | None = Field(None, description="Operating margin %")
        debt_to_equity: float | None = Field(None, description="Debt-to-Equity ratio")
+       current_ratio: float | None = Field(None, description="Current ratio (liquidity)")
+       roe: float | None = Field(None, description="Return on Equity %")
+
+       # Business assessment (existing)
+       business_score: float
+       business_assessment: str
    ```
-2. Update fundamental analysis agent prompts to include financial metrics
-3. Ensure fundamental data tools fetch these metrics
-4. Update normalizer to extract to `FundamentalMetrics` dataclass
-5. Add fundamental metrics table to report template
 
-**Clarify Sentiment Calculation** (Medium Priority):
-1. Document sentiment scoring algorithm in code comments
-2. Add config option: `sentiment_source: llm | api | hybrid`
-3. If using Alpha Vantage scores, document this clearly
-4. If using LLM, document prompt and scoring criteria
-5. Add sentiment source metadata to reports
+2. **Update fundamental analysis agent prompt** to request financial metrics analysis
 
-**Standardize News Caching** (Medium Priority):
-1. Define single authoritative date range for news (e.g., last 7 days)
-2. Remove overlapping cache files or clarify purpose of each
-3. Add cache metadata indicating which file is used for reports
-4. Implement cache cleanup for outdated files
+3. **Verify data tools** fetch financial metrics (Alpha Vantage OVERVIEW endpoint, Finnhub basic financials)
 
-#### Files to Review
+4. **Update normalizer** to extract financial metrics to database
 
-- **Technical**: `src/agents/output_models.py` (TechnicalAnalysisOutput), `src/tools/technical.py`, `src/analysis/normalizer.py`
-- **News**: `src/data/providers/finnhub.py`, `src/cache/manager.py`
-- **Sentiment**: `src/agents/sentiment.py`, `src/tools/sentiment.py`
-- **Fundamental**: `src/agents/output_models.py` (FundamentalAnalysisOutput), `src/tools/fundamental.py`
-- **Reports**: `src/reports/generator.py`, report templates
+5. **Add fundamental metrics table** to report template
+
+**Implementation Priority**: Complete before Issue #3 (architectural improvements)
+
+#### Files to Review/Modify
+
+- `src/agents/output_models.py` - Add financial metrics fields to `FundamentalAnalysisOutput`
+- `src/llm/prompts.py` - Update fundamental analysis agent prompt
+- `src/tools/fundamental.py` - Verify/enhance financial metrics fetching
+- `src/data/providers/alpha_vantage.py` - Check OVERVIEW endpoint usage
+- `src/data/providers/finnhub.py` - Check basic financials endpoint
+- `src/analysis/normalizer.py` - Add financial metrics extraction
+- `src/reports/generator.py` - Add fundamental metrics table to report
 
 #### Success Criteria
 
-- [ ] MACD values appear in all reports where technical analysis is performed
-- [ ] Technical indicator values match reference sources within acceptable tolerance (±5%)
-- [ ] Single authoritative news cache file per analysis run
-- [ ] Sentiment calculation method documented and consistent
-- [ ] Fundamental metrics (P/E, EPS, etc.) appear in reports and database
-- [ ] Data source metadata included in reports for transparency
-- [ ] Validation warnings when data discrepancies exceed thresholds
+- [ ] Fundamental metrics (P/E, EPS, revenue, margins, etc.) appear in all reports
+- [ ] Financial metrics stored in database with analyst ratings
+- [ ] Report includes comprehensive "Fundamental Metrics" table with 8-10 key metrics
+- [ ] Metrics validated against reference sources (±5% tolerance)
+- [ ] Missing metrics clearly indicated in report ("N/A" or "Not Available")
+- [ ] Data source documented (e.g., "Source: Alpha Vantage OVERVIEW")
 
 ---
 
 ### Issue #3: Data Architecture and Technical Infrastructure Improvements (December 2025)
 
-**Status**: 📋 **PROPOSED** - Architecture improvements for better performance and flexibility
+**Status**: 📋 **PROPOSED** - Comprehensive architecture improvements
 **Discovered**: 2025-12-08
 **Impact**: Performance, maintainability, configurability, and accuracy
 **Priority**: 🟡 High - Foundation improvements affecting all analysis modes
+**Resolves**: Technical indicator discrepancies, news inconsistencies, sentiment calculation clarity (from original Issue #2 scope)
 
 #### Problem Description
 
-Multiple architectural issues discovered that affect data storage efficiency, calculation accuracy, and system flexibility:
+Multiple architectural issues discovered during Issue #2 investigation that affect data storage efficiency, calculation accuracy, and system flexibility. These improvements will resolve technical indicator discrepancies, news count inconsistencies, and sentiment calculation concerns identified in initial analysis.
 
 **1. Inefficient Price Data Storage**
 
