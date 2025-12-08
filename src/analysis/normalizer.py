@@ -752,9 +752,11 @@ class AnalysisResultNormalizer:
         if isinstance(macd_data, dict):
             macd_value = macd_data.get("line")
             macd_signal_value = macd_data.get("signal")
+            macd_histogram_value = macd_data.get("histogram")
         else:
             macd_value = macd_data
             macd_signal_value = indicators.get("macd_signal")
+            macd_histogram_value = indicators.get("macd_histogram")
 
         # Extract Bollinger Bands values (handle dict format)
         bbands_data = indicators.get("bbands")
@@ -770,6 +772,7 @@ class AnalysisResultNormalizer:
             rsi=indicators.get("rsi"),
             macd=macd_value,
             macd_signal=macd_signal_value,
+            macd_histogram=macd_histogram_value,
             sma_20=indicators.get("sma_20"),
             sma_50=indicators.get("sma_50"),
             sma_200=indicators.get("sma_200"),

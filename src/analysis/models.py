@@ -65,6 +65,7 @@ class TechnicalIndicators(BaseModel):
     rsi: float | None = Field(default=None, ge=0, le=100, description="RSI (14-period)")
     macd: float | None = Field(default=None, description="MACD value")
     macd_signal: float | None = Field(default=None, description="MACD signal line")
+    macd_histogram: float | None = Field(default=None, description="MACD histogram")
     sma_20: float | None = Field(default=None, ge=0, description="20-day SMA")
     sma_50: float | None = Field(default=None, ge=0, description="50-day SMA")
     sma_200: float | None = Field(default=None, ge=0, description="200-day SMA")

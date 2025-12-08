@@ -539,10 +539,13 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
         if tech.rsi is not None:
             sections.append(f"| RSI (14) | {tech.rsi:.2f} |")
         if tech.macd is not None and tech.macd_signal is not None:
-            sections.append(f"| MACD | {tech.macd:.2f} / {tech.macd_signal:.2f} |")
+            macd_display = f"{tech.macd:.2f} / {tech.macd_signal:.2f}"
+            if tech.macd_histogram is not None:
+                macd_display += f" / {tech.macd_histogram:.2f}"
+            sections.append(f"| MACD (12, 26, 9) | {macd_display} |")
         if tech.bb_upper is not None and tech.bb_middle is not None and tech.bb_lower is not None:
             sections.append(
-                f"| Bollinger Bands | ${tech.bb_lower:.2f} / ${tech.bb_middle:.2f} / ${tech.bb_upper:.2f} |"
+                f"| Bollinger Bands (20, 2.0) | ${tech.bb_lower:.2f} / ${tech.bb_middle:.2f} / ${tech.bb_upper:.2f} |"
             )
         if tech.sma_20 is not None:
             sections.append(f"| SMA (20) | ${tech.sma_20:.2f} |")
@@ -553,7 +556,7 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
         if tech.volume_avg is not None:
             sections.append(f"| Avg Volume (20d) | {tech.volume_avg:,} |")
         if tech.atr is not None:
-            sections.append(f"| ATR | ${tech.atr:.2f} |")
+            sections.append(f"| ATR (14) | ${tech.atr:.2f} |")
 
         sections.append("")
 
