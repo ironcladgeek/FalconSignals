@@ -145,11 +145,10 @@ class AnalysisResultNormalizer:
 
         # Extract component results from nested structure
         analysis_data = analysis.get("analysis", {})
+        technical_data = analysis_data.get("technical", {})
 
         # Extract technical component
-        technical = AnalysisResultNormalizer._extract_technical_rule_based(
-            analysis_data.get("technical", {})
-        )
+        technical = AnalysisResultNormalizer._extract_technical_rule_based(technical_data)
 
         # Extract fundamental component
         fundamental = AnalysisResultNormalizer._extract_fundamental_rule_based(
@@ -731,7 +730,21 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_technical_rule_based(tech_data: dict[str, Any]) -> AnalysisComponentResult:
         """Extract technical analysis component from rule-based output."""
+        # Check for error status in technical analysis result
+        if tech_data.get("status") == "error":
+            error_msg = tech_data.get("message", "Unknown error in technical analysis")
+            logger.warning(f"Technical analysis failed: {error_msg}")
+            # Return component result with error information
+            return AnalysisComponentResult(
+                component="technical",
+                score=tech_data.get("technical_score", 0.0),
+                raw_data=tech_data,
+                technical_indicators=None,
+                reasoning=f"Error: {error_msg}",
+            )
+
         indicators = tech_data.get("indicators", {})
+
         components = tech_data.get("components", {})
 
         # Extract MACD values (handle both dict and float formats)
@@ -766,38 +779,46 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_fundamental_rule_based(fund_data: dict[str, Any]) -> AnalysisComponentResult:
         """Extract fundamental analysis component from rule-based output."""
-        metrics = fund_data.get("metrics", {})
-        analyst_ratings = fund_data.get("analyst_ratings", {})
+        # Extract metrics from nested data_sources structure
+        data_sources = fund_data.get("data_sources", {})
+        metrics = data_sources.get("metrics", {})
+        analyst_data = data_sources.get("analyst", {})
+
+        # Extract metrics from nested structure
+        valuation = metrics.get("valuation", {})
+        profitability = metrics.get("profitability", {})
+        financial_health = metrics.get("financial_health", {})
+        growth = metrics.get("growth", {})
 
         fundamental_metrics = FundamentalMetrics(
-            pe_ratio=metrics.get("pe_ratio"),
-            pb_ratio=metrics.get("pb_ratio"),
-            ps_ratio=metrics.get("ps_ratio"),
-            peg_ratio=metrics.get("peg_ratio"),
-            ev_ebitda=metrics.get("ev_ebitda"),
-            profit_margin=metrics.get("profit_margin"),
-            operating_margin=metrics.get("operating_margin"),
-            roe=metrics.get("roe"),
-            roa=metrics.get("roa"),
-            debt_to_equity=metrics.get("debt_to_equity"),
-            current_ratio=metrics.get("current_ratio"),
-            revenue_growth=metrics.get("revenue_growth"),
-            earnings_growth=metrics.get("earnings_growth"),
+            pe_ratio=valuation.get("trailing_pe") or valuation.get("forward_pe"),
+            pb_ratio=valuation.get("price_to_book"),
+            ps_ratio=valuation.get("price_to_sales"),
+            peg_ratio=valuation.get("peg_ratio"),
+            ev_ebitda=valuation.get("enterprise_to_ebitda"),
+            profit_margin=profitability.get("profit_margin"),
+            operating_margin=profitability.get("operating_margin"),
+            roe=profitability.get("return_on_equity"),
+            roa=profitability.get("return_on_assets"),
+            debt_to_equity=financial_health.get("debt_to_equity"),
+            current_ratio=financial_health.get("current_ratio"),
+            revenue_growth=growth.get("revenue_growth"),
+            earnings_growth=growth.get("earnings_growth"),
         )
 
         analyst_info = None
-        if analyst_ratings:
+        if analyst_data:
             analyst_info = AnalystInfo(
-                num_analysts=analyst_ratings.get("num_analysts"),
-                consensus_rating=analyst_ratings.get("consensus_rating"),
-                strong_buy=analyst_ratings.get("strong_buy"),
-                buy=analyst_ratings.get("buy"),
-                hold=analyst_ratings.get("hold"),
-                sell=analyst_ratings.get("sell"),
-                strong_sell=analyst_ratings.get("strong_sell"),
-                price_target=analyst_ratings.get("price_target"),
-                price_target_high=analyst_ratings.get("price_target_high"),
-                price_target_low=analyst_ratings.get("price_target_low"),
+                num_analysts=analyst_data.get("total_analysts"),
+                consensus_rating=analyst_data.get("consensus_rating"),
+                strong_buy=analyst_data.get("strong_buy"),
+                buy=analyst_data.get("buy"),
+                hold=analyst_data.get("hold"),
+                sell=analyst_data.get("sell"),
+                strong_sell=analyst_data.get("strong_sell"),
+                price_target=analyst_data.get("price_target"),
+                price_target_high=analyst_data.get("price_target_high"),
+                price_target_low=analyst_data.get("price_target_low"),
             )
 
         return AnalysisComponentResult(

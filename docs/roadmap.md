@@ -2608,6 +2608,20 @@ torch = "^2.1.0"  # Required by transformers
 2. `feat(analysis): add configurable technical indicators with pandas-ta`
 3. `feat(data): add unified news aggregator with source prioritization`
 4. `feat(sentiment): add local FinBERT sentiment scoring with hybrid modes`
+5. `fix(tools): add column name mapping for CSV price data compatibility` (December 8, 2025)
+
+**Critical Fix** (December 8, 2025):
+After migrating from JSON to CSV storage, a column naming mismatch was discovered where:
+- **CSV storage** uses standard pandas column names: `close`, `open`, `high`, `low`, `volume`
+- **Legacy code** expected StockPrice model format: `close_price`, `open_price`, `high_price`, `low_price`
+
+This caused `'close_price' KeyError` when scanning instruments. The fix adds automatic column name mapping in `PriceFetcherTool._fetch_with_unified_storage()` to convert DataFrame records to legacy format, ensuring backward compatibility with existing agents (scanner, analysis tools).
+
+**Files Modified**:
+- `src/tools/fetchers.py` - Added column name mapping when converting DataFrame to dict records
+  - Maps `close` → `close_price`, `open` → `open_price`, `high` → `high_price`, `low` → `low_price`
+  - Preserves optional fields (`adj_close`, `currency`)
+  - Ensures compatibility with MarketScannerAgent and other tools expecting legacy format
 
 ---
 

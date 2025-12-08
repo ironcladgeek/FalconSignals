@@ -1,12 +1,16 @@
 """Data fetching tools for agents."""
 
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
+
+import pandas as pd
 
 from src.cache.manager import CacheManager
 from src.config import get_config
+from src.data.price_manager import PriceDataManager
 from src.data.provider_manager import ProviderManager
 from src.data.providers import DataProviderFactory
+from src.sentiment.analyzer import ConfigurableSentimentAnalyzer
 from src.tools.base import BaseTool
 from src.utils.logging import get_logger
 
@@ -14,13 +18,14 @@ logger = get_logger(__name__)
 
 
 class PriceFetcherTool(BaseTool):
-    """Tool for fetching stock price data."""
+    """Tool for fetching stock price data with unified CSV storage."""
 
     def __init__(
         self,
         cache_manager: CacheManager = None,
         provider_name: str = None,
         fixture_path: str = None,
+        use_unified_storage: bool = True,
     ):
         """Initialize price fetcher.
 
@@ -28,6 +33,7 @@ class PriceFetcherTool(BaseTool):
             cache_manager: Optional cache manager for caching prices
             provider_name: Data provider to use (default: yahoo_finance, or 'fixture' for test mode)
             fixture_path: Path to fixture directory (required if provider_name is 'fixture')
+            use_unified_storage: Use unified CSV storage (PriceDataManager)
         """
         super().__init__(
             name="PriceFetcher",
@@ -41,6 +47,10 @@ class PriceFetcherTool(BaseTool):
         self.provider_name = provider_name or "yahoo_finance"
         self.fixture_path = fixture_path
         self.historical_date = None  # Track historical date for backtesting
+        self.use_unified_storage = use_unified_storage
+
+        # Initialize unified price manager
+        self._price_manager: Optional[PriceDataManager] = None
 
         # Create provider with fixture path if needed
         if self.provider_name == "fixture" and fixture_path:
@@ -49,6 +59,13 @@ class PriceFetcherTool(BaseTool):
             )
         else:
             self.provider = DataProviderFactory.create(self.provider_name)
+
+    @property
+    def price_manager(self) -> PriceDataManager:
+        """Get or create price manager."""
+        if self._price_manager is None:
+            self._price_manager = PriceDataManager()
+        return self._price_manager
 
     def set_historical_date(self, historical_date):
         """Set historical date for backtesting.
@@ -66,7 +83,7 @@ class PriceFetcherTool(BaseTool):
         end_date: datetime = None,
         days_back: int = 30,
     ) -> dict[str, Any]:
-        """Fetch price data for ticker.
+        """Fetch price data for ticker using unified CSV storage.
 
         Args:
             ticker: Stock ticker symbol
@@ -89,49 +106,172 @@ class PriceFetcherTool(BaseTool):
             if start_date is None:
                 start_date = end_date - timedelta(days=days_back)
 
-            # Check cache first
-            # Use consistent cache key format: prices:<ticker>:<start_date>:<end_date>
-            cache_key = (
-                f"prices:{ticker}:{start_date.strftime('%Y-%m-%d')}:{end_date.strftime('%Y-%m-%d')}"
-            )
-            cached = self.cache_manager.get(cache_key)
-            if cached:
-                logger.debug(f"Cache hit for {ticker} prices")
-                return cached
+            # Convert to date objects for price manager
+            start_d = start_date.date() if isinstance(start_date, datetime) else start_date
+            end_d = end_date.date() if isinstance(end_date, datetime) else end_date
 
-            # Fetch from provider
-            logger.debug(f"Fetching prices for {ticker}")
-            prices = self.provider.get_stock_prices(ticker, start_date, end_date)
-
-            if not prices:
-                return {
-                    "ticker": ticker,
-                    "prices": [],
-                    "count": 0,
-                    "error": f"No price data found for {ticker}",
-                }
-
-            # Cache results
-            result = {
-                "ticker": ticker,
-                "prices": [p.model_dump() for p in prices],
-                "count": len(prices),
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "latest_price": prices[-1].close_price,
-            }
-            self.cache_manager.set(cache_key, result, ttl_hours=24)
-
-            return result
+            # Use unified CSV storage if enabled
+            if self.use_unified_storage:
+                return self._fetch_with_unified_storage(ticker, start_d, end_d)
+            else:
+                return self._fetch_with_legacy_cache(ticker, start_date, end_date)
 
         except Exception as e:
-            logger.debug(f"Error fetching prices for {ticker}: {e}")
+            logger.error(f"Error fetching prices for {ticker}: {e}")
             return {
                 "ticker": ticker,
                 "prices": [],
                 "count": 0,
                 "error": str(e),
             }
+
+    def _fetch_with_unified_storage(
+        self,
+        ticker: str,
+        start_date: date,
+        end_date: date,
+    ) -> dict[str, Any]:
+        """Fetch prices using unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date
+            end_date: End date
+
+        Returns:
+            Dictionary with prices and metadata
+        """
+        pm = self.price_manager
+
+        # Check if we need to fetch new data
+        existing_start, existing_end = pm.get_data_range(ticker)
+
+        needs_fetch = False
+        if existing_start is None or existing_end is None:
+            needs_fetch = True
+            logger.debug(f"No existing price data for {ticker}, fetching fresh")
+        elif existing_end < end_date:
+            needs_fetch = True
+            logger.debug(f"Updating {ticker} prices: {existing_end} -> {end_date}")
+        elif existing_start > start_date:
+            needs_fetch = True
+            logger.debug(f"Backfilling {ticker} prices: {start_date} -> {existing_start}")
+
+        if needs_fetch:
+            # Fetch from provider
+            fetch_start = start_date
+            if existing_start and existing_start < start_date:
+                fetch_start = existing_end + timedelta(days=1)  # Only fetch new
+
+            fetch_end = end_date
+
+            logger.debug(f"Fetching {ticker} prices: {fetch_start} -> {fetch_end}")
+            prices = self.provider.get_stock_prices(
+                ticker,
+                datetime.combine(fetch_start, datetime.min.time()),
+                datetime.combine(fetch_end, datetime.max.time()),
+            )
+
+            if prices:
+                # Store in unified CSV
+                price_dicts = [p.model_dump() for p in prices]
+                pm.store_prices(ticker, price_dicts, append=True)
+                logger.info(f"Stored {len(prices)} prices for {ticker} in unified CSV")
+
+        # Read from unified storage
+        df = pm.get_prices(ticker, start_date=start_date, end_date=end_date)
+
+        if df.empty:
+            return {
+                "ticker": ticker,
+                "prices": [],
+                "count": 0,
+                "error": f"No price data found for {ticker}",
+            }
+
+        # Convert DataFrame to list of dicts with legacy column names for compatibility
+        prices_list = []
+        for _, row in df.iterrows():
+            price_dict = {
+                "close_price": row["close"],
+                "open_price": row["open"],
+                "high_price": row["high"],
+                "low_price": row["low"],
+                "volume": row["volume"],
+                "date": row["date"],
+            }
+            # Include optional fields if present
+            if "adj_close" in row and pd.notna(row["adj_close"]):
+                price_dict["adjusted_close"] = row["adj_close"]
+            if "currency" in row and pd.notna(row["currency"]):
+                price_dict["currency"] = row["currency"]
+
+            prices_list.append(price_dict)
+
+        # Get latest price
+        latest = pm.get_latest_price(ticker)
+        latest_price = latest["close"] if latest else None
+
+        return {
+            "ticker": ticker,
+            "prices": prices_list,
+            "count": len(prices_list),
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "latest_price": latest_price,
+            "storage": "unified_csv",
+        }
+
+    def _fetch_with_legacy_cache(
+        self,
+        ticker: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> dict[str, Any]:
+        """Fetch prices using legacy JSON cache (backward compatibility).
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date
+            end_date: End date
+
+        Returns:
+            Dictionary with prices and metadata
+        """
+        # Check cache first
+        cache_key = (
+            f"prices:{ticker}:{start_date.strftime('%Y-%m-%d')}:{end_date.strftime('%Y-%m-%d')}"
+        )
+        cached = self.cache_manager.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for {ticker} prices")
+            return cached
+
+        # Fetch from provider
+        logger.debug(f"Fetching prices for {ticker}")
+        prices = self.provider.get_stock_prices(ticker, start_date, end_date)
+
+        if not prices:
+            return {
+                "ticker": ticker,
+                "prices": [],
+                "count": 0,
+                "error": f"No price data found for {ticker}",
+            }
+
+        # Cache results
+        result = {
+            "ticker": ticker,
+            "prices": [p.model_dump() for p in prices],
+            "count": len(prices),
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "latest_price": prices[-1].close_price,
+            "storage": "legacy_json",
+        }
+        self.cache_manager.set(cache_key, result, ttl_hours=24)
+
+        return result
 
     def get_latest(self, ticker: str) -> dict[str, Any]:
         """Get latest price for ticker.
@@ -669,30 +809,52 @@ class FinancialDataFetcherTool(BaseTool):
 
 
 class NewsFetcherTool(BaseTool):
-    """Tool for fetching news articles with sentiment using Alpha Vantage primary."""
+    """Tool for fetching news articles with local FinBERT sentiment scoring."""
 
-    def __init__(self, cache_manager: CacheManager = None):
+    def __init__(
+        self,
+        cache_manager: CacheManager = None,
+        use_local_sentiment: bool = True,
+    ):
         """Initialize news fetcher.
 
         Args:
             cache_manager: Optional cache manager for caching news
+            use_local_sentiment: Use local FinBERT for sentiment scoring (more accurate)
         """
         super().__init__(
             name="NewsFetcher",
             description=(
-                "Fetch recent news articles with sentiment analysis using Alpha Vantage. "
+                "Fetch recent news articles with local FinBERT sentiment analysis. "
                 "Input: ticker symbol. "
-                "Output: List of news articles with sentiment scores and topics."
+                "Output: List of news articles with accurate sentiment scores."
             ),
         )
         self.cache_manager = cache_manager or CacheManager()
+        self.use_local_sentiment = use_local_sentiment
 
-        # Use Alpha Vantage Premium for news sentiment
+        # Use Alpha Vantage Premium for news content
         self.provider_manager = ProviderManager(
             primary_provider="alpha_vantage",
-            backup_providers=[],  # No backup for news - Alpha Vantage Premium only
+            backup_providers=["finnhub"],
         )
         self.historical_date = None  # Track historical date for backtesting
+
+        # Lazy-load sentiment analyzer
+        self._sentiment_analyzer = None
+
+    @property
+    def sentiment_analyzer(self):
+        """Get or create sentiment analyzer (lazy initialization)."""
+        if self._sentiment_analyzer is None:
+            try:
+                config = get_config()
+                sentiment_config = config.data.sentiment if config.data.sentiment else None
+                self._sentiment_analyzer = ConfigurableSentimentAnalyzer(sentiment_config)
+            except Exception as e:
+                logger.warning(f"Could not initialize sentiment analyzer: {e}")
+                self._sentiment_analyzer = None
+        return self._sentiment_analyzer
 
     def set_historical_date(self, historical_date):
         """Set historical date for backtesting.
@@ -744,8 +906,8 @@ class NewsFetcherTool(BaseTool):
                 logger.debug(f"Cache hit for {ticker} news")
                 return cached
 
-            # Fetch news using Alpha Vantage Premium
-            logger.debug(f"Fetching news with sentiment for {ticker}")
+            # Fetch news from provider
+            logger.debug(f"Fetching news for {ticker}")
             articles = self.provider_manager.get_news(ticker, limit, as_of_date=as_of_date)
 
             if not articles:
@@ -754,30 +916,45 @@ class NewsFetcherTool(BaseTool):
                     "articles": [],
                     "count": 0,
                     "sentiment_summary": None,
+                    "scoring_method": "none",
                 }
+
+            # Apply local FinBERT sentiment scoring (more accurate than API sentiment)
+            scoring_method = "api_provider"
+            if self.use_local_sentiment and self.sentiment_analyzer:
+                try:
+                    logger.info(f"Applying FinBERT sentiment to {len(articles)} articles")
+                    sentiment_result = self.sentiment_analyzer.analyze_sentiment(
+                        articles, method="local"
+                    )
+                    scoring_method = sentiment_result.get("method", "local_finbert")
+                    # Articles are updated in-place by the analyzer
+                    logger.info(f"Sentiment scoring complete using {scoring_method}")
+                except Exception as e:
+                    logger.warning(f"Local sentiment scoring failed, using API scores: {e}")
+                    scoring_method = "api_provider_fallback"
 
             # Calculate date range from articles for cache key
             cache_key = simple_cache_key  # Default
-            if articles:
-                article_dates = []
-                for article in articles:
-                    pub_date_str = article.published_date
-                    if isinstance(pub_date_str, str):
-                        # Extract date portion (YYYY-MM-DD)
-                        date_part = (
-                            pub_date_str.split()[0] if " " in pub_date_str else pub_date_str[:10]
-                        )
-                        article_dates.append(date_part)
-                    elif isinstance(pub_date_str, datetime):
-                        article_dates.append(pub_date_str.strftime("%Y-%m-%d"))
+            article_dates = []
+            for article in articles:
+                pub_date_str = article.published_date
+                if isinstance(pub_date_str, str):
+                    # Extract date portion (YYYY-MM-DD)
+                    date_part = (
+                        pub_date_str.split()[0] if " " in pub_date_str else pub_date_str[:10]
+                    )
+                    article_dates.append(date_part)
+                elif isinstance(pub_date_str, datetime):
+                    article_dates.append(pub_date_str.strftime("%Y-%m-%d"))
 
-                if article_dates:
-                    min_date = min(article_dates)
-                    max_date = max(article_dates)
-                    cache_key = f"news_sentiment:{ticker}:{min_date}:{max_date}"
-                    logger.debug(f"News date range for {ticker}: {min_date} to {max_date}")
+            if article_dates:
+                min_date = min(article_dates)
+                max_date = max(article_dates)
+                cache_key = f"news_finbert:{ticker}:{min_date}:{max_date}"
+                logger.debug(f"News date range for {ticker}: {min_date} to {max_date}")
 
-            # Calculate sentiment summary
+            # Calculate sentiment summary from (now FinBERT-scored) articles
             positive = sum(1 for a in articles if a.sentiment == "positive")
             negative = sum(1 for a in articles if a.sentiment == "negative")
             neutral = sum(1 for a in articles if a.sentiment == "neutral")
@@ -803,6 +980,7 @@ class NewsFetcherTool(BaseTool):
                     if avg_sentiment < -0.1
                     else "neutral"
                 ),
+                "scoring_method": scoring_method,
             }
 
             result = {
@@ -810,6 +988,7 @@ class NewsFetcherTool(BaseTool):
                 "articles": [a.model_dump() for a in articles],
                 "count": len(articles),
                 "sentiment_summary": sentiment_summary,
+                "scoring_method": scoring_method,
                 "timestamp": datetime.now().isoformat(),
             }
 
