@@ -449,23 +449,66 @@ class AlphaVantageProvider(DataProvider):
                 logger.warning(f"No company data available for {ticker}")
                 return None
 
-            # Extract key information
+            # Extract comprehensive fundamental data from OVERVIEW
             return {
+                # Basic info
                 "ticker": data.get("Symbol", ticker),
                 "name": data.get("Name", ""),
                 "description": data.get("Description", ""),
                 "sector": data.get("Sector", ""),
                 "industry": data.get("Industry", ""),
+                "currency": data.get("Currency", "USD"),
+                "exchange": data.get("Exchange", ""),
+                # Valuation metrics
                 "market_cap": self._safe_float(data.get("MarketCapitalization")),
                 "pe_ratio": self._safe_float(data.get("PERatio")),
-                "dividend_yield": self._safe_float(data.get("DividendYield")),
+                "trailing_pe": self._safe_float(data.get("TrailingPE")),
+                "forward_pe": self._safe_float(data.get("ForwardPE")),
+                "peg_ratio": self._safe_float(data.get("PEGRatio")),
+                "price_to_book": self._safe_float(data.get("PriceToBookRatio")),
+                "price_to_sales": self._safe_float(data.get("PriceToSalesRatioTTM")),
+                "ev_to_revenue": self._safe_float(data.get("EVToRevenue")),
+                "ev_to_ebitda": self._safe_float(data.get("EVToEBITDA")),
+                "book_value": self._safe_float(data.get("BookValue")),
+                # Profitability metrics
                 "eps": self._safe_float(data.get("EPS")),
+                "diluted_eps_ttm": self._safe_float(data.get("DilutedEPSTTM")),
+                "revenue_per_share_ttm": self._safe_float(data.get("RevenuePerShareTTM")),
+                "profit_margin": self._safe_float(data.get("ProfitMargin")),
+                "operating_margin": self._safe_float(data.get("OperatingMarginTTM")),
+                "return_on_assets": self._safe_float(data.get("ReturnOnAssetsTTM")),
+                "return_on_equity": self._safe_float(data.get("ReturnOnEquityTTM")),
+                "revenue_ttm": self._safe_float(data.get("RevenueTTM")),
+                "gross_profit_ttm": self._safe_float(data.get("GrossProfitTTM")),
+                "ebitda": self._safe_float(data.get("EBITDA")),
+                # Growth metrics
+                "quarterly_earnings_growth_yoy": self._safe_float(
+                    data.get("QuarterlyEarningsGrowthYOY")
+                ),
+                "quarterly_revenue_growth_yoy": self._safe_float(
+                    data.get("QuarterlyRevenueGrowthYOY")
+                ),
+                # Dividend info
+                "dividend_per_share": self._safe_float(data.get("DividendPerShare")),
+                "dividend_yield": self._safe_float(data.get("DividendYield")),
+                # Analyst info
+                "analyst_target_price": self._safe_float(data.get("AnalystTargetPrice")),
+                "analyst_rating_strong_buy": self._safe_int(data.get("AnalystRatingStrongBuy")),
+                "analyst_rating_buy": self._safe_int(data.get("AnalystRatingBuy")),
+                "analyst_rating_hold": self._safe_int(data.get("AnalystRatingHold")),
+                "analyst_rating_sell": self._safe_int(data.get("AnalystRatingSell")),
+                "analyst_rating_strong_sell": self._safe_int(data.get("AnalystRatingStrongSell")),
+                # Risk/Volatility
                 "beta": self._safe_float(data.get("Beta"), default=1.0),
                 "52_week_high": self._safe_float(data.get("52WeekHigh")),
                 "52_week_low": self._safe_float(data.get("52WeekLow")),
-                "analyst_target_price": self._safe_float(data.get("AnalystTargetPrice")),
-                "currency": data.get("Currency", "USD"),
-                "exchange": data.get("Exchange", ""),
+                "50_day_moving_average": self._safe_float(data.get("50DayMovingAverage")),
+                "200_day_moving_average": self._safe_float(data.get("200DayMovingAverage")),
+                # Shares info
+                "shares_outstanding": self._safe_float(data.get("SharesOutstanding")),
+                "shares_float": self._safe_float(data.get("SharesFloat")),
+                "percent_insiders": self._safe_float(data.get("PercentInsiders")),
+                "percent_institutions": self._safe_float(data.get("PercentInstitutions")),
             }
 
         except ValueError:
@@ -640,6 +683,24 @@ class AlphaVantageProvider(DataProvider):
             return default
         try:
             return float(value)
+        except (ValueError, TypeError):
+            return default
+
+    @staticmethod
+    def _safe_int(value: str | None, default: int | None = None) -> int | None:
+        """Safely convert string to int, handling None and 'None' strings.
+
+        Args:
+            value: String value to convert
+            default: Default value if conversion fails
+
+        Returns:
+            Int value or default
+        """
+        if value is None or value == "" or value == "None" or value == "-":
+            return default
+        try:
+            return int(value)
         except (ValueError, TypeError):
             return default
 

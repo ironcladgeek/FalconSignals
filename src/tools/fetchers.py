@@ -329,8 +329,14 @@ class FinancialDataFetcherTool(BaseTool):
             # Fetch price context for momentum
             price_context = self._get_price_context(ticker)
 
-            # Fetch yfinance metrics
-            metrics = self._get_yfinance_metrics(ticker)
+            # Extract metrics from Alpha Vantage company_info (primary) with yfinance fallback
+            metrics = self._extract_metrics_from_company_info(company_info)
+            if not self._has_valid_metrics(metrics):
+                logger.debug(
+                    f"Alpha Vantage metrics incomplete for {ticker}, using yfinance fallback"
+                )
+                yfinance_metrics = self._get_yfinance_metrics(ticker)
+                metrics = self._merge_metrics(metrics, yfinance_metrics)
 
             # Determine data availability
             available_sources = []
@@ -534,6 +540,132 @@ class FinancialDataFetcherTool(BaseTool):
         except Exception as e:
             logger.debug(f"Error getting yfinance metrics for {ticker}: {e}")
             return {}
+
+    def _extract_metrics_from_company_info(self, company_info: dict | None) -> dict[str, Any]:
+        """Extract fundamental metrics from Alpha Vantage company info (OVERVIEW endpoint).
+
+        Args:
+            company_info: Dictionary from Alpha Vantage get_company_info()
+
+        Returns:
+            Dictionary with valuation, profitability, financial health, and growth metrics
+        """
+        if not company_info:
+            return {}
+
+        # Extract valuation metrics from Alpha Vantage OVERVIEW
+        valuation = {}
+        if company_info.get("trailing_pe"):
+            valuation["trailing_pe"] = company_info["trailing_pe"]
+        if company_info.get("forward_pe"):
+            valuation["forward_pe"] = company_info["forward_pe"]
+        if company_info.get("price_to_book"):
+            valuation["price_to_book"] = company_info["price_to_book"]
+        if company_info.get("price_to_sales"):
+            valuation["price_to_sales"] = company_info["price_to_sales"]
+        if company_info.get("peg_ratio"):
+            valuation["peg_ratio"] = company_info["peg_ratio"]
+        if company_info.get("ev_to_revenue"):
+            valuation["enterprise_to_revenue"] = company_info["ev_to_revenue"]
+        if company_info.get("ev_to_ebitda"):
+            valuation["enterprise_to_ebitda"] = company_info["ev_to_ebitda"]
+        if company_info.get("book_value"):
+            valuation["book_value"] = company_info["book_value"]
+
+        # Extract profitability metrics
+        profitability = {}
+        if company_info.get("profit_margin"):
+            profitability["profit_margin"] = company_info["profit_margin"]
+        if company_info.get("operating_margin"):
+            profitability["operating_margin"] = company_info["operating_margin"]
+        if company_info.get("return_on_equity"):
+            profitability["return_on_equity"] = company_info["return_on_equity"]
+        if company_info.get("return_on_assets"):
+            profitability["return_on_assets"] = company_info["return_on_assets"]
+        if company_info.get("eps"):
+            profitability["trailing_eps"] = company_info["eps"]
+        if company_info.get("diluted_eps_ttm"):
+            profitability["diluted_eps_ttm"] = company_info["diluted_eps_ttm"]
+        if company_info.get("revenue_ttm"):
+            profitability["revenue_ttm"] = company_info["revenue_ttm"]
+        if company_info.get("gross_profit_ttm"):
+            profitability["gross_profit_ttm"] = company_info["gross_profit_ttm"]
+        if company_info.get("ebitda"):
+            profitability["ebitda"] = company_info["ebitda"]
+
+        # Note: Alpha Vantage OVERVIEW doesn't include financial health metrics like
+        # debt_to_equity, current_ratio, free_cashflow - these come from yfinance
+        financial_health = {}
+
+        # Extract growth metrics
+        growth = {}
+        if company_info.get("quarterly_earnings_growth_yoy"):
+            growth["earnings_growth"] = company_info["quarterly_earnings_growth_yoy"]
+            growth["earnings_quarterly_growth"] = company_info["quarterly_earnings_growth_yoy"]
+        if company_info.get("quarterly_revenue_growth_yoy"):
+            growth["revenue_growth"] = company_info["quarterly_revenue_growth_yoy"]
+
+        return {
+            "valuation": valuation,
+            "profitability": profitability,
+            "financial_health": financial_health,
+            "growth": growth,
+            "data_source": "Alpha Vantage",
+        }
+
+    def _has_valid_metrics(self, metrics: dict) -> bool:
+        """Check if metrics dictionary has enough valid data.
+
+        Args:
+            metrics: Metrics dictionary
+
+        Returns:
+            True if metrics have at least 3 valid valuation fields
+        """
+        if not metrics:
+            return False
+        valuation = metrics.get("valuation", {})
+        # Consider valid if we have at least P/E, P/B, and one other metric
+        key_metrics = ["trailing_pe", "price_to_book", "peg_ratio", "ev_to_ebitda"]
+        valid_count = sum(1 for k in key_metrics if valuation.get(k) is not None)
+        return valid_count >= 2
+
+    def _merge_metrics(self, primary: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
+        """Merge two metrics dictionaries, preferring primary values.
+
+        Args:
+            primary: Primary metrics (Alpha Vantage)
+            fallback: Fallback metrics (yfinance)
+
+        Returns:
+            Merged metrics dictionary
+        """
+        if not fallback:
+            return primary
+        if not primary:
+            return fallback
+
+        merged = {}
+        for category in ["valuation", "profitability", "financial_health", "growth"]:
+            primary_cat = primary.get(category, {})
+            fallback_cat = fallback.get(category, {})
+
+            # Start with fallback, then override with primary (non-None values)
+            merged_cat = dict(fallback_cat)
+            for key, value in primary_cat.items():
+                if value is not None:
+                    merged_cat[key] = value
+
+            if merged_cat:
+                merged[category] = merged_cat
+
+        # Use Alpha Vantage as primary data source if it contributed
+        if primary.get("valuation") or primary.get("profitability"):
+            merged["data_source"] = "Alpha Vantage (primary) + Yahoo Finance (fallback)"
+        else:
+            merged["data_source"] = "Yahoo Finance"
+
+        return merged
 
 
 class NewsFetcherTool(BaseTool):
