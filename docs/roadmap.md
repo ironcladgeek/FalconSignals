@@ -2609,8 +2609,9 @@ torch = "^2.1.0"  # Required by transformers
 3. `feat(data): add unified news aggregator with source prioritization`
 4. `feat(sentiment): add local FinBERT sentiment scoring with hybrid modes`
 5. `fix(tools): add column name mapping for CSV price data compatibility` (December 8, 2025)
+6. `fix(analysis): fix metadata extraction in reports - technical indicators & fundamental metrics` (December 8, 2025)
 
-**Critical Fix** (December 8, 2025):
+**Critical Fix #1** (December 8, 2025):
 After migrating from JSON to CSV storage, a column naming mismatch was discovered where:
 - **CSV storage** uses standard pandas column names: `close`, `open`, `high`, `low`, `volume`
 - **Legacy code** expected StockPrice model format: `close_price`, `open_price`, `high_price`, `low_price`
@@ -2622,6 +2623,57 @@ This caused `'close_price' KeyError` when scanning instruments. The fix adds aut
   - Maps `close` → `close_price`, `open` → `open_price`, `high` → `high_price`, `low` → `low_price`
   - Preserves optional fields (`adj_close`, `currency`)
   - Ensures compatibility with MarketScannerAgent and other tools expecting legacy format
+
+**Critical Fix #2** (December 8, 2025):
+After CSV migration, technical indicators and fundamental metrics were not appearing in generated reports or being saved to database. Investigation revealed multiple issues:
+
+**Root Causes**:
+1. Config required 200 periods minimum but many stocks have <50 days of historical data
+2. Normalizer expected flat metrics dict but FundamentalAnalysisAgent returns nested structure:
+   - Agent: `{"data_sources": {"metrics": {"valuation": {...}, "profitability": {...}}}}`
+   - Normalizer: Expected `{"metrics": {"pe_ratio": ...}}`
+3. No error handling when TechnicalIndicatorTool fails due to insufficient data
+4. Analyst data field name mismatch: `total_analysts` vs expected `num_analysts`
+
+**Solutions Implemented**:
+1. **Config Changes** (`config/default.yaml`, `config/local.yaml`):
+   - Lowered `min_periods_required` from 200 → 30 periods to support newer stocks
+   - Disabled SMA-50 and SMA-200 (require 50/200 periods) - now only use SMA-20, MACD, RSI, ATR
+   - Updated comments to explain period requirements
+
+2. **Normalizer Fixes** (`src/analysis/normalizer.py`):
+   - Added error handling in `_extract_technical_rule_based()` to detect `status: error` cases
+   - Fixed `_extract_fundamental_rule_based()` to navigate nested metrics structure:
+     ```python
+     # Extract from nested structure
+     valuation = metrics.get("valuation", {})
+     profitability = metrics.get("profitability", {})
+     growth = metrics.get("growth", {})
+
+     # Map to flat FundamentalMetrics model
+     pe_ratio = valuation.get("trailing_pe") or valuation.get("forward_pe")
+     profit_margin = profitability.get("profit_margin")
+     revenue_growth = growth.get("revenue_growth")
+     ```
+   - Fixed analyst data extraction: `total_analysts` → `num_analysts`
+   - Added warning logs when technical analysis fails
+
+**Results**:
+- ✅ Technical Indicators table now populated: MACD (10.17/7.82), SMA-20 ($188.99), ATR ($5.67)
+- ✅ Fundamental Metrics table now populated: P/E (42.01), P/B (6.13), margins (15.7%), ROE (15.8%), growth rates
+- ✅ Analyst Ratings table enhanced: Shows analyst count (20) and distribution (4/11/5)
+- ✅ All metadata correctly persists to database
+- ✅ System now supports stocks with limited historical data (30+ days vs previous 200+ requirement)
+
+**Files Modified**:
+- `config/default.yaml` - Lower min_periods, disable SMA-50/200
+- `config/local.yaml` - Match default.yaml changes
+- `src/analysis/normalizer.py` - Error handling + nested metrics extraction + analyst field mapping
+
+**Testing**:
+- Tested with KEYS ticker (42 days of data)
+- Verified all 4 metadata sections display correctly in reports
+- Confirmed data persists to database via repository layer
 
 ---
 
