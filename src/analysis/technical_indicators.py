@@ -291,6 +291,55 @@ class ConfigurableTechnicalAnalyzer:
                         "d": float(result[d_col].iloc[-1]),
                     }
 
+            elif name == "ichimoku":
+                result = ta.ichimoku(
+                    df["high"],
+                    df["low"],
+                    df["close"],
+                    tenkan=params.get("tenkan", 9),
+                    kijun=params.get("kijun", 26),
+                    senkou=params.get("senkou", 52),
+                )
+                if result is not None and isinstance(result, tuple) and len(result) == 2:
+                    # Ichimoku returns (df, span_b_periods)
+                    ichimoku_df = result[0]
+                    if ichimoku_df is not None and not ichimoku_df.empty:
+                        # Extract all Ichimoku components
+                        # Column names: ISA_9 (tenkan), ISB_26 (kijun), ITS_9 (chikou),
+                        # IKS_26 (senkou_a), ICS_26 (senkou_b)
+                        components = {}
+                        last_row = ichimoku_df.iloc[-1]
+
+                        for col in ichimoku_df.columns:
+                            value = last_row[col]
+                            # Skip NaN values (insufficient data)
+                            if pd.isna(value):
+                                continue
+
+                            col_lower = col.lower()
+                            if (
+                                col.startswith("ISA_") or "isa_" in col_lower
+                            ):  # Tenkan-sen (conversion line)
+                                components["tenkan"] = float(value)
+                            elif (
+                                col.startswith("ISB_") or "isb_" in col_lower
+                            ):  # Kijun-sen (base line)
+                                components["kijun"] = float(value)
+                            elif (
+                                col.startswith("ITS_") or "its_" in col_lower
+                            ):  # Chikou Span (lagging span)
+                                components["chikou"] = float(value)
+                            elif (
+                                col.startswith("IKS_") or "iks_" in col_lower
+                            ):  # Senkou Span A (leading span A)
+                                components["senkou_a"] = float(value)
+                            elif (
+                                col.startswith("ICS_") or "ics_" in col_lower
+                            ):  # Senkou Span B (leading span B)
+                                components["senkou_b"] = float(value)
+
+                        return components if components else None
+
             else:
                 # Try to call indicator dynamically
                 func = getattr(ta, name, None)

@@ -536,69 +536,14 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
         sections.append("| Indicator | Value |")
         sections.append("|-----------|-------|")
 
-        # Display technical indicators with configuration parameters
-        rsi_14 = getattr(tech, "rsi_14", None)
-        if rsi_14 is not None:
-            sections.append(f"| RSI (14) | {rsi_14:.2f} |")
+        # GENERIC DISPLAY: Automatically format all indicators from dynamic fields
+        # This works for ANY indicator without code changes!
+        indicator_rows = _format_technical_indicators_generic(tech)
+        sections.extend(indicator_rows)
 
-        # MACD with all 3 components
-        macd_line = getattr(tech, "macd_12_26_9_line", None)
-        macd_signal = getattr(tech, "macd_12_26_9_signal", None)
-        macd_histogram = getattr(tech, "macd_12_26_9_histogram", None)
-        if macd_line is not None and macd_signal is not None:
-            macd_display = f"{macd_line:.2f} / {macd_signal:.2f}"
-            if macd_histogram is not None:
-                macd_display += f" / {macd_histogram:.2f}"
-            sections.append(f"| MACD (12, 26, 9) | {macd_display} |")
-
-        # Bollinger Bands with all 3 bands
-        bb_upper = getattr(tech, "bbands_20_2_upper", None)
-        bb_middle = getattr(tech, "bbands_20_2_middle", None)
-        bb_lower = getattr(tech, "bbands_20_2_lower", None)
-        if bb_upper is not None and bb_middle is not None and bb_lower is not None:
-            sections.append(
-                f"| Bollinger Bands (20, 2.0) | ${bb_lower:.2f} / ${bb_middle:.2f} / ${bb_upper:.2f} |"
-            )
-
-        # SMAs
-        if tech.sma_20 is not None:
-            sections.append(f"| SMA (20) | ${tech.sma_20:.2f} |")
-        if tech.sma_50 is not None:
-            sections.append(f"| SMA (50) | ${tech.sma_50:.2f} |")
-        sma_200 = getattr(tech, "sma_200", None)
-        if sma_200 is not None:
-            sections.append(f"| SMA (200) | ${sma_200:.2f} |")
-
-        # EMAs
-        ema_12 = getattr(tech, "ema_12", None)
-        if ema_12 is not None:
-            sections.append(f"| EMA (12) | ${ema_12:.2f} |")
-        ema_26 = getattr(tech, "ema_26", None)
-        if ema_26 is not None:
-            sections.append(f"| EMA (26) | ${ema_26:.2f} |")
-
-        # ADX with directional movement
-        adx_14 = getattr(tech, "adx_14", None)
-        adx_14_dmp = getattr(tech, "adx_14_dmp", None)
-        adx_14_dmn = getattr(tech, "adx_14_dmn", None)
-        if adx_14 is not None:
-            adx_display = f"{adx_14:.2f}"
-            if adx_14_dmp is not None and adx_14_dmn is not None:
-                adx_display += f" (+DI: {adx_14_dmp:.2f}, -DI: {adx_14_dmn:.2f})"
-            sections.append(f"| ADX (14) | {adx_display} |")
-
-        # Stochastic Oscillator
-        stoch_k = getattr(tech, "stoch_14_3_k", None)
-        stoch_d = getattr(tech, "stoch_14_3_d", None)
-        if stoch_k is not None and stoch_d is not None:
-            sections.append(f"| Stochastic (14, 3) | %K: {stoch_k:.2f}, %D: {stoch_d:.2f} |")
-
-        # Volume and ATR
+        # Volume (special case - not a technical indicator)
         if tech.volume_avg is not None:
             sections.append(f"| Avg Volume (20d) | {tech.volume_avg:,} |")
-        atr_14 = getattr(tech, "atr_14", None)
-        if atr_14 is not None:
-            sections.append(f"| ATR (14) | ${atr_14:.2f} |")
 
         sections.append("")
 
@@ -706,3 +651,188 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
         sections.append("")
 
     return "\n".join(sections)
+
+
+def _format_technical_indicators_generic(tech: "TechnicalIndicators") -> list[str]:
+    """Format technical indicators using GENERIC approach.
+
+    This function automatically displays ANY indicator without code changes!
+    It works by:
+    1. Grouping fields by base indicator name (e.g., macd_12_26_9_*)
+    2. Detecting multi-component indicators (line/signal, upper/lower, etc.)
+    3. Formatting based on indicator type patterns
+
+    Adding Ichimoku Cloud or any new indicator requires ZERO code changes -
+    just add to config and this will display it!
+
+    Args:
+        tech: TechnicalIndicators model with dynamic fields
+
+    Returns:
+        List of markdown table rows
+    """
+    from collections import defaultdict
+
+    rows = []
+
+    # Get all field names except volume_avg (handled separately)
+    # Pydantic models with extra="allow" store extra fields in model_extra
+    all_fields = {}
+
+    # Get defined fields
+    for field_name in tech.model_fields.keys():
+        if field_name == "volume_avg":
+            continue
+        value = getattr(tech, field_name, None)
+        if value is not None and isinstance(value, (int, float)):
+            all_fields[field_name] = value
+
+    # Get extra fields (dynamically added indicators)
+    if hasattr(tech, "__pydantic_extra__") and tech.__pydantic_extra__:
+        for field_name, value in tech.__pydantic_extra__.items():
+            if value is not None and isinstance(value, (int, float)):
+                all_fields[field_name] = value
+
+    # Group fields by base indicator (e.g., macd_12_26_9_line/signal → macd_12_26_9)
+    indicator_groups = defaultdict(dict)
+    for field_name, value in all_fields.items():
+        # Try to split into base_indicator_component
+        # Pattern: indicator_params_component (e.g., macd_12_26_9_line, bbands_20_2_upper)
+        parts = field_name.rsplit("_", 1)
+        if len(parts) == 2:
+            base, component = parts
+            indicator_groups[base][component] = value
+        else:
+            # Simple indicator (e.g., rsi_14)
+            indicator_groups[field_name]["value"] = value
+
+    # Define display order and formatting rules
+    INDICATOR_ORDER = [
+        "rsi",
+        "macd",
+        "bbands",
+        "sma",
+        "ema",
+        "adx",
+        "stoch",
+        "atr",
+        "ichimoku",
+        "obv",
+        "cmf",
+        "vwap",  # Future-proof for common indicators
+    ]
+
+    # Sort indicators by predefined order (if defined), then alphabetically
+    def sort_key(item):
+        base_name = item[0]
+        # Extract indicator type (rsi, macd, etc.) from base_name
+        indicator_type = base_name.split("_")[0]
+        if indicator_type in INDICATOR_ORDER:
+            return (INDICATOR_ORDER.index(indicator_type), base_name)
+        return (len(INDICATOR_ORDER), base_name)
+
+    sorted_groups = sorted(indicator_groups.items(), key=sort_key)
+
+    # Format each indicator group
+    for base_name, components in sorted_groups:
+        indicator_type = base_name.split("_")[0]
+        params = "_".join(base_name.split("_")[1:])  # Extract parameters (14, 12_26_9, etc.)
+
+        # Detect indicator pattern and format accordingly
+        if "value" in components and len(components) == 1:
+            # Simple single-value indicator (RSI, SMA, EMA, ATR)
+            value = components["value"]
+            display_name = _format_indicator_name(indicator_type, params)
+
+            # Price-based indicators get $ formatting
+            if indicator_type in ["sma", "ema", "atr", "vwap"]:
+                rows.append(f"| {display_name} | ${value:.2f} |")
+            else:
+                rows.append(f"| {display_name} | {value:.2f} |")
+
+        elif "line" in components and "signal" in components:
+            # MACD-like indicators with line/signal/histogram
+            display_name = _format_indicator_name(indicator_type, params)
+            display_values = [f"{components['line']:.2f}", f"{components['signal']:.2f}"]
+            if "histogram" in components:
+                display_values.append(f"{components['histogram']:.2f}")
+            rows.append(f"| {display_name} | {' / '.join(display_values)} |")
+
+        elif "upper" in components and "lower" in components:
+            # Band indicators (Bollinger Bands, Ichimoku Senkou)
+            display_name = _format_indicator_name(indicator_type, params)
+            display_values = []
+            if "lower" in components:
+                display_values.append(f"${components['lower']:.2f}")
+            if "middle" in components:
+                display_values.append(f"${components['middle']:.2f}")
+            if "upper" in components:
+                display_values.append(f"${components['upper']:.2f}")
+            rows.append(f"| {display_name} | {' / '.join(display_values)} |")
+
+        elif indicator_type == "adx" and ("dmp" in components or "dmn" in components):
+            # ADX with directional movement
+            display_name = _format_indicator_name("adx", params)
+            # The main ADX value is stored without suffix (handled by flattening)
+            adx_val = components.get(base_name.split("_")[-1], components.get("value", 0))
+            display = f"{adx_val:.2f}"
+            if "dmp" in components and "dmn" in components:
+                display += f" (+DI: {components['dmp']:.2f}, -DI: {components['dmn']:.2f})"
+            rows.append(f"| {display_name} | {display} |")
+
+        elif indicator_type == "stoch" and "k" in components:
+            # Stochastic with %K and %D
+            display_name = _format_indicator_name("stoch", params)
+            display = f"%K: {components['k']:.2f}"
+            if "d" in components:
+                display += f", %D: {components['d']:.2f}"
+            rows.append(f"| {display_name} | {display} |")
+
+        else:
+            # Generic multi-component display (works for Ichimoku, future indicators)
+            display_name = _format_indicator_name(indicator_type, params)
+            component_strs = [f"{k}: {v:.2f}" for k, v in sorted(components.items())]
+            rows.append(f"| {display_name} | {', '.join(component_strs)} |")
+
+    return rows
+
+
+def _format_indicator_name(indicator_type: str, params: str) -> str:
+    """Format indicator display name with parameters in parentheses.
+
+    Examples:
+    - ("rsi", "14") → "RSI (14)"
+    - ("macd", "12_26_9") → "MACD (12, 26, 9)"
+    - ("bbands", "20_2") → "Bollinger Bands (20, 2.0)"
+    - ("ichimoku", "9_26_52") → "Ichimoku Cloud (9, 26, 52)"
+    """
+    # Indicator display names
+    DISPLAY_NAMES = {
+        "rsi": "RSI",
+        "macd": "MACD",
+        "bbands": "Bollinger Bands",
+        "sma": "SMA",
+        "ema": "EMA",
+        "adx": "ADX",
+        "stoch": "Stochastic",
+        "atr": "ATR",
+        "ichimoku": "Ichimoku Cloud",
+        "obv": "OBV",
+        "cmf": "CMF",
+        "vwap": "VWAP",
+    }
+
+    display_name = DISPLAY_NAMES.get(indicator_type, indicator_type.upper())
+
+    if params:
+        # Convert 12_26_9 → "12, 26, 9"
+        # Convert 20_2 → "20, 2.0" (special case for Bollinger Bands std dev)
+        param_parts = params.split("_")
+        if indicator_type == "bbands" and len(param_parts) == 2:
+            # Format std dev as decimal
+            formatted_params = f"{param_parts[0]}, {float(param_parts[1]):.1f}"
+        else:
+            formatted_params = ", ".join(param_parts)
+        return f"{display_name} ({formatted_params})"
+
+    return display_name

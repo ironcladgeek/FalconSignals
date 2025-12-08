@@ -729,7 +729,15 @@ class AnalysisResultNormalizer:
 
     @staticmethod
     def _extract_technical_rule_based(tech_data: dict[str, Any]) -> AnalysisComponentResult:
-        """Extract technical analysis component from rule-based output."""
+        """Extract technical analysis component from rule-based output.
+
+        This method uses a GENERIC approach that automatically handles any indicator
+        without requiring code changes. It flattens nested indicator outputs into
+        parameterized field names (e.g., macd_12_26_9_line, ichimoku_9_26_52_tenkan).
+
+        Adding new indicators (like Ichimoku Cloud) requires ZERO code changes here -
+        just add them to config/local.yaml!
+        """
         # Check for error status in technical analysis result
         if tech_data.get("status") == "error":
             error_msg = tech_data.get("message", "Unknown error in technical analysis")
@@ -744,84 +752,35 @@ class AnalysisResultNormalizer:
             )
 
         indicators = tech_data.get("indicators", {})
-
         components = tech_data.get("components", {})
 
-        # Build dynamic indicator fields with configuration parameters in names
+        # Build dynamic indicator fields using GENERIC flattening approach
         indicator_fields = {}
 
-        # Check if we have full_analysis with detailed indicators
+        # Check if we have full_analysis with detailed indicators from calculate_indicators()
         full_analysis = indicators.get("full_analysis", {})
         detailed_indicators = full_analysis.get("indicators", {})
 
-        # RSI - use rsi_14 format
-        if "rsi" in indicators:
-            indicator_fields["rsi_14"] = indicators["rsi"]
-        elif "rsi_14" in detailed_indicators:
-            rsi_data = detailed_indicators["rsi_14"]
-            if isinstance(rsi_data, dict):
-                indicator_fields["rsi_14"] = rsi_data.get("value")
-            else:
-                indicator_fields["rsi_14"] = rsi_data
+        # GENERIC EXTRACTION: Iterate through all calculated indicators
+        # This works for ANY indicator: RSI, MACD, BBands, Ichimoku, etc.
+        for indicator_key, indicator_value in detailed_indicators.items():
+            # Flatten the indicator output into parameterized fields
+            flattened = AnalysisResultNormalizer._flatten_indicator_output(
+                indicator_key, indicator_value
+            )
+            indicator_fields.update(flattened)
 
-        # MACD - use macd_12_26_9 format with line/signal/histogram
-        macd_data = indicators.get("macd") or detailed_indicators.get("macd")
-        if isinstance(macd_data, dict):
-            indicator_fields["macd_12_26_9_line"] = macd_data.get("line")
-            indicator_fields["macd_12_26_9_signal"] = macd_data.get("signal")
-            indicator_fields["macd_12_26_9_histogram"] = macd_data.get("histogram")
+        # LEGACY FALLBACK: Handle old flat structure (backwards compatibility)
+        # This ensures old data continues to work
+        if not indicator_fields and indicators:
+            indicator_fields = AnalysisResultNormalizer._extract_legacy_indicators(indicators)
 
-        # Bollinger Bands - use bbands_20_2 format with upper/middle/lower
-        bbands_data = indicators.get("bbands") or detailed_indicators.get("bbands_20")
-        if isinstance(bbands_data, dict):
-            indicator_fields["bbands_20_2_upper"] = bbands_data.get("upper")
-            indicator_fields["bbands_20_2_middle"] = bbands_data.get("middle")
-            indicator_fields["bbands_20_2_lower"] = bbands_data.get("lower")
-
-        # SMAs - already have period in name
-        for sma_key in ["sma_20", "sma_50", "sma_200"]:
-            if sma_key in indicators:
-                indicator_fields[sma_key] = indicators[sma_key]
-            elif sma_key in detailed_indicators:
-                sma_data = detailed_indicators[sma_key]
-                if isinstance(sma_data, dict):
-                    indicator_fields[sma_key] = sma_data.get("value")
-                else:
-                    indicator_fields[sma_key] = sma_data
-
-        # EMAs - extract from detailed_indicators
-        for ema_key in ["ema_12", "ema_26"]:
-            if ema_key in detailed_indicators:
-                ema_data = detailed_indicators[ema_key]
-                if isinstance(ema_data, dict):
-                    indicator_fields[ema_key] = ema_data.get("value")
-
-        # ADX - extract all components
-        if "adx_14" in detailed_indicators:
-            adx_data = detailed_indicators["adx_14"]
-            if isinstance(adx_data, dict):
-                indicator_fields["adx_14"] = adx_data.get("adx")
-                indicator_fields["adx_14_dmp"] = adx_data.get("dmp")  # Directional Movement Plus
-                indicator_fields["adx_14_dmn"] = adx_data.get("dmn")  # Directional Movement Minus
-
-        # Stochastic - extract k and d
-        if "stoch" in detailed_indicators:
-            stoch_data = detailed_indicators["stoch"]
-            if isinstance(stoch_data, dict):
-                indicator_fields["stoch_14_3_k"] = stoch_data.get("k")
-                indicator_fields["stoch_14_3_d"] = stoch_data.get("d")
-
-        # ATR - use atr_14 format
-        atr_value = indicators.get("atr") or components.get("volatility", {}).get("atr")
-        if atr_value is None and "atr_14" in detailed_indicators:
-            atr_data = detailed_indicators["atr_14"]
-            if isinstance(atr_data, dict):
-                atr_value = atr_data.get("value")
-        if atr_value is not None:
-            indicator_fields["atr_14"] = atr_value
-
-        # Volume average
-        volume_avg = indicators.get("volume_avg") or components.get("volume", {}).get("avg_volume")
+        # Extract volume average (special case - not a technical indicator)
+        volume_avg = (
+            indicators.get("volume_avg")
+            or full_analysis.get("volume_analysis", {}).get("avg_volume")
+            or components.get("volume", {}).get("avg_volume")
+        )
 
         technical_indicators = TechnicalIndicators(
             volume_avg=volume_avg,
@@ -1274,3 +1233,141 @@ class AnalysisResultNormalizer:
             sector=synthesis_data.get("sector"),
             market=synthesis_data.get("market"),
         )
+
+    @staticmethod
+    def _flatten_indicator_output(
+        indicator_key: str, indicator_value: Any
+    ) -> dict[str, float | None]:
+        """Flatten indicator output into parameterized field names.
+
+        This is a GENERIC method that works for ANY indicator structure:
+        - Simple value: {"value": 42.5} → {indicator_key: 42.5}
+        - Multi-component: {"upper": 100, "lower": 80} → {indicator_key_upper: 100, ...}
+        - Nested: {"tenkan": 50, "kijun": 48} → {indicator_key_tenkan: 50, ...}
+
+        Special cases:
+        - ADX: {"adx": 33, "dmp": 42, "dmn": 11} → {adx_14: 33, adx_14_dmp: 42, adx_14_dmn: 11}
+        - MACD without params: {"line": X, "signal": Y} → {macd_12_26_9_line: X, ...} (adds default params)
+
+        Examples:
+        - rsi_14: {"value": 74.44} → {"rsi_14": 74.44}
+        - macd: {"line": 8.79, "signal": 6.17, "histogram": 2.63}
+          → {"macd_12_26_9_line": 8.79, "macd_12_26_9_signal": 6.17, "macd_12_26_9_histogram": 2.63}
+        - ichimoku_9_26_52: {"tenkan": 50, "kijun": 48, "senkou_a": 49, "senkou_b": 47}
+          → {"ichimoku_9_26_52_tenkan": 50, "ichimoku_9_26_52_kijun": 48, ...}
+
+        Args:
+            indicator_key: Key from detailed_indicators (e.g., "rsi_14", "macd", "ichimoku_9_26_52")
+            indicator_value: Value - can be dict with "value", multi-component dict, or scalar
+
+        Returns:
+            Dictionary mapping field names to numeric values
+        """
+        flattened = {}
+
+        if isinstance(indicator_value, dict):
+            # Check for simple {"value": X} structure
+            if "value" in indicator_value and len(indicator_value) == 1:
+                # Simple case: {"value": 74.44} → {indicator_key: 74.44}
+                value = indicator_value["value"]
+                if isinstance(value, (int, float)):
+                    flattened[indicator_key] = float(value)
+            else:
+                # Multi-component case: flatten all numeric fields
+                # Special handling: if component name == indicator base name, use key without suffix
+                # E.g., adx_14: {"adx": 33, ...} → {adx_14: 33, ...} not {adx_14_adx: 33}
+                indicator_base = indicator_key.split("_")[0]  # "adx_14" → "adx"
+
+                for component_name, component_value in indicator_value.items():
+                    # Only process numeric values, skip strings like "percent_b", "bandwidth"
+                    if not isinstance(component_value, (int, float)):
+                        continue
+
+                    # Skip Bollinger Bands metadata fields (bandwidth, percent_b) - not needed for display
+                    if component_name in ("bandwidth", "percent_b", "percent"):
+                        continue
+
+                    # Check if component name matches indicator base (adx_14 + "adx" → just adx_14)
+                    if component_name == indicator_base:
+                        field_name = indicator_key
+                    else:
+                        # Create parameterized field name: indicator_key_component
+                        field_name = f"{indicator_key}_{component_name}"
+                    flattened[field_name] = float(component_value)
+
+                # Add default parameters if missing (e.g., macd → macd_12_26_9)
+                if indicator_base == "macd" and not any("_" in k for k in flattened.keys()):
+                    # Rename macd_* to macd_12_26_9_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "macd":
+                            continue  # Skip bare "macd"
+                        new_key = k.replace("macd_", "macd_12_26_9_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+                elif indicator_base == "bbands" and not any("_" in k for k in flattened.keys()):
+                    # Rename bbands_* to bbands_20_2_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "bbands":
+                            continue
+                        new_key = k.replace("bbands_", "bbands_20_2_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+                elif indicator_base == "stoch" and not "_" in indicator_key:
+                    # Rename stoch_* to stoch_14_3_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "stoch":
+                            continue
+                        new_key = k.replace("stoch_", "stoch_14_3_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+        elif isinstance(indicator_value, (int, float)):
+            # Direct numeric value (rare but possible)
+            flattened[indicator_key] = float(indicator_value)
+
+        return flattened
+
+    @staticmethod
+    def _extract_legacy_indicators(indicators: dict[str, Any]) -> dict[str, float | None]:
+        """Extract indicators from legacy flat structure (backwards compatibility).
+
+        This handles old data format where indicators were stored as:
+        {"rsi": 74.44, "macd": {...}, "bbands": {...}}
+
+        New code should use _flatten_indicator_output instead.
+        """
+        legacy_fields = {}
+
+        # RSI - simple value
+        if "rsi" in indicators:
+            legacy_fields["rsi_14"] = indicators["rsi"]
+
+        # MACD - multi-component
+        if "macd" in indicators and isinstance(indicators["macd"], dict):
+            macd = indicators["macd"]
+            legacy_fields["macd_12_26_9_line"] = macd.get("line")
+            legacy_fields["macd_12_26_9_signal"] = macd.get("signal")
+            legacy_fields["macd_12_26_9_histogram"] = macd.get("histogram")
+
+        # Bollinger Bands - multi-component
+        if "bbands" in indicators and isinstance(indicators["bbands"], dict):
+            bbands = indicators["bbands"]
+            legacy_fields["bbands_20_2_upper"] = bbands.get("upper")
+            legacy_fields["bbands_20_2_middle"] = bbands.get("middle")
+            legacy_fields["bbands_20_2_lower"] = bbands.get("lower")
+
+        # SMAs - simple values
+        for sma_key in ["sma_20", "sma_50", "sma_200"]:
+            if sma_key in indicators:
+                legacy_fields[sma_key] = indicators[sma_key]
+
+        # ATR - simple value
+        if "atr" in indicators:
+            legacy_fields["atr_14"] = indicators["atr"]
+
+        return legacy_fields
