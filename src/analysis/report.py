@@ -439,6 +439,10 @@ class ReportGenerator:
             for flag in signal.risk.flags:
                 lines.append(f"- {flag}\n")
 
+        if signal.rationale:
+            lines.append("\n📝 **Detailed Rationale:**\n")
+            lines.append(f"{signal.rationale}\n")
+
         # Add metadata tables if available
         metadata_tables = format_metadata_tables(signal)
         if metadata_tables:
