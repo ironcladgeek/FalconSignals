@@ -540,6 +540,10 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
             sections.append(f"| RSI (14) | {tech.rsi:.2f} |")
         if tech.macd is not None and tech.macd_signal is not None:
             sections.append(f"| MACD | {tech.macd:.2f} / {tech.macd_signal:.2f} |")
+        if tech.bb_upper is not None and tech.bb_middle is not None and tech.bb_lower is not None:
+            sections.append(
+                f"| Bollinger Bands | ${tech.bb_lower:.2f} / ${tech.bb_middle:.2f} / ${tech.bb_upper:.2f} |"
+            )
         if tech.sma_20 is not None:
             sections.append(f"| SMA (20) | ${tech.sma_20:.2f} |")
         if tech.sma_50 is not None:

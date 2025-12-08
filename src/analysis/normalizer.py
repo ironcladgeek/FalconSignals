@@ -756,6 +756,16 @@ class AnalysisResultNormalizer:
             macd_value = macd_data
             macd_signal_value = indicators.get("macd_signal")
 
+        # Extract Bollinger Bands values (handle dict format)
+        bbands_data = indicators.get("bbands")
+        bb_upper = None
+        bb_middle = None
+        bb_lower = None
+        if isinstance(bbands_data, dict):
+            bb_upper = bbands_data.get("upper")
+            bb_middle = bbands_data.get("middle")
+            bb_lower = bbands_data.get("lower")
+
         technical_indicators = TechnicalIndicators(
             rsi=indicators.get("rsi"),
             macd=macd_value,
@@ -763,6 +773,9 @@ class AnalysisResultNormalizer:
             sma_20=indicators.get("sma_20"),
             sma_50=indicators.get("sma_50"),
             sma_200=indicators.get("sma_200"),
+            bb_upper=bb_upper,
+            bb_middle=bb_middle,
+            bb_lower=bb_lower,
             volume_avg=indicators.get("volume_avg")
             or components.get("volume", {}).get("avg_volume"),
             atr=indicators.get("atr") or components.get("volatility", {}).get("atr"),

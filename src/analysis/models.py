@@ -68,6 +68,9 @@ class TechnicalIndicators(BaseModel):
     sma_20: float | None = Field(default=None, ge=0, description="20-day SMA")
     sma_50: float | None = Field(default=None, ge=0, description="50-day SMA")
     sma_200: float | None = Field(default=None, ge=0, description="200-day SMA")
+    bb_upper: float | None = Field(default=None, ge=0, description="Bollinger Band upper")
+    bb_middle: float | None = Field(default=None, ge=0, description="Bollinger Band middle")
+    bb_lower: float | None = Field(default=None, ge=0, description="Bollinger Band lower")
     volume_avg: int | None = Field(default=None, ge=0, description="Average volume (20-day)")
     atr: float | None = Field(default=None, ge=0, description="Average True Range")
 

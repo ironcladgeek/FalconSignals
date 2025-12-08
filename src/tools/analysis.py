@@ -91,9 +91,10 @@ class TechnicalIndicatorTool(BaseTool):
                 if sma_key in indicators:
                     output[sma_key] = indicators[sma_key].get("value")
 
-            # RSI
-            if "rsi" in indicators:
-                output["rsi"] = indicators["rsi"].get("value")
+            # RSI (check both 'rsi' and 'rsi_14')
+            rsi_data = indicators.get("rsi") or indicators.get("rsi_14")
+            if rsi_data:
+                output["rsi"] = rsi_data.get("value")
 
             # MACD
             if "macd" in indicators:
@@ -104,9 +105,10 @@ class TechnicalIndicatorTool(BaseTool):
             if atr_data:
                 output["atr"] = atr_data.get("value")
 
-            # Bollinger Bands
-            if "bbands" in indicators:
-                output["bbands"] = indicators["bbands"]
+            # Bollinger Bands (check both 'bbands' and 'bbands_20')
+            bbands_data = indicators.get("bbands") or indicators.get("bbands_20")
+            if bbands_data:
+                output["bbands"] = bbands_data
 
             # Trend
             trend = results.get("trend", {})
