@@ -356,6 +356,7 @@ class CrewAIToolAdapter:
                 analyst_data = fundamental_result.get("analyst_data", {})
                 sentiment = fundamental_result.get("sentiment", {})
                 price_context = fundamental_result.get("price_context", {})
+                metrics = fundamental_result.get("metrics", {})
                 data_availability = fundamental_result.get("data_availability", "unknown")
 
                 # Check if we have any real data
@@ -364,10 +365,14 @@ class CrewAIToolAdapter:
                     sentiment.get("positive", 0) + sentiment.get("negative", 0) > 0
                 )
                 has_price_data = price_context and price_context.get("change_percent") is not None
+                has_metrics = metrics and any(
+                    metrics.get(k)
+                    for k in ["valuation", "profitability", "financial_health", "growth"]
+                )
 
                 logger.debug(
                     f"Fundamental data for {ticker}: analyst={has_analyst_data}, "
-                    f"sentiment={has_sentiment_data}, price={has_price_data}"
+                    f"sentiment={has_sentiment_data}, price={has_price_data}, metrics={has_metrics}"
                 )
 
                 # Format for LLM analysis
@@ -402,13 +407,20 @@ class CrewAIToolAdapter:
                         "latest_price": price_context.get("latest_price"),
                         "period_days": price_context.get("period_days", 30),
                     },
+                    "metrics": {
+                        "available": has_metrics,
+                        "valuation": metrics.get("valuation", {}),
+                        "profitability": metrics.get("profitability", {}),
+                        "financial_health": metrics.get("financial_health", {}),
+                        "growth": metrics.get("growth", {}),
+                    },
                     "data_sources": "Free tier APIs only (Finnhub + Yahoo Finance)",
                     "note": (
                         "Real fundamental data from free tier endpoints. "
-                        "Use analyst consensus, sentiment distribution, and momentum "
-                        "to assess fundamental strength. "
+                        "IMPORTANT: Use the 'metrics' section to extract financial ratios. "
                         f"Data available: {data_availability}. "
-                        "If data is limited, acknowledge the limitation and focus on available information."
+                        "Extract pe_ratio from metrics.valuation.trailing_pe, "
+                        "profit_margin from metrics.profitability.profit_margin, etc."
                     ),
                 }
 
