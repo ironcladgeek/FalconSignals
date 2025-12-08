@@ -750,19 +750,29 @@ class AnalysisResultNormalizer:
         # Build dynamic indicator fields with configuration parameters in names
         indicator_fields = {}
 
+        # Check if we have full_analysis with detailed indicators
+        full_analysis = indicators.get("full_analysis", {})
+        detailed_indicators = full_analysis.get("indicators", {})
+
         # RSI - use rsi_14 format
         if "rsi" in indicators:
             indicator_fields["rsi_14"] = indicators["rsi"]
+        elif "rsi_14" in detailed_indicators:
+            rsi_data = detailed_indicators["rsi_14"]
+            if isinstance(rsi_data, dict):
+                indicator_fields["rsi_14"] = rsi_data.get("value")
+            else:
+                indicator_fields["rsi_14"] = rsi_data
 
         # MACD - use macd_12_26_9 format with line/signal/histogram
-        macd_data = indicators.get("macd")
+        macd_data = indicators.get("macd") or detailed_indicators.get("macd")
         if isinstance(macd_data, dict):
             indicator_fields["macd_12_26_9_line"] = macd_data.get("line")
             indicator_fields["macd_12_26_9_signal"] = macd_data.get("signal")
             indicator_fields["macd_12_26_9_histogram"] = macd_data.get("histogram")
 
-        # Bollinger Bands - use bbands_20_2.0 format with upper/middle/lower
-        bbands_data = indicators.get("bbands")
+        # Bollinger Bands - use bbands_20_2 format with upper/middle/lower
+        bbands_data = indicators.get("bbands") or detailed_indicators.get("bbands_20")
         if isinstance(bbands_data, dict):
             indicator_fields["bbands_20_2_upper"] = bbands_data.get("upper")
             indicator_fields["bbands_20_2_middle"] = bbands_data.get("middle")
@@ -772,9 +782,41 @@ class AnalysisResultNormalizer:
         for sma_key in ["sma_20", "sma_50", "sma_200"]:
             if sma_key in indicators:
                 indicator_fields[sma_key] = indicators[sma_key]
+            elif sma_key in detailed_indicators:
+                sma_data = detailed_indicators[sma_key]
+                if isinstance(sma_data, dict):
+                    indicator_fields[sma_key] = sma_data.get("value")
+                else:
+                    indicator_fields[sma_key] = sma_data
+
+        # EMAs - extract from detailed_indicators
+        for ema_key in ["ema_12", "ema_26"]:
+            if ema_key in detailed_indicators:
+                ema_data = detailed_indicators[ema_key]
+                if isinstance(ema_data, dict):
+                    indicator_fields[ema_key] = ema_data.get("value")
+
+        # ADX - extract all components
+        if "adx_14" in detailed_indicators:
+            adx_data = detailed_indicators["adx_14"]
+            if isinstance(adx_data, dict):
+                indicator_fields["adx_14"] = adx_data.get("adx")
+                indicator_fields["adx_14_dmp"] = adx_data.get("dmp")  # Directional Movement Plus
+                indicator_fields["adx_14_dmn"] = adx_data.get("dmn")  # Directional Movement Minus
+
+        # Stochastic - extract k and d
+        if "stoch" in detailed_indicators:
+            stoch_data = detailed_indicators["stoch"]
+            if isinstance(stoch_data, dict):
+                indicator_fields["stoch_14_3_k"] = stoch_data.get("k")
+                indicator_fields["stoch_14_3_d"] = stoch_data.get("d")
 
         # ATR - use atr_14 format
         atr_value = indicators.get("atr") or components.get("volatility", {}).get("atr")
+        if atr_value is None and "atr_14" in detailed_indicators:
+            atr_data = detailed_indicators["atr_14"]
+            if isinstance(atr_data, dict):
+                atr_value = atr_data.get("value")
         if atr_value is not None:
             indicator_fields["atr_14"] = atr_value
 

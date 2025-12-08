@@ -569,6 +569,30 @@ def format_metadata_tables(signal: InvestmentSignal) -> str:
         if sma_200 is not None:
             sections.append(f"| SMA (200) | ${sma_200:.2f} |")
 
+        # EMAs
+        ema_12 = getattr(tech, "ema_12", None)
+        if ema_12 is not None:
+            sections.append(f"| EMA (12) | ${ema_12:.2f} |")
+        ema_26 = getattr(tech, "ema_26", None)
+        if ema_26 is not None:
+            sections.append(f"| EMA (26) | ${ema_26:.2f} |")
+
+        # ADX with directional movement
+        adx_14 = getattr(tech, "adx_14", None)
+        adx_14_dmp = getattr(tech, "adx_14_dmp", None)
+        adx_14_dmn = getattr(tech, "adx_14_dmn", None)
+        if adx_14 is not None:
+            adx_display = f"{adx_14:.2f}"
+            if adx_14_dmp is not None and adx_14_dmn is not None:
+                adx_display += f" (+DI: {adx_14_dmp:.2f}, -DI: {adx_14_dmn:.2f})"
+            sections.append(f"| ADX (14) | {adx_display} |")
+
+        # Stochastic Oscillator
+        stoch_k = getattr(tech, "stoch_14_3_k", None)
+        stoch_d = getattr(tech, "stoch_14_3_d", None)
+        if stoch_k is not None and stoch_d is not None:
+            sections.append(f"| Stochastic (14, 3) | %K: {stoch_k:.2f}, %D: {stoch_d:.2f} |")
+
         # Volume and ATR
         if tech.volume_avg is not None:
             sections.append(f"| Avg Volume (20d) | {tech.volume_avg:,} |")
