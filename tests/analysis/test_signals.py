@@ -23,15 +23,10 @@ class TestSignalSynthesis:
     @pytest.fixture
     def config(self):
         """Create test configuration."""
-        return {
-            "capital_starting": 2000,
-            "capital_monthly_deposit": 500,
-            "max_position_size_pct": 10,
-            "max_sector_concentration_pct": 20,
-            "risk_volatility_high": 3.0,
-            "risk_volatility_very_high": 5.0,
-            "include_disclaimers": True,
-        }
+        from src.config.loader import load_config
+
+        # Load default config for testing
+        return load_config()
 
     def test_create_investment_signal(self, config, cache_manager):
         """Test signal creation from analysis data using new unified approach."""
