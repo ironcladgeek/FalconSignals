@@ -971,10 +971,46 @@ class AnalysisResultNormalizer:
                 strong_sell=fund.strong_sell_count,
             )
 
+        # Extract financial metrics from Pydantic model
+        fundamental_metrics = None
+        has_any_metric = any(
+            [
+                fund.pe_ratio,
+                fund.pb_ratio,
+                fund.ps_ratio,
+                fund.peg_ratio,
+                fund.ev_ebitda,
+                fund.profit_margin,
+                fund.operating_margin,
+                fund.roe,
+                fund.roa,
+                fund.debt_to_equity,
+                fund.current_ratio,
+                fund.revenue_growth,
+                fund.earnings_growth,
+            ]
+        )
+        if has_any_metric:
+            fundamental_metrics = FundamentalMetrics(
+                pe_ratio=fund.pe_ratio,
+                pb_ratio=fund.pb_ratio,
+                ps_ratio=fund.ps_ratio,
+                peg_ratio=fund.peg_ratio,
+                ev_ebitda=fund.ev_ebitda,
+                profit_margin=fund.profit_margin,
+                operating_margin=fund.operating_margin,
+                roe=fund.roe,
+                roa=fund.roa,
+                debt_to_equity=fund.debt_to_equity,
+                current_ratio=fund.current_ratio,
+                revenue_growth=fund.revenue_growth,
+                earnings_growth=fund.earnings_growth,
+            )
+
         return AnalysisComponentResult(
             component="fundamental",
             score=synth.fundamental_score if synth else fund.fundamental_score,
-            fundamental_metrics=None,  # Not in Pydantic model yet
+            fundamental_metrics=fundamental_metrics,
             analyst_info=analyst_info,
             reasoning=fund.reasoning,
             confidence=fund.fundamental_score,

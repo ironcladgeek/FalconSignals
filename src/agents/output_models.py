@@ -51,6 +51,39 @@ class FundamentalAnalysisOutput(BaseModel):
         None, description="Overall consensus: Strong Buy, Buy, Hold, Sell, or Strong Sell"
     )
 
+    # Financial metrics - Valuation (from tool data)
+    pe_ratio: float | None = Field(None, description="Price-to-Earnings ratio (trailing)")
+    forward_pe: float | None = Field(None, description="Forward P/E ratio")
+    pb_ratio: float | None = Field(None, description="Price-to-Book ratio")
+    ps_ratio: float | None = Field(None, description="Price-to-Sales ratio")
+    peg_ratio: float | None = Field(None, description="PEG ratio (P/E to growth)")
+    ev_ebitda: float | None = Field(None, description="Enterprise Value to EBITDA")
+
+    # Financial metrics - Profitability
+    profit_margin: float | None = Field(
+        None, description="Net profit margin (as decimal, e.g. 0.15)"
+    )
+    operating_margin: float | None = Field(
+        None, description="Operating margin (as decimal, e.g. 0.20)"
+    )
+    gross_margin: float | None = Field(None, description="Gross margin (as decimal, e.g. 0.40)")
+    roe: float | None = Field(None, description="Return on Equity (as decimal, e.g. 0.18)")
+    roa: float | None = Field(None, description="Return on Assets (as decimal, e.g. 0.10)")
+
+    # Financial metrics - Financial Health
+    debt_to_equity: float | None = Field(None, description="Debt-to-Equity ratio")
+    current_ratio: float | None = Field(
+        None, description="Current ratio (current assets/liabilities)"
+    )
+
+    # Financial metrics - Growth
+    revenue_growth: float | None = Field(
+        None, description="Revenue growth YoY (as decimal, e.g. 0.12)"
+    )
+    earnings_growth: float | None = Field(
+        None, description="Earnings growth YoY (as decimal, e.g. 0.15)"
+    )
+
     # Business quality assessment
     competitive_position: str = Field(
         ..., description="Competitive position: strong, moderate, or weak"
