@@ -3,9 +3,12 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from src.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from src.data.price_manager import PriceDataManager
 
 logger = get_logger(__name__)
 
@@ -50,15 +53,22 @@ class CacheManager:
     Uses JSON format for flexibility and human-readability.
     """
 
-    def __init__(self, cache_dir: str | Path = "data/cache"):
+    def __init__(
+        self,
+        cache_dir: str | Path = "data/cache",
+        use_unified_prices: bool = True,
+    ):
         """Initialize cache manager.
 
         Args:
             cache_dir: Directory for cache files
+            use_unified_prices: If True, use PriceDataManager for price data (CSV storage)
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._memory_cache = {}
+        self._use_unified_prices = use_unified_prices
+        self._price_manager: Optional["PriceDataManager"] = None
         logger.debug(f"Cache manager initialized at {self.cache_dir}")
 
     def get(
@@ -470,3 +480,90 @@ class CacheManager:
         # Sanitize filename
         filename = filename.replace("/", "_")
         return self.cache_dir / filename
+
+    @property
+    def price_manager(self) -> "PriceDataManager":
+        """Get or create the PriceDataManager instance.
+
+        Returns:
+            PriceDataManager for unified price storage
+        """
+        if self._price_manager is None:
+            from src.data.price_manager import PriceDataManager
+
+            prices_dir = self.cache_dir / "prices"
+            self._price_manager = PriceDataManager(prices_dir=prices_dir)
+        return self._price_manager
+
+    def get_unified_prices(
+        self,
+        ticker: str,
+        start_date=None,
+        end_date=None,
+    ):
+        """Get price data from unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date (optional)
+            end_date: End date (optional)
+
+        Returns:
+            DataFrame with price data or empty DataFrame if not found
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_prices(ticker, start_date, end_date)
+
+    def store_unified_prices(
+        self,
+        ticker: str,
+        prices: list[dict],
+        append: bool = True,
+    ) -> int:
+        """Store price data in unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            prices: List of price dictionaries
+            append: If True, merge with existing data
+
+        Returns:
+            Number of rows stored
+        """
+        if not self._use_unified_prices:
+            return 0
+        return self.price_manager.store_prices(ticker, prices, append=append)
+
+    def get_unified_latest_price(self, ticker: str) -> Optional[Any]:
+        """Get latest price from unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Price data dictionary or None
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_latest_price(ticker)
+
+    def get_unified_price_at_date(
+        self,
+        ticker: str,
+        target_date,
+        tolerance_days: int = 5,
+    ) -> Optional[Any]:
+        """Get price for a specific date from unified storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            target_date: Target date
+            tolerance_days: Days to look back for non-trading days
+
+        Returns:
+            Price data dictionary or None
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_price_at_date(ticker, target_date, tolerance_days)
