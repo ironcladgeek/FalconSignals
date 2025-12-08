@@ -128,7 +128,7 @@ class PriceFetcherTool(BaseTool):
 
             # Use unified CSV storage if enabled
             if self.use_unified_storage:
-                return self._fetch_with_unified_storage(ticker, start_d, end_d)
+                return self._fetch_with_unified_storage(ticker, start_d, end_d, days_back)
             else:
                 return self._fetch_with_legacy_cache(ticker, start_date, end_date)
 
@@ -146,6 +146,7 @@ class PriceFetcherTool(BaseTool):
         ticker: str,
         start_date: date,
         end_date: date,
+        days_back: int = None,
     ) -> dict[str, Any]:
         """Fetch prices using unified CSV storage.
 
@@ -153,6 +154,7 @@ class PriceFetcherTool(BaseTool):
             ticker: Stock ticker symbol
             start_date: Start date (what we need)
             end_date: End date (what we need)
+            days_back: Number of days to fetch (used for period-based fetching)
 
         Returns:
             Dictionary with prices and metadata
@@ -165,15 +167,15 @@ class PriceFetcherTool(BaseTool):
         needs_fetch = False
         fetch_start = None
         fetch_end = None
+        fetched_successfully = False
 
         if existing_start is None or existing_end is None:
-            # No data at all - fetch the full range
+            # No data at all - use period-based fetch (more reliable than exact dates)
             needs_fetch = True
-            fetch_start = start_date
-            fetch_end = end_date
-            logger.debug(
-                f"No existing price data for {ticker}, fetching {start_date} to {end_date}"
-            )
+            period = f"{days_back}d" if days_back else "730d"
+            fetch_start = None  # Will use period instead
+            fetch_end = None
+            logger.debug(f"No existing price data for {ticker}, fetching with period={period}")
         else:
             # We have some data - check if it covers our needed range
             # Adjust end_date if it's today and we already have yesterday's data
@@ -205,19 +207,27 @@ class PriceFetcherTool(BaseTool):
                 fetch_end = existing_start - timedelta(days=1)
                 logger.debug(f"Backfilling {ticker} prices: {fetch_start} -> {fetch_end}")
 
-        if needs_fetch and fetch_start and fetch_end:
-            logger.info(f"Fetching {ticker} prices: {fetch_start} to {fetch_end}")
-            prices = self.provider.get_stock_prices(
-                ticker,
-                datetime.combine(fetch_start, datetime.min.time()),
-                datetime.combine(fetch_end, datetime.max.time()),
-            )
+        if needs_fetch:
+            if fetch_start is None and fetch_end is None:
+                # Period-based fetch (initial fetch with no existing data)
+                period = f"{days_back}d" if days_back else "730d"
+                logger.info(f"Fetching {ticker} prices with period={period}")
+                prices = self.provider.get_stock_prices(ticker, period=period)
+            else:
+                # Date-range fetch (updating existing data)
+                logger.info(f"Fetching {ticker} prices: {fetch_start} to {fetch_end}")
+                prices = self.provider.get_stock_prices(
+                    ticker,
+                    datetime.combine(fetch_start, datetime.min.time()),
+                    datetime.combine(fetch_end, datetime.max.time()),
+                )
 
             if prices:
                 # Store in unified CSV
                 price_dicts = [p.model_dump() for p in prices]
                 pm.store_prices(ticker, price_dicts, append=True)
                 logger.info(f"Stored {len(prices)} prices for {ticker} in unified CSV")
+                fetched_successfully = True
             else:
                 logger.warning(
                     f"No new prices fetched for {ticker} in range {fetch_start} to {fetch_end}"
@@ -227,12 +237,33 @@ class PriceFetcherTool(BaseTool):
         df = pm.get_prices(ticker, start_date=start_date, end_date=end_date)
 
         if df.empty:
-            return {
-                "ticker": ticker,
-                "prices": [],
-                "count": 0,
-                "error": f"No price data found for {ticker}",
-            }
+            # If we just fetched successfully but got no data in our range, get nearest available data
+            # (the requested dates might be non-trading days)
+            if fetched_successfully:
+                logger.warning(
+                    f"Fetch completed for {ticker} but no data in exact range {start_date} to {end_date}. "
+                    "Using nearest available data..."
+                )
+                # Try to get any available data for this ticker
+                df = pm.get_prices(ticker)
+                if not df.empty:
+                    logger.info(
+                        f"Found {len(df)} prices for {ticker} from {df['date'].min().date()} to {df['date'].max().date()}"
+                    )
+                else:
+                    return {
+                        "ticker": ticker,
+                        "prices": [],
+                        "count": 0,
+                        "error": f"No price data found for {ticker} after successful fetch",
+                    }
+            else:
+                return {
+                    "ticker": ticker,
+                    "prices": [],
+                    "count": 0,
+                    "error": f"No price data found for {ticker}",
+                }
 
         # Convert DataFrame to list of dicts with legacy column names for compatibility
         prices_list = []

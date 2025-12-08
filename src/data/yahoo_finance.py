@@ -28,15 +28,18 @@ class YahooFinanceProvider(DataProvider):
     def get_stock_prices(
         self,
         ticker: str,
-        start_date: datetime,
-        end_date: datetime,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        period: str = None,
     ) -> list[StockPrice]:
         """Fetch historical stock price data from Yahoo Finance.
 
         Args:
             ticker: Stock ticker symbol
-            start_date: Start date for historical data
-            end_date: End date for historical data
+            start_date: Start date for historical data (ignored if period is set)
+            end_date: End date for historical data (ignored if period is set)
+            period: Period string like '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'
+                    or '100d' for 100 days. If set, overrides start_date/end_date.
 
         Returns:
             List of StockPrice objects sorted by date
@@ -46,34 +49,39 @@ class YahooFinanceProvider(DataProvider):
             RuntimeError: If API call fails
         """
         try:
-            logger.debug(f"Fetching prices for {ticker} from {start_date} to {end_date}")
-
-            # Fetch data using yfinance
-            data = yf.download(
-                ticker,
-                start=start_date,
-                end=end_date,
-                progress=False,
-                auto_adjust=False,  # Keep original and adjusted close prices
-            )
+            if period:
+                logger.debug(f"Fetching prices for {ticker} with period={period}")
+                # Use period-based fetching (more reliable)
+                stock = yf.Ticker(ticker)
+                data = stock.history(period=period, auto_adjust=False)
+            else:
+                logger.debug(f"Fetching prices for {ticker} from {start_date} to {end_date}")
+                # Fetch data using yfinance with date range
+                data = yf.download(
+                    ticker,
+                    start=start_date,
+                    end=end_date,
+                    progress=False,
+                    auto_adjust=False,  # Keep original and adjusted close prices
+                )
 
             if data.empty:
                 raise ValueError(f"No data found for ticker: {ticker}")
 
             prices = []
             for index, row in data.iterrows():
-                # Handle MultiIndex columns from yfinance
-                # When downloading a single ticker, columns are (PriceLevel, Ticker)
-                # When columns are flat, they're just price levels
+                # Handle different column formats from yfinance
+                # yf.Ticker().history() returns flat columns: Open, High, Low, Close, Volume, etc.
+                # yf.download() can return MultiIndex columns: (PriceLevel, Ticker)
                 def get_price_value(row, key):
                     """Extract scalar price value, handling both flat and MultiIndex columns."""
                     try:
-                        # Try MultiIndex first (single ticker download)
-                        val = row[(key, ticker.upper())]
+                        # Try flat column first (from Ticker().history())
+                        val = row[key]
                     except (KeyError, TypeError):
                         try:
-                            # Fall back to flat column names
-                            val = row[key]
+                            # Try MultiIndex (from yf.download())
+                            val = row[(key, ticker.upper())]
                         except (KeyError, TypeError):
                             return None
                     return float(val) if pd.notna(val) else None
@@ -97,12 +105,22 @@ class YahooFinanceProvider(DataProvider):
                     continue
 
                 market = self._infer_market(ticker)
+
+                # Convert index to naive datetime (remove timezone info)
+                if hasattr(index, "to_pydatetime"):
+                    dt = index.to_pydatetime()
+                    # Remove timezone if present
+                    if dt.tzinfo is not None:
+                        dt = dt.replace(tzinfo=None)
+                else:
+                    dt = index
+
                 price = StockPrice(
                     ticker=ticker.upper(),
                     name=self._get_ticker_name(ticker),
                     market=market,
                     instrument_type=InstrumentType.STOCK,
-                    date=index.to_pydatetime() if hasattr(index, "to_pydatetime") else index,
+                    date=dt,
                     open_price=open_price,
                     high_price=high_price,
                     low_price=low_price,
