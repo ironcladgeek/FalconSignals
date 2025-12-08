@@ -83,32 +83,82 @@ class TechnicalIndicatorTool(BaseTool):
                 "latest_price": results.get("latest_price"),
             }
 
-            # Extract key indicators for backward compatibility
+            # Extract ALL indicators using the same generic flattening as normalizer
             indicators = results.get("indicators", {})
+            logger.debug(
+                f"TechnicalIndicatorTool: extracted {len(indicators)} indicator groups from results"
+            )
 
-            # SMAs
-            for sma_key in ["sma_20", "sma_50", "sma_200"]:
-                if sma_key in indicators:
-                    output[sma_key] = indicators[sma_key].get("value")
+            # Use generic extraction to get all indicator values
+            from src.analysis.normalizer import AnalysisResultNormalizer
 
-            # RSI (check both 'rsi' and 'rsi_14')
-            rsi_data = indicators.get("rsi") or indicators.get("rsi_14")
-            if rsi_data:
-                output["rsi"] = rsi_data.get("value")
+            # Create a dict with full_analysis structure for generic extraction
+            mock_tech_data = {"indicators": {"full_analysis": results}}
 
-            # MACD
-            if "macd" in indicators:
-                output["macd"] = indicators["macd"]
+            # Use the generic flattening logic
+            indicator_count = 0
+            for indicator_key, indicator_value in indicators.items():
+                flattened = AnalysisResultNormalizer._flatten_indicator_output(
+                    indicator_key, indicator_value
+                )
+                indicator_count += len(flattened)
+                logger.debug(
+                    f"  {indicator_key}: flattened to {len(flattened)} fields -> {list(flattened.keys())}"
+                )
 
-            # ATR
-            atr_data = indicators.get("atr") or indicators.get("atr_14")
-            if atr_data:
-                output["atr"] = atr_data.get("value")
+                # Add all flattened fields to output, mapping to Pydantic model field names
+                for field_name, field_value in flattened.items():
+                    # Map parameterized names to Pydantic model field names
+                    if field_name == "rsi_14":
+                        output["rsi"] = field_value
+                    elif field_name == "macd_line":
+                        output["macd"] = field_value
+                    elif field_name == "macd_signal":
+                        output["macd_signal"] = field_value
+                    elif field_name == "macd_histogram":
+                        output["macd_histogram"] = field_value
+                    elif field_name == "bbands_20_upper":
+                        output["bbands_upper"] = field_value
+                    elif field_name == "bbands_20_middle":
+                        output["bbands_middle"] = field_value
+                    elif field_name == "bbands_20_lower":
+                        output["bbands_lower"] = field_value
+                    elif field_name == "atr_14":
+                        output["atr"] = field_value
+                    elif field_name == "sma_20":
+                        output["sma_20"] = field_value
+                    elif field_name == "sma_50":
+                        output["sma_50"] = field_value
+                    elif field_name == "ema_12":
+                        output["ema_12"] = field_value
+                    elif field_name == "ema_26":
+                        output["ema_26"] = field_value
+                    elif field_name == "wma_14":
+                        output["wma_14"] = field_value
+                    elif field_name == "adx_14":
+                        output["adx"] = field_value
+                    elif field_name == "adx_14_dmp":
+                        output["adx_dmp"] = field_value
+                    elif field_name == "adx_14_dmn":
+                        output["adx_dmn"] = field_value
+                    elif field_name == "stoch_14_3_k":
+                        output["stoch_k"] = field_value
+                    elif field_name == "stoch_14_3_d":
+                        output["stoch_d"] = field_value
+                    elif field_name == "ichimoku_tenkan":
+                        output["ichimoku_tenkan"] = field_value
+                    elif field_name == "ichimoku_kijun":
+                        output["ichimoku_kijun"] = field_value
+                    elif field_name == "ichimoku_senkou_a":
+                        output["ichimoku_senkou_a"] = field_value
+                    elif field_name == "ichimoku_senkou_b":
+                        output["ichimoku_senkou_b"] = field_value
+                    elif field_name == "ichimoku_chikou":
+                        output["ichimoku_chikou"] = field_value
 
-            # Bollinger Bands (check both 'bbands' and 'bbands_20')
-            bbands_data = indicators.get("bbands") or indicators.get("bbands_20")
-            if bbands_data:
-                output["bbands"] = bbands_data
+            logger.info(
+                f"TechnicalIndicatorTool: mapped {indicator_count} indicator values to {len([k for k in output.keys() if k not in ['symbol', 'periods', 'latest_price']])} Pydantic model fields"
+            )
 
             # Trend
             trend = results.get("trend", {})

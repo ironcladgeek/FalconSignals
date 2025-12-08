@@ -11,10 +11,52 @@ class TechnicalAnalysisOutput(BaseModel):
     """Structured output for technical analysis agent."""
 
     # Technical indicators (extracted from tool outputs)
+    # RSI
     rsi: float | None = Field(None, description="RSI value (0-100)", ge=0, le=100)
+
+    # MACD
     macd: float | None = Field(None, description="MACD line value")
     macd_signal: float | None = Field(None, description="MACD signal line value")
+    macd_histogram: float | None = Field(None, description="MACD histogram value")
+
+    # Bollinger Bands
+    bbands_upper: float | None = Field(None, description="Bollinger Bands upper band", ge=0)
+    bbands_middle: float | None = Field(None, description="Bollinger Bands middle band", ge=0)
+    bbands_lower: float | None = Field(None, description="Bollinger Bands lower band", ge=0)
+
+    # ATR
     atr: float | None = Field(None, description="Average True Range value", ge=0)
+
+    # Moving Averages
+    sma_20: float | None = Field(None, description="20-period Simple Moving Average", ge=0)
+    sma_50: float | None = Field(None, description="50-period Simple Moving Average", ge=0)
+    ema_12: float | None = Field(None, description="12-period Exponential Moving Average", ge=0)
+    ema_26: float | None = Field(None, description="26-period Exponential Moving Average", ge=0)
+    wma_14: float | None = Field(None, description="14-period Weighted Moving Average", ge=0)
+
+    # ADX (Average Directional Index)
+    adx: float | None = Field(None, description="ADX value (0-100)", ge=0, le=100)
+    adx_dmp: float | None = Field(None, description="ADX +DI value", ge=0)
+    adx_dmn: float | None = Field(None, description="ADX -DI value", ge=0)
+
+    # Stochastic Oscillator
+    stoch_k: float | None = Field(None, description="Stochastic %K value (0-100)", ge=0, le=100)
+    stoch_d: float | None = Field(None, description="Stochastic %D value (0-100)", ge=0, le=100)
+
+    # Ichimoku Cloud
+    ichimoku_tenkan: float | None = Field(
+        None, description="Ichimoku Tenkan-sen (conversion line)", ge=0
+    )
+    ichimoku_kijun: float | None = Field(None, description="Ichimoku Kijun-sen (base line)", ge=0)
+    ichimoku_senkou_a: float | None = Field(
+        None, description="Ichimoku Senkou Span A (leading span A)", ge=0
+    )
+    ichimoku_senkou_b: float | None = Field(
+        None, description="Ichimoku Senkou Span B (leading span B)", ge=0
+    )
+    ichimoku_chikou: float | None = Field(
+        None, description="Ichimoku Chikou Span (lagging span)", ge=0
+    )
 
     # Analysis interpretation
     trend_direction: str = Field(..., description="Trend direction: bullish, bearish, or neutral")

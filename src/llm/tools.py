@@ -77,7 +77,9 @@ class CrewAIToolAdapter:
         """
         self.config = config
         self.price_fetcher = PriceFetcherTool()
-        self.technical_tool = TechnicalIndicatorTool()
+        # Pass config to technical tool so it uses correct indicators and min_periods
+        tech_config = config.analysis.technical_indicators if config else None
+        self.technical_tool = TechnicalIndicatorTool(config=tech_config)
         self.news_fetcher = NewsFetcherTool()
         self.fundamental_fetcher = FinancialDataFetcherTool(db_path=db_path)
         # Cache to store data between tool calls
@@ -94,22 +96,23 @@ class CrewAIToolAdapter:
 
         @tool("Fetch Price Data")
         @tool_with_timeout(timeout_seconds=15)
-        def fetch_price_data(ticker: str, days_back: int = None) -> str:
+        def fetch_price_data(ticker: str) -> str:
             """Fetch historical and current price data for an instrument.
 
             Args:
                 ticker: Stock ticker symbol
-                days_back: Number of days of history to fetch (defaults to config value)
 
             Returns:
                 JSON string with summary of price data (full data cached for other tools)
             """
             try:
-                # Use config value if days_back not specified
-                if days_back is None:
-                    days_back = (
-                        self.config.analysis.historical_data_lookback_days if self.config else 730
-                    )
+                # Always use config value for lookback period
+                if self.config and hasattr(self.config.analysis, "historical_data_lookback_days"):
+                    days_back = self.config.analysis.historical_data_lookback_days
+                    logger.debug(f"Using config lookback: {days_back} days")
+                else:
+                    days_back = 730
+                    logger.warning(f"No config available, using default lookback: {days_back} days")
 
                 logger.info(f"Fetching price data for {ticker} ({days_back} days)")
                 result = self.price_fetcher.run(ticker, days_back=days_back)

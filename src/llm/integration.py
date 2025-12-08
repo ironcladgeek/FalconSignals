@@ -172,6 +172,16 @@ class LLMAnalysisOrchestrator:
         context = context or {}
         context["ticker"] = ticker
 
+        # Inject config values into context for agents to access
+        if self.config:
+            if hasattr(self.config.analysis, "historical_data_lookback_days"):
+                context["historical_data_lookback_days"] = (
+                    self.config.analysis.historical_data_lookback_days
+                )
+                logger.debug(
+                    f"Set historical_data_lookback_days in context: {context['historical_data_lookback_days']}"
+                )
+
         logger.info(f"Starting comprehensive analysis for {ticker}")
 
         # Save debug: input context

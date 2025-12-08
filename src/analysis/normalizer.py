@@ -738,6 +738,16 @@ class AnalysisResultNormalizer:
         Adding new indicators (like Ichimoku Cloud) requires ZERO code changes here -
         just add them to config/local.yaml!
         """
+        # Handle invalid input
+        if not isinstance(tech_data, dict):
+            logger.error(f"Technical data is not a dict: type={type(tech_data)}, value={tech_data}")
+            return AnalysisComponentResult(
+                component="technical",
+                score=0.0,
+                technical_indicators=None,
+                reasoning="Invalid technical data type",
+            )
+
         # Check for error status in technical analysis result
         if tech_data.get("status") == "error":
             error_msg = tech_data.get("message", "Unknown error in technical analysis")
@@ -955,7 +965,13 @@ class AnalysisResultNormalizer:
     def _tech_model_to_component(
         tech: "TechnicalAnalysisOutput", synth: "SignalSynthesisOutput"
     ) -> AnalysisComponentResult:
-        """Convert TechnicalAnalysisOutput Pydantic model to component result."""
+        """Convert TechnicalAnalysisOutput Pydantic model to component result.
+
+        Maps all indicator fields from simple Pydantic names (rsi, macd) to
+        parameterized database field names (rsi_14, macd_12_26_9_line).
+        This ensures ALL calculated indicators reach the database, not just the 4
+        that were hardcoded before.
+        """
         # Import here to avoid circular dependency
 
         if tech is None:
@@ -965,15 +981,88 @@ class AnalysisResultNormalizer:
                 technical_indicators=None,
             )
 
+        # Build TechnicalIndicators with ALL fields mapped from Pydantic model
+        # Map simple Pydantic field names to parameterized database field names
+        # based on standard configuration values
+        indicator_dict = {}
+
+        # RSI (default: 14-period)
+        if tech.rsi is not None:
+            indicator_dict["rsi_14"] = tech.rsi
+
+        # MACD (default: fast=12, slow=26, signal=9)
+        if tech.macd is not None:
+            indicator_dict["macd_12_26_9_line"] = tech.macd
+        if tech.macd_signal is not None:
+            indicator_dict["macd_12_26_9_signal"] = tech.macd_signal
+        if tech.macd_histogram is not None:
+            indicator_dict["macd_12_26_9_histogram"] = tech.macd_histogram
+
+        # Bollinger Bands (default: length=20, std=2.0)
+        if tech.bbands_upper is not None:
+            indicator_dict["bbands_20_2_0_upper"] = tech.bbands_upper
+        if tech.bbands_middle is not None:
+            indicator_dict["bbands_20_2_0_middle"] = tech.bbands_middle
+        if tech.bbands_lower is not None:
+            indicator_dict["bbands_20_2_0_lower"] = tech.bbands_lower
+
+        # ATR (default: 14-period)
+        if tech.atr is not None:
+            indicator_dict["atr_14"] = tech.atr
+
+        # Simple Moving Averages
+        if tech.sma_20 is not None:
+            indicator_dict["sma_20"] = tech.sma_20
+        if tech.sma_50 is not None:
+            indicator_dict["sma_50"] = tech.sma_50
+
+        # Exponential Moving Averages
+        if tech.ema_12 is not None:
+            indicator_dict["ema_12"] = tech.ema_12
+        if tech.ema_26 is not None:
+            indicator_dict["ema_26"] = tech.ema_26
+
+        # Weighted Moving Average (default: 14-period)
+        if tech.wma_14 is not None:
+            indicator_dict["wma_14"] = tech.wma_14
+
+        # ADX (default: 14-period)
+        if tech.adx is not None:
+            indicator_dict["adx_14"] = tech.adx
+        if tech.adx_dmp is not None:
+            indicator_dict["adx_14_dmp"] = tech.adx_dmp
+        if tech.adx_dmn is not None:
+            indicator_dict["adx_14_dmn"] = tech.adx_dmn
+
+        # Stochastic Oscillator (default: k=14, d=3)
+        if tech.stoch_k is not None:
+            indicator_dict["stoch_14_3_k"] = tech.stoch_k
+        if tech.stoch_d is not None:
+            indicator_dict["stoch_14_3_d"] = tech.stoch_d
+
+        # Ichimoku Cloud (default: tenkan=9, kijun=26, senkou=52)
+        if tech.ichimoku_tenkan is not None:
+            indicator_dict["ichimoku_9_26_52_tenkan"] = tech.ichimoku_tenkan
+        if tech.ichimoku_kijun is not None:
+            indicator_dict["ichimoku_9_26_52_kijun"] = tech.ichimoku_kijun
+        if tech.ichimoku_senkou_a is not None:
+            indicator_dict["ichimoku_9_26_52_senkou_a"] = tech.ichimoku_senkou_a
+        if tech.ichimoku_senkou_b is not None:
+            indicator_dict["ichimoku_9_26_52_senkou_b"] = tech.ichimoku_senkou_b
+        if tech.ichimoku_chikou is not None:
+            indicator_dict["ichimoku_9_26_52_chikou"] = tech.ichimoku_chikou
+
+        # Create TechnicalIndicators object with dynamic fields
+        technical_indicators = TechnicalIndicators(**indicator_dict)
+
+        logger.debug(
+            f"Mapped {len(indicator_dict)} indicators from Pydantic model to database fields"
+        )
+
         return AnalysisComponentResult(
             component="technical",
             score=synth.technical_score if synth else tech.technical_score,
-            technical_indicators=TechnicalIndicators(
-                rsi=tech.rsi,
-                macd=tech.macd,
-                macd_signal=tech.macd_signal,
-                atr=tech.atr,
-            ),
+            technical_indicators=technical_indicators,
             reasoning=tech.reasoning,
             confidence=tech.technical_score,
         )
