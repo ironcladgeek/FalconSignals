@@ -12,15 +12,14 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Try to import transformers and torch
+# Try to import transformers
 try:
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    from transformers import pipeline
 
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
-    logger.info("transformers/torch not installed, FinBERT scoring not available")
+    logger.info("transformers not installed, FinBERT scoring not available")
 
 
 @dataclass
@@ -28,16 +27,16 @@ class SentimentScore:
     """Sentiment score for a single article."""
 
     sentiment: str  # 'positive', 'negative', 'neutral'
-    score: float  # -1.0 to 1.0
-    confidence: float  # 0.0 to 1.0
+    score: float  # Confidence score (0.0 to 1.0)
+    confidence: float  # Same as score (kept for compatibility)
     raw_probs: Optional[dict[str, float]] = None  # Optional raw probabilities
 
 
 class FinBERTSentimentScorer:
     """Local FinBERT-based sentiment scorer for financial text.
 
-    Uses the ProsusAI/finbert model specifically trained on financial text,
-    providing more accurate sentiment analysis than general-purpose models.
+    Uses the ProsusAI/finbert model via transformers pipeline API,
+    providing accurate sentiment analysis for financial text.
     """
 
     # Default model for financial sentiment
@@ -54,52 +53,47 @@ class FinBERTSentimentScorer:
 
         Args:
             model_name: Hugging Face model name. Defaults to ProsusAI/finbert.
-            device: Device to use ('cpu', 'cuda', 'mps'). Auto-detected if None.
+            device: Device to use ('cpu', 'cuda', 'mps', or device number). Auto-detected if None.
             batch_size: Batch size for processing multiple texts.
             max_length: Maximum token length for texts.
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError(
-                "transformers and torch are required for FinBERT. "
-                "Install with: pip install transformers torch"
+                "transformers is required for FinBERT. Install with: pip install transformers torch"
             )
 
         self.model_name = model_name or self.DEFAULT_MODEL
         self.batch_size = batch_size
         self.max_length = max_length
-
-        # Auto-detect device
-        if device is None:
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                self.device = "mps"
-            else:
-                self.device = "cpu"
-        else:
-            self.device = device
+        self.device = device  # None = auto-detect, or specific device
 
         logger.info(
-            f"Initializing FinBERT scorer with model={self.model_name}, device={self.device}"
+            f"Initializing FinBERT scorer with model={self.model_name}, device={device or 'auto'}"
         )
 
-        # Load model and tokenizer
-        self._tokenizer = None
-        self._model = None
+        # Lazy-load pipeline
+        self._pipeline = None
         self._loaded = False
 
     def _ensure_loaded(self) -> None:
-        """Lazy-load the model and tokenizer."""
+        """Lazy-load the pipeline."""
         if self._loaded:
             return
 
         logger.info(f"Loading FinBERT model: {self.model_name}")
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self._model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
-        self._model = self._model.to(self.device)
-        self._model.eval()
+
+        # Create pipeline with device auto-detection
+        device_arg = self.device if self.device is not None else -1  # -1 = CPU, >=0 = GPU
+        self._pipeline = pipeline(
+            "text-classification",
+            model=self.model_name,
+            device=device_arg,
+            truncation=True,
+            max_length=self.max_length,
+        )
+
         self._loaded = True
-        logger.info(f"FinBERT model loaded successfully on {self.device}")
+        logger.info(f"FinBERT pipeline loaded successfully")
 
     def score_text(self, text: str) -> SentimentScore:
         """Score sentiment for a single text.
@@ -108,65 +102,34 @@ class FinBERTSentimentScorer:
             text: Text to analyze
 
         Returns:
-            SentimentScore with sentiment label, score, and confidence
+            SentimentScore with sentiment label and confidence score
         """
         self._ensure_loaded()
 
-        # Tokenize
-        inputs = self._tokenizer(
-            text,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        ).to(self.device)
+        # Get prediction from pipeline
+        result = self._pipeline(text)[0]
 
-        # Get predictions
-        with torch.no_grad():
-            outputs = self._model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1)[0]
-
-        # FinBERT outputs: [positive, negative, neutral]
-        # Note: Some models have different orderings, we handle this
-        labels = ["positive", "negative", "neutral"]
-        if hasattr(self._model.config, "id2label"):
-            labels = [self._model.config.id2label[i] for i in range(len(probs))]
-
-        # Create probability dict
-        raw_probs = {labels[i]: float(probs[i]) for i in range(len(probs))}
-
-        # Find the label indices
-        pos_idx = labels.index("positive") if "positive" in labels else 0
-        neg_idx = labels.index("negative") if "negative" in labels else 1
-        neut_idx = labels.index("neutral") if "neutral" in labels else 2
-
-        # Calculate score (-1 to 1)
-        score = float(probs[pos_idx] - probs[neg_idx])
-
-        # Get predicted sentiment
-        pred_idx = int(probs.argmax())
-        sentiment = labels[pred_idx]
-
-        # Confidence is the max probability
-        confidence = float(probs.max())
+        # Extract label and score
+        sentiment = result["label"]
+        score = result["score"]
 
         return SentimentScore(
             sentiment=sentiment,
             score=score,
-            confidence=confidence,
-            raw_probs=raw_probs,
+            confidence=score,  # Same as score
+            raw_probs=None,  # Pipeline doesn't return all probabilities by default
         )
 
     def score_articles(
         self,
         articles: list[NewsArticle],
-        include_summary: bool = True,
+        include_title: bool = False,
     ) -> list[SentimentScore]:
         """Score sentiment for multiple articles.
 
         Args:
             articles: List of news articles to analyze
-            include_summary: If True, combine title and summary for analysis
+            include_title: If True, prepend title to summary for analysis
 
         Returns:
             List of SentimentScore objects (same order as input)
@@ -179,8 +142,8 @@ class FinBERTSentimentScorer:
         # Prepare texts
         texts = []
         for article in articles:
-            if include_summary and article.summary:
-                text = f"{article.title}. {article.summary}"
+            if article.summary:
+                text = f"{article.title}. {article.summary}" if include_title else article.summary
             else:
                 text = article.title
             texts.append(text)
@@ -203,48 +166,21 @@ class FinBERTSentimentScorer:
         Returns:
             List of SentimentScore objects
         """
-        # Tokenize batch
-        inputs = self._tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        ).to(self.device)
-
-        # Get predictions
-        with torch.no_grad():
-            outputs = self._model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1)
-
-        # Get labels
-        labels = ["positive", "negative", "neutral"]
-        if hasattr(self._model.config, "id2label"):
-            labels = [self._model.config.id2label[i] for i in range(probs.shape[1])]
-
-        # Find label indices
-        pos_idx = labels.index("positive") if "positive" in labels else 0
-        neg_idx = labels.index("negative") if "negative" in labels else 1
+        # Get predictions from pipeline (returns list of dicts)
+        pipeline_results = self._pipeline(texts)
 
         # Convert to SentimentScore objects
         results = []
-        for i in range(len(texts)):
-            prob = probs[i]
-
-            # Calculate score and confidence
-            score = float(prob[pos_idx] - prob[neg_idx])
-            pred_idx = int(prob.argmax())
-            sentiment = labels[pred_idx]
-            confidence = float(prob.max())
-
-            raw_probs = {labels[j]: float(prob[j]) for j in range(len(labels))}
+        for result in pipeline_results:
+            sentiment = result["label"]
+            score = result["score"]
 
             results.append(
                 SentimentScore(
                     sentiment=sentiment,
                     score=score,
-                    confidence=confidence,
-                    raw_probs=raw_probs,
+                    confidence=score,
+                    raw_probs=None,
                 )
             )
 
@@ -320,13 +256,24 @@ class FinBERTSentimentScorer:
         neutral = sum(1 for s in scores if s.sentiment == "neutral")
         total = len(scores)
 
-        avg_score = sum(s.score for s in scores) / total
-        avg_confidence = sum(s.confidence for s in scores) / total
+        # Calculate weighted average score (-1 to +1)
+        # Positive sentiment: +score, Negative: -score, Neutral: 0
+        weighted_scores = []
+        for s in scores:
+            if s.sentiment == "positive":
+                weighted_scores.append(s.score)
+            elif s.sentiment == "negative":
+                weighted_scores.append(-s.score)
+            else:  # neutral
+                weighted_scores.append(0.0)
 
-        # Determine overall sentiment
-        if avg_score > 0.1:
+        avg_score = sum(weighted_scores) / total if total > 0 else 0.0
+        avg_confidence = sum(s.confidence for s in scores) / total if total > 0 else 0.0
+
+        # Determine overall sentiment based on weighted average
+        if avg_score > 0.05:
             overall = "positive"
-        elif avg_score < -0.1:
+        elif avg_score < -0.05:
             overall = "negative"
         else:
             overall = "neutral"
