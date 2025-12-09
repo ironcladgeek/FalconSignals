@@ -7,6 +7,7 @@ import pandas as pd
 
 from src.cache.manager import CacheManager
 from src.config import get_config
+from src.data.news_aggregator import NewsSourceConfig, UnifiedNewsAggregator
 from src.data.price_manager import PriceDataManager
 from src.data.provider_manager import ProviderManager
 from src.data.providers import DataProviderFactory
@@ -908,13 +909,47 @@ class NewsFetcherTool(BaseTool):
         )
         self.cache_manager = cache_manager or CacheManager()
         self.use_local_sentiment = use_local_sentiment
-
-        # Use Alpha Vantage Premium for news content
-        self.provider_manager = ProviderManager(
-            primary_provider="alpha_vantage",
-            backup_providers=["finnhub"],
-        )
         self.historical_date = None  # Track historical date for backtesting
+
+        # Get news configuration from config
+        config = get_config()
+        news_config = config.data.news if hasattr(config.data, "news") else None
+
+        # Initialize UnifiedNewsAggregator for combining news from multiple sources
+        if news_config and news_config.use_unified_aggregator:
+            # Convert config sources to NewsSourceConfig objects
+            sources = [
+                NewsSourceConfig(
+                    name=source.name,
+                    priority=source.priority,
+                    enabled=source.enabled,
+                    max_articles=source.max_articles,
+                )
+                for source in news_config.sources
+            ]
+
+            self.news_aggregator = UnifiedNewsAggregator(
+                sources=sources,
+                target_article_count=news_config.target_article_count,
+                max_age_days=news_config.max_age_days,
+                cache_manager=None,  # Disable internal caching; NewsFetcherTool handles it
+            )
+            logger.debug(
+                f"Initialized UnifiedNewsAggregator with {len(sources)} sources, "
+                f"target={news_config.target_article_count} articles"
+            )
+        else:
+            # Fallback to default configuration if config not available
+            self.news_aggregator = UnifiedNewsAggregator(
+                sources=[
+                    NewsSourceConfig(name="alpha_vantage", priority=1, max_articles=50),
+                    NewsSourceConfig(name="finnhub", priority=2, max_articles=50),
+                ],
+                target_article_count=50,
+                max_age_days=7,
+                cache_manager=None,  # Disable internal caching; NewsFetcherTool handles it
+            )
+            logger.debug("Initialized UnifiedNewsAggregator with default configuration")
 
         # Lazy-load sentiment analyzer
         self._sentiment_analyzer = None
@@ -982,9 +1017,13 @@ class NewsFetcherTool(BaseTool):
                 logger.debug(f"Cache hit for {ticker} news")
                 return cached
 
-            # Fetch news from provider
-            logger.debug(f"Fetching news for {ticker}")
-            articles = self.provider_manager.get_news(ticker, limit, as_of_date=as_of_date)
+            # Fetch news from multiple sources using UnifiedNewsAggregator
+            logger.debug(f"Fetching news for {ticker} from multiple sources")
+            articles = self.news_aggregator.fetch_news(
+                ticker,
+                lookback_days=None,  # Will use max_age_days from config
+                as_of_date=as_of_date,
+            )
 
             if not articles:
                 return {
