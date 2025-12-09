@@ -208,7 +208,9 @@ class NewsConfig(BaseModel):
     target_article_count: int = Field(
         default=50, ge=1, le=200, description="Target number of articles for analysis"
     )
-    max_age_days: int = Field(default=7, ge=1, le=30, description="Maximum age of articles in days")
+    max_age_days: int = Field(
+        default=30, ge=1, le=352, description="Maximum age of articles in days"
+    )
     sources: list[NewsSourceConfig] = Field(
         default_factory=lambda: [
             NewsSourceConfig(name="alpha_vantage", priority=1, max_articles=50),
