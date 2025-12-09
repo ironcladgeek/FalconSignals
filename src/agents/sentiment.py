@@ -149,6 +149,9 @@ class SentimentAgent(BaseAgent):
                 "sentiment_metrics": sentiment,
                 "direction": sentiment.get("sentiment_direction", "neutral"),
                 "news_count": sentiment.get("count", 0),
+                "positive_news": sentiment.get("positive", 0),
+                "negative_news": sentiment.get("negative", 0),
+                "neutral_news": sentiment.get("neutral", 0),
                 "recommendation": self._score_to_recommendation(score),
             }
 
