@@ -488,7 +488,6 @@ US_TECH_INTERNET = [
     "CPNG",  # Coupang
     "SE",  # Sea Limited
     "SHOP",  # Shopify
-    "SQ",  # Block (Square)
     "PYPL",  # PayPal
     "WIX",  # Wix.com
     "GDDY",  # GoDaddy
@@ -606,7 +605,6 @@ US_FINANCIALS_FINTECH = [
     "V",  # Visa
     "MA",  # Mastercard
     "PYPL",  # PayPal
-    "SQ",  # Block (Square)
     "COIN",  # Coinbase
     "AFRM",  # Affirm
     "UPST",  # Upstart
@@ -1141,7 +1139,6 @@ US_CLOUD_COMPUTING = [
     "AYX",  # Alteryx
     "HUBS",  # HubSpot
     "SHOP",  # Shopify
-    "SQ",  # Block
     "WDAY",  # Workday
     "VEEV",  # Veeva Systems
     "TEAM",  # Atlassian
@@ -1560,7 +1557,6 @@ US_PORTFOLIO_BALANCED_AGGRESSIVE = [
     "DDOG",  # Datadog
     "NET",  # Cloudflare
     # Financials Growth
-    "SQ",  # Block
     "COIN",  # Coinbase
     # Healthcare Innovation
     "LLY",  # Eli Lilly (GLP-1)
@@ -1723,7 +1719,6 @@ US_PORTFOLIO_NEXT_GEN_TECH = [
 US_PORTFOLIO_DISRUPTIVE_INNOVATION = [
     # ARK-style disruptive innovation across sectors
     # Fintech Disruption
-    "SQ",  # Block
     "COIN",  # Coinbase
     "AFRM",  # Affirm
     "SOFI",  # SoFi
@@ -1977,7 +1972,6 @@ US_PORTFOLIO_MILLENNIAL_FAVORITES = [
     "PTON",  # Peloton
     "PLNT",  # Planet Fitness
     # Fintech
-    "SQ",  # Block/Cash App
     "PYPL",  # PayPal/Venmo
     "SOFI",  # SoFi
     "HOOD",  # Robinhood
