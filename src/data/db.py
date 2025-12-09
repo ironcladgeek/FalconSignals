@@ -11,6 +11,9 @@ from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, create_engine
 
+# Track initialized databases to avoid redundant initialization logging
+_initialized_databases = set()
+
 
 class DatabaseManager:
     """Manages database connections and initialization."""
@@ -29,6 +32,7 @@ class DatabaseManager:
         """Initialize database engine and create tables.
 
         Creates the SQLite database and all required tables if they don't exist.
+        Only logs initialization message once per database path.
         """
         try:
             # Ensure parent directory exists
@@ -46,7 +50,11 @@ class DatabaseManager:
             SQLModel.metadata.create_all(self.engine)
             self._initialized = True
 
-            logger.info(f"Database initialized at {self.db_path}")
+            # Only log once per database path to avoid spam
+            db_path_str = str(self.db_path)
+            if db_path_str not in _initialized_databases:
+                logger.info(f"Database initialized at {self.db_path}")
+                _initialized_databases.add(db_path_str)
         except SQLAlchemyError as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
