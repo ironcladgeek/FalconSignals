@@ -64,6 +64,7 @@ nav:
   - Home: index.md
   - Reports: reports/
   - Tickers: tickers/
+  - Tags: tags/
   - Signals: signals/
   - About: about.md
 

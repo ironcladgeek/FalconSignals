@@ -1,6 +1,7 @@
 """NordInvest CLI interface."""
 
 import json
+import subprocess
 import sys
 import time
 from datetime import date, datetime
@@ -471,12 +472,12 @@ def analyze(
         try:
             historical_date = datetime.strptime(date, "%Y-%m-%d").date()
             typer.echo(f"📅 Historical date analysis mode: {historical_date}")
-        except ValueError:
+        except ValueError as e:
             typer.echo(
                 f"❌ Error: Invalid date format '{date}'. Use YYYY-MM-DD format (e.g., 2024-06-01)",
                 err=True,
             )
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from e
 
     # Handle test mode (true test mode with fixtures)
     if test:
@@ -950,7 +951,7 @@ def report(
         True, "--save/--no-save", help="Save report to file (default: save)"
     ),
     config: str = typer.Option(
-        "config/default.yaml",
+        "config/local.yaml",
         "--config",
         "-c",
         help="Path to configuration file",
@@ -990,9 +991,9 @@ def report(
         if date:
             try:
                 datetime.strptime(date, "%Y-%m-%d")
-            except ValueError:
+            except ValueError as e:
                 typer.echo(f"❌ Error: Invalid date format '{date}'. Use YYYY-MM-DD", err=True)
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
 
         # Load configuration
         config_obj = load_config(config)
@@ -1114,7 +1115,7 @@ def publish(
         False, "--no-build", help="Skip MkDocs build step (for testing content generation)"
     ),
     config: str = typer.Option(
-        "config/default.yaml",
+        "config/local.yaml",
         "--config",
         "-c",
         help="Path to configuration file",
@@ -1126,6 +1127,7 @@ def publish(
     to GitHub Pages. Similar to report command but outputs to website format.
 
     Examples:
+
         # Publish from specific session and deploy
         publish --session-id 123
 
@@ -1269,6 +1271,15 @@ def publish(
                     logger.warning(f"Failed to generate page for {t}: {e}")
                     typer.echo(f"    ⚠️  {t}: {e}")
 
+        # Generate tag pages
+        typer.echo("  Generating tag pages...")
+        try:
+            tag_pages = generator.generate_tag_pages()
+            typer.echo(f"  ✓ Generated {len(tag_pages)} tag pages")
+        except Exception as e:
+            logger.warning(f"Failed to generate tag pages: {e}")
+            typer.echo(f"  ⚠️  Tag generation failed: {e}")
+
         # Generate index page
         typer.echo("  Generating index page...")
         index_path = generator.generate_index_page()
@@ -1284,7 +1295,6 @@ def publish(
         # Build site with MkDocs if requested
         if not no_build:
             typer.echo("\n🔨 Building site with MkDocs...")
-            import subprocess
 
             website_root = Path("website")
             result = subprocess.run(

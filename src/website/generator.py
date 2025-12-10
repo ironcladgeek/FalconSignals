@@ -350,6 +350,233 @@ class WebsiteGenerator:
         logger.info(f"Updated index page: {file_path}")
         return file_path
 
+    def generate_tag_pages(self) -> dict[str, Path]:
+        """Generate tag index pages for filtering content.
+
+        Creates pages for:
+        - Ticker tags (e.g., tags/AAPL.md)
+        - Signal type tags (e.g., tags/buy.md, tags/strong_buy.md)
+        - Date tags (e.g., tags/2025-12-10.md)
+
+        Returns:
+            Dictionary mapping tag name to generated file path
+        """
+        logger.info("Generating tag pages...")
+
+        tag_dir = self.output_dir / "tags"
+        tag_dir.mkdir(parents=True, exist_ok=True)
+
+        generated_tags = {}
+
+        # Get all recommendations from database
+        from sqlmodel import Session, select
+
+        from src.data.models import Recommendation, Ticker
+
+        with Session(self.recommendations_repo.engine) as session:
+            # Get all unique tickers
+            tickers_stmt = select(Ticker.symbol).distinct()
+            tickers = session.exec(tickers_stmt).all()
+
+            for ticker_symbol in tickers:
+                tag_path = self._generate_ticker_tag_page(ticker_symbol, session)
+                generated_tags[ticker_symbol] = tag_path
+
+            # Get all unique recommendation types
+            rec_types_stmt = select(Recommendation.recommendation).distinct()
+            rec_types = session.exec(rec_types_stmt).all()
+
+            for rec_type in rec_types:
+                if rec_type:  # Skip null values
+                    tag_path = self._generate_signal_type_tag_page(rec_type, session)
+                    generated_tags[rec_type] = tag_path
+
+            # Get all unique dates
+            dates_stmt = select(Recommendation.analysis_date).distinct()
+            dates = session.exec(dates_stmt).all()
+
+            for analysis_date in dates:
+                if analysis_date:
+                    date_str = (
+                        analysis_date.strftime("%Y-%m-%d")
+                        if hasattr(analysis_date, "strftime")
+                        else str(analysis_date)
+                    )
+                    tag_path = self._generate_date_tag_page(date_str, session)
+                    generated_tags[date_str] = tag_path
+
+        logger.info(f"Generated {len(generated_tags)} tag pages")
+        return generated_tags
+
+    def _generate_ticker_tag_page(self, ticker: str, session) -> Path:
+        """Generate tag page for a specific ticker."""
+        from sqlmodel import select
+
+        from src.data.models import Recommendation, Ticker
+
+        # Get all recommendations for this ticker
+        stmt = (
+            select(Recommendation)
+            .join(Ticker)
+            .where(Ticker.symbol == ticker)
+            .order_by(Recommendation.analysis_date.desc())
+        )
+        recommendations = session.exec(stmt).all()
+
+        lines = [
+            f"# {ticker} - All Analysis",
+            "",
+            f"Complete analysis history for **{ticker}**.",
+            "",
+            f"Total recommendations: {len(recommendations)}",
+            "",
+            "## Recent Analysis",
+            "",
+            "| Date | Recommendation | Confidence | Price | Mode |",
+            "|------|---------------|-----------|-------|------|",
+        ]
+
+        for rec in recommendations[:20]:  # Show last 20
+            lines.append(
+                f"| {rec.analysis_date} | "
+                f"**{rec.recommendation.upper()}** | "
+                f"{rec.confidence}% | "
+                f"${rec.price_at_analysis:.2f} | "
+                f"{rec.mode} |"
+            )
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                f"[View detailed {ticker} page](../tickers/{ticker}.md)",
+                "",
+            ]
+        )
+
+        file_path = self.output_dir / "tags" / f"{ticker}.md"
+        with open(file_path, "w") as f:
+            f.write("\n".join(lines))
+
+        return file_path
+
+    def _generate_signal_type_tag_page(self, signal_type: str, session) -> Path:
+        """Generate tag page for a specific signal type (buy, sell, etc)."""
+        from sqlmodel import select
+
+        from src.data.models import Recommendation, Ticker
+
+        # Get all recommendations of this type
+        stmt = (
+            select(Recommendation, Ticker)
+            .join(Ticker)
+            .where(Recommendation.recommendation == signal_type)
+            .order_by(Recommendation.analysis_date.desc())
+        )
+        results = session.exec(stmt).all()
+
+        # Group by ticker
+        ticker_groups = {}
+        for rec, ticker in results:
+            if ticker.symbol not in ticker_groups:
+                ticker_groups[ticker.symbol] = []
+            ticker_groups[ticker.symbol].append(rec)
+
+        lines = [
+            f"# {signal_type.upper()} Signals",
+            "",
+            f"All **{signal_type}** recommendations across all tickers.",
+            "",
+            f"Total signals: {len(results)}",
+            f"Unique tickers: {len(ticker_groups)}",
+            "",
+            "## By Ticker",
+            "",
+        ]
+
+        for ticker_symbol in sorted(ticker_groups.keys()):
+            recs = ticker_groups[ticker_symbol]
+            latest = recs[0]
+            lines.extend(
+                [
+                    f"### {ticker_symbol}",
+                    "",
+                    f"- Latest: {latest.analysis_date} (Confidence: {latest.confidence}%)",
+                    f"- Total {signal_type} signals: {len(recs)}",
+                    f"- [View {ticker_symbol} details](../tickers/{ticker_symbol}.md)",
+                    "",
+                ]
+            )
+
+        file_path = self.output_dir / "tags" / f"{signal_type}.md"
+        with open(file_path, "w") as f:
+            f.write("\n".join(lines))
+
+        return file_path
+
+    def _generate_date_tag_page(self, date_str: str, session) -> Path:
+        """Generate tag page for a specific analysis date."""
+        from sqlmodel import select
+
+        from src.data.models import Recommendation, Ticker
+
+        # Get all recommendations for this date
+        stmt = (
+            select(Recommendation, Ticker)
+            .join(Ticker)
+            .where(Recommendation.analysis_date == date_str)
+            .order_by(Ticker.symbol)
+        )
+        results = session.exec(stmt).all()
+
+        # Group by recommendation type
+        type_groups = {}
+        for rec, ticker in results:
+            if rec.recommendation not in type_groups:
+                type_groups[rec.recommendation] = []
+            type_groups[rec.recommendation].append((ticker.symbol, rec))
+
+        lines = [
+            f"# Analysis - {date_str}",
+            "",
+            f"All analysis signals from **{date_str}**.",
+            "",
+            f"Total signals: {len(results)}",
+            "",
+            "## Summary by Signal Type",
+            "",
+        ]
+
+        for sig_type in sorted(type_groups.keys()):
+            items = type_groups[sig_type]
+            lines.append(f"### {sig_type.upper()} ({len(items)})")
+            lines.append("")
+
+            for ticker_symbol, rec in items:
+                lines.append(
+                    f"- **{ticker_symbol}**: {rec.confidence}% confidence, "
+                    f"${rec.price_at_analysis:.2f} "
+                    f"([details](../tickers/{ticker_symbol}.md))"
+                )
+
+            lines.append("")
+
+        lines.extend(
+            [
+                "---",
+                "",
+                f"[View full report for {date_str}](../reports/{date_str}.md)",
+                "",
+            ]
+        )
+
+        file_path = self.output_dir / "tags" / f"{date_str}.md"
+        with open(file_path, "w") as f:
+            f.write("\n".join(lines))
+
+        return file_path
+
     def update_navigation(self):
         """Update .pages files for navigation."""
         # Create reports/.pages
@@ -365,6 +592,14 @@ class WebsiteGenerator:
         tickers_pages.parent.mkdir(parents=True, exist_ok=True)
         with open(tickers_pages, "w") as f:
             f.write("title: Tickers\n")
+            f.write("nav:\n")
+            f.write("  - ...\n")
+
+        # Create tags/.pages
+        tags_pages = self.output_dir / "tags" / ".pages"
+        tags_pages.parent.mkdir(parents=True, exist_ok=True)
+        with open(tags_pages, "w") as f:
+            f.write("title: Tags\n")
             f.write("nav:\n")
             f.write("  - ...\n")
 
