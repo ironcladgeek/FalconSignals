@@ -197,12 +197,23 @@ class YahooFinanceProvider(DataProvider):
 
             latest = hist.iloc[-1]
             market = self._infer_market(ticker)
+
+            # Convert pandas Timestamp to naive datetime
+            timestamp = hist.index[-1]
+            if hasattr(timestamp, "to_pydatetime"):
+                dt = timestamp.to_pydatetime()
+                # Remove timezone if present
+                if dt.tzinfo is not None:
+                    dt = dt.replace(tzinfo=None)
+            else:
+                dt = timestamp
+
             price = StockPrice(
                 ticker=ticker.upper(),
                 name=self._get_ticker_name(ticker),
                 market=market,
                 instrument_type=InstrumentType.STOCK,
-                date=hist.index[-1].to_pydantic(),
+                date=dt,
                 open_price=float(latest["Open"]),
                 high_price=float(latest["High"]),
                 low_price=float(latest["Low"]),
