@@ -166,10 +166,11 @@ data:
       max_length: 512 # Maximum token length
 
   # API providers (in priority order)
-  primary_provider: alpha_vantage # Alpha Vantage Premium: news sentiment + fundamentals + earnings estimates
+  # Primary: Yahoo Finance for price data (free, reliable, comprehensive)
+  # Backup: Alpha Vantage for news sentiment, fundamentals, and earnings estimates
+  primary_provider: yahoo_finance # Yahoo Finance: comprehensive price data (free)
   backup_providers:
-    - yahoo_finance # Yahoo Finance: reliable price data
-    - finnhub # Finnhub: analyst recommendations only
+    - alpha_vantage # Alpha Vantage: news sentiment + fundamentals + earnings (API key required)
 
 database:
   enabled: true

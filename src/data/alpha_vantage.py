@@ -7,7 +7,7 @@ from typing import Optional
 
 import requests
 
-from src.data.models import InstrumentType, Market, NewsArticle, StockPrice
+from src.data.models import Market, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.logging import get_logger
 
@@ -23,10 +23,12 @@ DEFAULT_TIMEOUT = 30
 class AlphaVantageProvider(DataProvider):
     """Alpha Vantage data provider implementation.
 
-    Supports stock price data, news sentiment, and company overview using Alpha Vantage API.
+    Supports news sentiment, company overview, and earnings data using Alpha Vantage API.
     Free tier: 25 requests/day, 500 requests/day with free API key.
     Provides enriched news sentiment data with topic relevance and sentiment scores.
-    Primary data source for news and sentiment analysis.
+    Primary data source for news, fundamentals, and sentiment analysis.
+
+    Note: Price data fetching has been deprecated - use Yahoo Finance for all price data.
     """
 
     def __init__(
@@ -62,138 +64,28 @@ class AlphaVantageProvider(DataProvider):
         start_date: datetime,
         end_date: datetime,
     ) -> list[StockPrice]:
-        """Fetch historical stock price data from Alpha Vantage.
+        """Price fetching is deprecated for Alpha Vantage.
 
-        Args:
-            ticker: Stock ticker symbol
-            start_date: Start date for historical data
-            end_date: End date for historical data
-
-        Returns:
-            List of StockPrice objects sorted by date
+        Use Yahoo Finance provider for all price data instead.
 
         Raises:
-            ValueError: If ticker is invalid or API key is missing
-            RuntimeError: If API call fails after retries
+            NotImplementedError: Always - Alpha Vantage is no longer used for price data
         """
-        if not self.api_key:
-            raise ValueError("Alpha Vantage API key is not configured")
-
-        try:
-            logger.debug(f"Fetching prices for {ticker} from {start_date} to {end_date}")
-
-            # Alpha Vantage only provides day-level data
-            data = self._api_call(
-                {
-                    "function": "TIME_SERIES_DAILY",
-                    "symbol": ticker,
-                    "outputsize": "full",
-                }
-            )
-
-            if "Error Message" in data:
-                raise ValueError(f"Invalid ticker: {ticker}")
-
-            if "Time Series (Daily)" not in data:
-                raise RuntimeError(f"Unexpected API response format for {ticker}")
-
-            prices = []
-            time_series = data["Time Series (Daily)"]
-
-            for date_str, values in time_series.items():
-                try:
-                    date = datetime.strptime(date_str, "%Y-%m-%d")
-
-                    # Filter by date range
-                    if not (start_date <= date <= end_date):
-                        continue
-
-                    price = StockPrice(
-                        ticker=ticker.upper(),
-                        name=ticker.upper(),
-                        market=self._infer_market(ticker),
-                        instrument_type=InstrumentType.STOCK,
-                        date=date,
-                        open_price=float(values["1. open"]),
-                        high_price=float(values["2. high"]),
-                        low_price=float(values["3. low"]),
-                        close_price=float(values["4. close"]),
-                        volume=int(values["5. volume"]),
-                        currency="USD",
-                    )
-                    prices.append(price)
-                except (ValueError, KeyError) as e:
-                    logger.warning(f"Skipping malformed data for {date_str}: {e}")
-                    continue
-
-            # Sort by date ascending
-            prices.sort(key=lambda p: p.date)
-
-            logger.debug(f"Retrieved {len(prices)} price records for {ticker}")
-            return prices
-
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching prices for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch prices for {ticker}: {e}")
+        raise NotImplementedError(
+            "Alpha Vantage price fetching is deprecated. Use Yahoo Finance for price data."
+        )
 
     def get_latest_price(self, ticker: str) -> StockPrice:
-        """Fetch latest stock price from Alpha Vantage.
+        """Price fetching is deprecated for Alpha Vantage.
 
-        Args:
-            ticker: Stock ticker symbol
-
-        Returns:
-            Latest StockPrice object
+        Use Yahoo Finance provider for all price data instead.
 
         Raises:
-            ValueError: If ticker is invalid or API key is missing
-            RuntimeError: If API call fails
+            NotImplementedError: Always - Alpha Vantage is no longer used for price data
         """
-        if not self.api_key:
-            raise ValueError("Alpha Vantage API key is not configured")
-
-        try:
-            logger.debug(f"Fetching latest price for {ticker}")
-
-            data = self._api_call(
-                {
-                    "function": "GLOBAL_QUOTE",
-                    "symbol": ticker,
-                }
-            )
-
-            if "Error Message" in data:
-                raise ValueError(f"Invalid ticker: {ticker}")
-
-            if "Global Quote" not in data or not data["Global Quote"]:
-                raise RuntimeError(f"No data available for {ticker}")
-
-            quote = data["Global Quote"]
-
-            price = StockPrice(
-                ticker=ticker.upper(),
-                name=ticker.upper(),
-                market=self._infer_market(ticker),
-                instrument_type=InstrumentType.STOCK,
-                date=datetime.now(),
-                open_price=float(quote.get("02. open", 0)),
-                high_price=float(quote.get("03. high", 0)),
-                low_price=float(quote.get("04. low", 0)),
-                close_price=float(quote.get("05. price", 0)),
-                volume=int(quote.get("06. volume", 0)),
-                currency="USD",
-            )
-
-            logger.debug(f"Latest price for {ticker}: {price.close_price}")
-            return price
-
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching latest price for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch latest price for {ticker}: {e}")
+        raise NotImplementedError(
+            "Alpha Vantage price fetching is deprecated. Use Yahoo Finance for price data."
+        )
 
     def _api_call(self, params: dict) -> dict:
         """Make API call with retry logic and exponential backoff.

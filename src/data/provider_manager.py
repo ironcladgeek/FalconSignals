@@ -21,19 +21,19 @@ class ProviderManager:
 
     def __init__(
         self,
-        primary_provider: str = "alpha_vantage",
+        primary_provider: str = "yahoo_finance",
         backup_providers: list[str] = None,
         db_path: Path | str | None = None,
     ):
         """Initialize provider manager.
 
         Args:
-            primary_provider: Primary provider name (default: alpha_vantage)
-            backup_providers: List of backup provider names (default: [yahoo_finance, finnhub])
+            primary_provider: Primary provider name (default: yahoo_finance for price data)
+            backup_providers: List of backup provider names (default: [alpha_vantage] for news/fundamentals)
             db_path: Optional path to database for storing analyst ratings
         """
         self.primary_provider_name = primary_provider
-        self.backup_provider_names = backup_providers or ["yahoo_finance", "finnhub"]
+        self.backup_provider_names = backup_providers or ["alpha_vantage"]
 
         # Initialize providers
         self.primary_provider = self._create_provider(primary_provider)
