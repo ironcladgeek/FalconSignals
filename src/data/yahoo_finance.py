@@ -84,6 +84,11 @@ class YahooFinanceProvider(DataProvider):
                             val = row[(key, ticker.upper())]
                         except (KeyError, TypeError):
                             return None
+
+                    # Ensure we have a scalar value (handle Series case)
+                    if isinstance(val, pd.Series):
+                        val = val.iloc[0] if len(val) > 0 else None
+
                     return float(val) if pd.notna(val) else None
 
                 # Extract price values
