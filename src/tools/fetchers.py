@@ -124,7 +124,15 @@ class PriceFetcherTool(BaseTool):
 
             # Only calculate start_date from days_back if NOT using period-based fetching
             if start_date is None and period is None and days_back is not None:
-                start_date = end_date - timedelta(days=days_back)
+                # days_back represents target TRADING days, but timedelta uses CALENDAR days
+                # Typical ratio: 252 trading days / 365 calendar days ≈ 0.69
+                # To get N trading days, fetch ~1.5x calendar days to account for weekends/holidays
+                calendar_days = int(days_back * 1.5)
+                start_date = end_date - timedelta(days=calendar_days)
+                logger.debug(
+                    f"Calculated start_date for {days_back} trading days: "
+                    f"{calendar_days} calendar days back = {start_date.date()}"
+                )
 
             # When using period, we don't need start/end dates at all
             if period:
@@ -218,42 +226,77 @@ class PriceFetcherTool(BaseTool):
                     needs_fetch = True
                     logger.warning(f"Could not parse period '{period}': {e}, fetching fresh")
         elif existing_start is None or existing_end is None:
-            # No data at all - use period-based fetch (more reliable than exact dates)
+            # No data at all - calculate date range from days_back
             needs_fetch = True
-            period = f"{days_back}d" if days_back else "730d"
-            fetch_start = None  # Will use period instead
-            fetch_end = None
-            logger.debug(f"No existing price data for {ticker}, fetching with period={period}")
+            # Don't use period here - calculate proper date range instead
+            # The start_date was already calculated above accounting for calendar/trading day ratio
+            if start_date is None:
+                # If no start_date calculated, create period as fallback
+                period = f"{days_back}d" if days_back else "730d"
+                fetch_start = None  # Will use period instead
+                fetch_end = None
+                logger.debug(f"No existing price data for {ticker}, fetching with period={period}")
+            else:
+                # Use calculated date range
+                fetch_start = start_date.date() if isinstance(start_date, datetime) else start_date
+                fetch_end = end_date.date() if isinstance(end_date, datetime) else end_date
+                logger.debug(
+                    f"No existing price data for {ticker}, fetching date range {fetch_start} to {fetch_end}"
+                )
         else:
             # We have some data - check if it covers our needed range
-            # Adjust end_date if it's today and we already have yesterday's data
-            # (market may not have closed yet or data may not be available)
-            today = date.today()
-            if end_date >= today and existing_end >= today - timedelta(days=1):
-                # We need today's data, but we have yesterday's - that's recent enough
-                # Don't try to fetch today until we know data is available
-                logger.debug(
-                    f"Adjusting end_date from {end_date} to {existing_end} (market may not have closed)"
-                )
-                end_date = existing_end
+            # For days_back requests, also check if we have enough TRADING days
+            if days_back and not period:
+                df_existing = pm.get_prices(ticker)
+                existing_trading_days = len(df_existing)
+                if existing_trading_days >= days_back:
+                    # We have enough trading days - use what we have
+                    logger.debug(
+                        f"Cached data sufficient for {ticker}: have {existing_trading_days} trading days, "
+                        f"need {days_back}"
+                    )
+                    # Don't fetch - we'll just use all cached data
+                else:
+                    # Not enough trading days - need to fetch more
+                    needs_fetch = True
+                    fetch_start = (
+                        start_date.date() if isinstance(start_date, datetime) else start_date
+                    )
+                    fetch_end = end_date.date() if isinstance(end_date, datetime) else end_date
+                    logger.debug(
+                        f"Insufficient cached trading days for {ticker}: have {existing_trading_days}, "
+                        f"need {days_back}, fetching {fetch_start} to {fetch_end}"
+                    )
+            else:
+                # Date-based request - check if date range is covered
+                # Adjust end_date if it's today and we already have yesterday's data
+                # (market may not have closed yet or data may not be available)
+                today = date.today()
+                if end_date >= today and existing_end >= today - timedelta(days=1):
+                    # We need today's data, but we have yesterday's - that's recent enough
+                    # Don't try to fetch today until we know data is available
+                    logger.debug(
+                        f"Adjusting end_date from {end_date} to {existing_end} (market may not have closed)"
+                    )
+                    end_date = existing_end
 
-            if existing_start <= start_date and existing_end >= end_date:
-                # We have all the data we need - no fetch required
-                logger.debug(
-                    f"Using cached {ticker} prices: have {existing_start} to {existing_end}, need {start_date} to {end_date}"
-                )
-            elif existing_end < end_date:
-                # Need to fetch forward to update to end_date
-                needs_fetch = True
-                fetch_start = existing_end + timedelta(days=1)
-                fetch_end = end_date
-                logger.debug(f"Updating {ticker} prices forward: {fetch_start} -> {fetch_end}")
-            elif existing_start > start_date:
-                # Need to fetch backward to get earlier data
-                needs_fetch = True
-                fetch_start = start_date
-                fetch_end = existing_start - timedelta(days=1)
-                logger.debug(f"Backfilling {ticker} prices: {fetch_start} -> {fetch_end}")
+                if existing_start <= start_date and existing_end >= end_date:
+                    # We have all the data we need - no fetch required
+                    logger.debug(
+                        f"Using cached {ticker} prices: have {existing_start} to {existing_end}, need {start_date} to {end_date}"
+                    )
+                elif existing_end < end_date:
+                    # Need to fetch forward to update to end_date
+                    needs_fetch = True
+                    fetch_start = existing_end + timedelta(days=1)
+                    fetch_end = end_date
+                    logger.debug(f"Updating {ticker} prices forward: {fetch_start} -> {fetch_end}")
+                elif existing_start > start_date:
+                    # Need to fetch backward to get earlier data
+                    needs_fetch = True
+                    fetch_start = start_date
+                    fetch_end = existing_start - timedelta(days=1)
+                    logger.debug(f"Backfilling {ticker} prices: {fetch_start} -> {fetch_end}")
 
         if needs_fetch:
             if fetch_start is None and fetch_end is None:
@@ -283,15 +326,17 @@ class PriceFetcherTool(BaseTool):
                 )
 
         # Read from unified storage (this will use cached data if we already have the full range)
-        # When using period-based fetching, ALWAYS read all available data (no date filtering)
+        # When using period or days_back, ALWAYS read all available data (no date filtering)
         # This ensures we get the full trading days, not calendar-day filtered data
-        if period or start_date is None:
+        if period or days_back or start_date is None:
             df = pm.get_prices(ticker)
             logger.debug(
                 f"Reading all available prices for {ticker} "
-                f"(period-based: {period is not None}, start_date is None: {start_date is None})"
+                f"(period: {period is not None}, days_back: {days_back is not None}, "
+                f"start_date is None: {start_date is None})"
             )
         else:
+            # Only filter by date when explicit start/end dates were provided (not calculated from days_back)
             df = pm.get_prices(ticker, start_date=start_date, end_date=end_date)
             logger.debug(f"Reading filtered prices for {ticker} from {start_date} to {end_date}")
 
@@ -504,7 +549,7 @@ class FinancialDataFetcherTool(BaseTool):
             as_of_date = None
             if self.historical_date:
                 as_of_date = datetime.combine(self.historical_date, datetime.max.time())
-                logger.info(f"Fetching fundamental data as of {self.historical_date} for {ticker}")
+                logger.debug(f"Fetching fundamental data as of {self.historical_date} for {ticker}")
 
             # Create cache key with date (historical or current)
             if self.historical_date:

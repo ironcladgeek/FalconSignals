@@ -109,15 +109,18 @@ class CrewAIToolAdapter:
                 # Always use config value for lookback period
                 if self.config and hasattr(self.config.analysis, "historical_data_lookback_days"):
                     days_back = self.config.analysis.historical_data_lookback_days
-                    logger.debug(f"Using config lookback: {days_back} days")
+                    logger.debug(f"Using config lookback: {days_back} trading days")
                 else:
                     days_back = 730
-                    logger.warning(f"No config available, using default lookback: {days_back} days")
+                    logger.warning(
+                        f"No config available, using default lookback: {days_back} trading days"
+                    )
 
-                logger.info(f"Fetching price data for {ticker} ({days_back} days)")
-                # Use period to get exact number of TRADING days (not calendar days)
-                period = f"{days_back}d"
-                result = self.price_fetcher.run(ticker, period=period)
+                logger.debug(f"Fetching price data for {ticker} (target: {days_back} trading days)")
+                # Use days_back to calculate start date accounting for weekends/holidays
+                # Note: period="Nd" means N calendar days (not trading days)
+                # days_back will calculate appropriate calendar date range
+                result = self.price_fetcher.run(ticker, days_back=days_back)
                 if "error" in result:
                     logger.error(f"Price fetcher returned error for {ticker}: {result['error']}")
                     return json.dumps({"error": result["error"]})
@@ -139,7 +142,9 @@ class CrewAIToolAdapter:
                     "message": f"Fetched {result.get('count', 0)} price data points. Use cache_key '{cache_key}' for technical analysis.",
                 }
 
-                logger.info(f"Price data fetch successful for {ticker}: {summary['count']} records")
+                logger.debug(
+                    f"Price data fetch successful for {ticker}: {summary['count']} records"
+                )
                 return json.dumps(summary, default=json_serial)
             except Exception as e:
                 logger.error(
@@ -153,7 +158,8 @@ class CrewAIToolAdapter:
             """Calculate technical indicators and return pre-computed analysis.
 
             This tool performs the mathematical calculations directly (rule-based)
-            and returns the results for LLM interpretation.
+            and returns the results for LLM interpretation. Price data is automatically
+            fetched if not already cached.
 
             Args:
                 ticker: Stock ticker symbol
@@ -162,20 +168,35 @@ class CrewAIToolAdapter:
                 JSON string with calculated indicators and automated technical analysis
             """
             try:
-                logger.info(f"Calculating technical indicators for {ticker}")
-                # Use cached price data
+                logger.debug(f"Calculating technical indicators for {ticker}")
+                # Use cached price data (auto-fetch if not available)
                 cache_key = f"prices_{ticker}"
-                if cache_key not in self._data_cache:
-                    logger.warning(
-                        f"No cached price data for {ticker}. Call fetch_price_data first."
-                    )
-                    return json.dumps(
-                        {
-                            "error": f"No price data cached for {ticker}. Call fetch_price_data first."
-                        }
-                    )
+                if cache_key not in self._data_cache or not self._data_cache[cache_key]:
+                    # Auto-fetch price data for convenience
+                    if self.config and hasattr(
+                        self.config.analysis, "historical_data_lookback_days"
+                    ):
+                        days_back = self.config.analysis.historical_data_lookback_days
+                    else:
+                        days_back = 90
 
-                prices = self._data_cache[cache_key]
+                    fetch_result = self.price_fetcher.run(ticker, days_back=days_back)
+                    if "error" in fetch_result:
+                        logger.error(
+                            f"Failed to auto-fetch price data for {ticker}: {fetch_result['error']}"
+                        )
+                        return json.dumps(
+                            {
+                                "error": f"No price data available for {ticker}. Fetch failed: {fetch_result['error']}"
+                            }
+                        )
+
+                    # Cache the fetched data
+                    prices = fetch_result.get("prices", [])
+                    self._data_cache[cache_key] = prices
+                else:
+                    prices = self._data_cache[cache_key]
+
                 if not prices:
                     logger.error(f"Cached price list is empty for {ticker}")
                     return json.dumps({"error": "No price data available"})
@@ -192,28 +213,26 @@ class CrewAIToolAdapter:
                         if self.config and hasattr(
                             self.config.analysis, "historical_data_lookback_days"
                         ):
-                            refetch_period = (
-                                f"{self.config.analysis.historical_data_lookback_days}d"
-                            )
+                            refetch_days = self.config.analysis.historical_data_lookback_days
                         else:
-                            refetch_period = "90d"  # Fallback
+                            refetch_days = 90  # Fallback
 
                         logger.warning(
-                            f"Insufficient cached data for {ticker}, refetching with period={refetch_period}"
+                            f"Insufficient cached data for {ticker}, refetching {refetch_days} trading days"
                         )
-                        # Refetch with period to get exactly N trading days
-                        refetch_result = self.price_fetcher.run(ticker, period=refetch_period)
+                        # Refetch with days_back to account for weekends/holidays
+                        refetch_result = self.price_fetcher.run(ticker, days_back=refetch_days)
                         if "error" not in refetch_result:
                             # Update cache and retry
                             prices = refetch_result.get("prices", [])
                             self._data_cache[cache_key] = prices
                             logger.info(
-                                f"Refetched {len(prices)} price points using period={refetch_period}"
+                                f"Refetched {len(prices)} price points using days_back={refetch_days}"
                             )
                             # Retry technical analysis
                             result = self.technical_tool.run(prices)
                             if "error" not in result:
-                                logger.info(
+                                logger.debug(
                                     "Technical indicators calculated successfully after refetch"
                                 )
                             else:
@@ -234,7 +253,7 @@ class CrewAIToolAdapter:
                     "Technical indicators calculated using mathematical formulas. LLM should interpret these signals."
                 )
 
-                logger.info(f"Technical indicators calculated successfully for {ticker}")
+                logger.debug(f"Technical indicators calculated successfully for {ticker}")
                 return json.dumps(result, default=json_serial)
             except Exception as e:
                 logger.error(
@@ -260,7 +279,7 @@ class CrewAIToolAdapter:
                 JSON string with news articles for LLM sentiment analysis
             """
             try:
-                logger.info(f"Fetching news articles for {ticker}")
+                logger.debug(f"Fetching news articles for {ticker}")
                 # Fetch news articles with timeout protection
                 news_result = self.news_fetcher.run(ticker, limit=max_articles)
 
@@ -354,7 +373,7 @@ class CrewAIToolAdapter:
                         f"based on article recency and importance."
                     )
 
-                    logger.info(
+                    logger.debug(
                         f"Sentiment analysis for {ticker}: {total} articles with pre-calculated scores"
                     )
                     return summary
@@ -412,7 +431,7 @@ class CrewAIToolAdapter:
                 JSON string with analyst consensus, sentiment, and momentum data
             """
             try:
-                logger.info(f"Fetching fundamental data for {ticker}")
+                logger.debug(f"Fetching fundamental data for {ticker}")
                 # Fetch fundamental data using the tool
                 fundamental_result = self.fundamental_fetcher.run(ticker)
 
@@ -508,7 +527,7 @@ class CrewAIToolAdapter:
                     ),
                 }
 
-                logger.info(f"Fundamental analysis prepared for {ticker}")
+                logger.debug(f"Fundamental analysis prepared for {ticker}")
                 return json.dumps(result, default=json_serial)
             except Exception as e:
                 logger.error(
