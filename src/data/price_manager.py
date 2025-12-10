@@ -206,7 +206,7 @@ class PriceDataManager:
         file_path = self.get_file_path(ticker)
         try:
             df_to_store.to_csv(file_path, index=False)
-            logger.info(f"Stored {len(df_to_store)} price records for {ticker}")
+            logger.debug(f"Stored {len(df_to_store)} price records for {ticker}")
             return len(df_to_store)
         except Exception as e:
             logger.error(f"Error storing prices for {ticker}: {e}")
