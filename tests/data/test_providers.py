@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.data.models import StockPrice
-
 
 @pytest.mark.unit
 class TestDataProviderBase:
@@ -87,67 +85,37 @@ class TestAlphaVantageProvider:
         assert av_provider.name == "alpha_vantage"
         assert av_provider.api_key == "test_key"
 
-    @patch("src.data.alpha_vantage.requests.get")
-    def test_get_stock_prices_success(self, mock_get, av_provider):
-        """Test successful stock price retrieval from Alpha Vantage."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "Time Series (Daily)": {
-                "2024-01-03": {
-                    "1. open": "104.0000",
-                    "2. high": "109.0000",
-                    "3. low": "99.0000",
-                    "4. close": "106.0000",
-                    "5. volume": "1100000",
-                },
-                "2024-01-02": {
-                    "1. open": "102.0000",
-                    "2. high": "107.0000",
-                    "3. low": "97.0000",
-                    "4. close": "104.0000",
-                    "5. volume": "1200000",
-                },
-            }
-        }
-        mock_get.return_value = mock_response
-
+    def test_get_stock_prices_success(self, av_provider):
+        """Test that stock price retrieval raises NotImplementedError (deprecated)."""
         start_date = datetime(2024, 1, 1)
         end_date = datetime(2024, 1, 3)
 
-        prices = av_provider.get_stock_prices("AAPL", start_date, end_date)
-
-        assert len(prices) == 2
-        assert isinstance(prices[0], StockPrice)
-        assert prices[0].close_price == 104.0  # Should be the most recent date
-        assert prices[0].volume == 1200000
-        assert prices[0].ticker == "AAPL"
-
-    @patch("src.data.alpha_vantage.requests.get")
-    def test_get_stock_prices_api_error(self, mock_get, av_provider):
-        """Test handling of Alpha Vantage API errors."""
-        mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = Exception("API Error")
-        mock_get.return_value = mock_response
-
-        start_date = datetime(2024, 1, 1)
-        end_date = datetime(2024, 1, 3)
-
-        with pytest.raises(RuntimeError, match="Failed to fetch prices for AAPL"):
+        with pytest.raises(
+            NotImplementedError,
+            match="Alpha Vantage price fetching is deprecated. Use Yahoo Finance for price data.",
+        ):
             av_provider.get_stock_prices("AAPL", start_date, end_date)
 
-    @patch("src.data.alpha_vantage.requests.get")
-    def test_get_stock_prices_rate_limit(self, mock_get, av_provider):
-        """Test handling of rate limit errors."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute"
-        }
-        mock_get.return_value = mock_response
-
+    def test_get_stock_prices_api_error(self, av_provider):
+        """Test that stock price retrieval raises NotImplementedError (deprecated)."""
         start_date = datetime(2024, 1, 1)
         end_date = datetime(2024, 1, 3)
 
-        with pytest.raises(RuntimeError, match="Alpha Vantage API rate limit exceeded"):
+        with pytest.raises(
+            NotImplementedError,
+            match="Alpha Vantage price fetching is deprecated",
+        ):
+            av_provider.get_stock_prices("AAPL", start_date, end_date)
+
+    def test_get_stock_prices_rate_limit(self, av_provider):
+        """Test that stock price retrieval raises NotImplementedError (deprecated)."""
+        start_date = datetime(2024, 1, 1)
+        end_date = datetime(2024, 1, 3)
+
+        with pytest.raises(
+            NotImplementedError,
+            match="Alpha Vantage price fetching is deprecated",
+        ):
             av_provider.get_stock_prices("AAPL", start_date, end_date)
 
     @patch("src.data.alpha_vantage.requests.get")
