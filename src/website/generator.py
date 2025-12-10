@@ -167,16 +167,45 @@ class WebsiteGenerator:
         Returns:
             List of markdown lines
         """
+        recommendation = signal.recommendation.value.upper().replace("_", " ")
+        if "BUY" in recommendation:
+            symbol = "🟢"
+        elif "HOLD" in recommendation:
+            symbol = "🟡"
+        elif "SELL" in recommendation:
+            symbol = "🔴"
         lines = [
-            f"#### {signal.ticker}",
+            f"#### {signal.ticker} - {signal.name}",
             "",
-            f"**Recommendation:** {signal.recommendation.value.upper().replace('_', ' ')}  ",
+            f"**Recommendation:** {symbol} {recommendation}  ",
             f"**Confidence:** {signal.confidence}%  ",
             f"**Current Price:** ${signal.current_price:.2f}",
             "",
         ]
 
         if include_details:
+            # Add risk level
+            if signal.risk:
+                lines.extend(
+                    [
+                        f"**Risk Level:** {signal.risk.level.value.replace('_', ' ').title()}",
+                        "",
+                    ]
+                )
+
+            # Add component scores
+            if signal.scores:
+                lines.extend(
+                    [
+                        "**Scores:**",
+                        "",
+                        f"- Technical: {signal.scores.technical:.0f}/100",
+                        f"- Fundamental: {signal.scores.fundamental:.0f}/100",
+                        f"- Sentiment: {signal.scores.sentiment:.0f}/100",
+                        "",
+                    ]
+                )
+
             # Add key reasons section
             if signal.key_reasons:
                 lines.extend(
@@ -208,28 +237,6 @@ class WebsiteGenerator:
                         "📝 **Detailed Analysis:**",
                         "",
                         signal.rationale,
-                        "",
-                    ]
-                )
-
-            # Add component scores
-            if signal.scores:
-                lines.extend(
-                    [
-                        "**Scores:**",
-                        "",
-                        f"- Technical: {signal.scores.technical:.0f}/100",
-                        f"- Fundamental: {signal.scores.fundamental:.0f}/100",
-                        f"- Sentiment: {signal.scores.sentiment:.0f}/100",
-                        "",
-                    ]
-                )
-
-            # Add risk assessment
-            if signal.risk:
-                lines.extend(
-                    [
-                        f"**Risk Assessment:** {signal.risk.level.value.replace('_', ' ').title()}",
                         "",
                     ]
                 )
