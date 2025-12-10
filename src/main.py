@@ -755,7 +755,7 @@ def analyze(
         # Apply filtering strategy before analysis (unified for both LLM and rule-based)
         typer.echo(f"\n🔍 Stage 1: Filtering tickers (strategy: {strategy})")
         try:
-            filtered_ticker_list, filter_result = _filter_tickers(
+            filtered_ticker_list, _ = _filter_tickers(
                 ticker_list,
                 strategy,
                 config_obj,
@@ -764,6 +764,8 @@ def analyze(
                 historical_date,
                 config_obj.test_mode if test else None,
             )
+            if filtered_ticker_list:
+                typer.echo("  ✓ Tickers selected for analysis: " + ", ".join(filtered_ticker_list))
 
             # Track which tickers passed the filter
             tickers_with_anomalies = filtered_ticker_list
