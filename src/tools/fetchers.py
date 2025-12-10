@@ -86,21 +86,23 @@ class PriceFetcherTool(BaseTool):
         start_date: datetime = None,
         end_date: datetime = None,
         days_back: int = None,
+        period: str = None,
     ) -> dict[str, Any]:
         """Fetch price data for ticker using unified CSV storage.
 
         Args:
             ticker: Stock ticker symbol
-            start_date: Start date (if None, uses days_back)
+            start_date: Start date (if None, uses days_back or period)
             end_date: End date (defaults to today or historical_date if set)
             days_back: Days back from end_date if start_date is None (defaults to config value or 730)
+            period: Period string for yfinance (e.g., '60d' for 60 trading days). Overrides days_back.
 
         Returns:
             Dictionary with prices and metadata
         """
         try:
             # Use config value for days_back if not provided
-            if days_back is None:
+            if days_back is None and period is None:
                 if (
                     self.config
                     and hasattr(self.config, "analysis")
@@ -120,16 +122,23 @@ class PriceFetcherTool(BaseTool):
                 else:
                     end_date = datetime.now()
 
-            if start_date is None:
+            if start_date is None and period is None:
                 start_date = end_date - timedelta(days=days_back)
 
-            # Convert to date objects for price manager
-            start_d = start_date.date() if isinstance(start_date, datetime) else start_date
-            end_d = end_date.date() if isinstance(end_date, datetime) else end_date
+            # When using period, we don't need start/end dates at all
+            if period:
+                # Period-based fetching - yfinance handles everything
+                start_d = None
+                end_d = None
+                logger.debug(f"Period-based request: period={period}, ignoring date range")
+            else:
+                # Date-based fetching
+                start_d = start_date.date() if isinstance(start_date, datetime) else start_date
+                end_d = end_date.date() if isinstance(end_date, datetime) else end_date
 
             # Use unified CSV storage if enabled
             if self.use_unified_storage:
-                return self._fetch_with_unified_storage(ticker, start_d, end_d, days_back)
+                return self._fetch_with_unified_storage(ticker, start_d, end_d, days_back, period)
             else:
                 return self._fetch_with_legacy_cache(ticker, start_date, end_date)
 
@@ -145,17 +154,19 @@ class PriceFetcherTool(BaseTool):
     def _fetch_with_unified_storage(
         self,
         ticker: str,
-        start_date: date,
-        end_date: date,
+        start_date: date | None,
+        end_date: date | None,
         days_back: int = None,
+        period: str = None,
     ) -> dict[str, Any]:
         """Fetch prices using unified CSV storage.
 
         Args:
             ticker: Stock ticker symbol
-            start_date: Start date (what we need)
-            end_date: End date (what we need)
+            start_date: Start date (what we need), None if using period
+            end_date: End date (what we need), None if using period
             days_back: Number of days to fetch (used for period-based fetching)
+            period: Period string for yfinance (e.g., '60d' for 60 trading days). Overrides dates.
 
         Returns:
             Dictionary with prices and metadata
@@ -170,7 +181,39 @@ class PriceFetcherTool(BaseTool):
         fetch_end = None
         fetched_successfully = False
 
-        if existing_start is None or existing_end is None:
+        # If period is provided, check if existing cached data is sufficient
+        if period:
+            if existing_start is None or existing_end is None:
+                # No cached data - need to fetch
+                needs_fetch = True
+                logger.debug(f"No existing data for {ticker}, fetching with period={period}")
+            else:
+                # Have cached data - check if we need to fetch more based on period
+                # Extract number of days from period (e.g., "90d" -> 90)
+                try:
+                    requested_days = int(period.rstrip("d"))
+                    # Count existing trading days
+                    df_existing = pm.get_prices(ticker)
+                    existing_trading_days = len(df_existing)
+
+                    if existing_trading_days >= requested_days:
+                        # We have enough data
+                        logger.debug(
+                            f"Cached data sufficient for {ticker}: have {existing_trading_days} trading days, "
+                            f"need {requested_days} (period={period})"
+                        )
+                    else:
+                        # Need to fetch more data
+                        needs_fetch = True
+                        logger.debug(
+                            f"Cached data insufficient for {ticker}: have {existing_trading_days} trading days, "
+                            f"need {requested_days} (period={period}), refetching"
+                        )
+                except (ValueError, AttributeError) as e:
+                    # Can't parse period, fetch fresh
+                    needs_fetch = True
+                    logger.warning(f"Could not parse period '{period}': {e}, fetching fresh")
+        elif existing_start is None or existing_end is None:
             # No data at all - use period-based fetch (more reliable than exact dates)
             needs_fetch = True
             period = f"{days_back}d" if days_back else "730d"
@@ -211,7 +254,8 @@ class PriceFetcherTool(BaseTool):
         if needs_fetch:
             if fetch_start is None and fetch_end is None:
                 # Period-based fetch (initial fetch with no existing data)
-                period = f"{days_back}d" if days_back else "730d"
+                if period is None:
+                    period = f"{days_back}d" if days_back else "730d"
                 logger.info(f"Fetching {ticker} prices with period={period}")
                 prices = self.provider.get_stock_prices(ticker, period=period)
             else:
@@ -235,7 +279,15 @@ class PriceFetcherTool(BaseTool):
                 )
 
         # Read from unified storage (this will use cached data if we already have the full range)
-        df = pm.get_prices(ticker, start_date=start_date, end_date=end_date)
+        # If start_date is None (period-based request), read all available data
+        # Also read all data if we used days_back (to get full trading days, not calendar filtered)
+        if start_date is None or (period and not needs_fetch):
+            df = pm.get_prices(ticker)
+            logger.debug(
+                f"Reading all available prices for {ticker} (period-based or full cache request)"
+            )
+        else:
+            df = pm.get_prices(ticker, start_date=start_date, end_date=end_date)
 
         if df.empty:
             # If we just fetched successfully but got no data in our range, get nearest available data
@@ -289,12 +341,20 @@ class PriceFetcherTool(BaseTool):
         latest = pm.get_latest_price(ticker)
         latest_price = latest["close"] if latest else None
 
+        # Get actual date range from data
+        if not df.empty:
+            actual_start = df["date"].min().date()
+            actual_end = df["date"].max().date()
+        else:
+            actual_start = start_date
+            actual_end = end_date
+
         return {
             "ticker": ticker,
             "prices": prices_list,
             "count": len(prices_list),
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
+            "start_date": actual_start.isoformat() if actual_start else None,
+            "end_date": actual_end.isoformat() if actual_end else None,
             "latest_price": latest_price,
             "storage": "unified_csv",
         }
@@ -970,11 +1030,20 @@ class NewsFetcherTool(BaseTool):
                 # the date range after retrieval
                 pass
 
-            # Check simple cache key first (for current/non-historical requests)
+            # Check for existing cached news data
+            # First try simple key for current requests, then look for any recent news cache
             simple_cache_key = f"news_sentiment:{ticker}"
+            news_prefix = f"news:{ticker}"  # Matches any TICKER_news*.json files
+
             cached = self.cache_manager.get(simple_cache_key)
             if cached and not self.historical_date:
-                logger.debug(f"Cache hit for {ticker} news")
+                logger.debug(f"Cache hit for {ticker} news (simple key)")
+                return cached
+
+            # Try to find any existing news cache (news-finbert, news-sentiment, etc.)
+            cached = self.cache_manager.find_latest_by_prefix(news_prefix)
+            if cached and not self.historical_date:
+                logger.debug(f"Cache hit for {ticker} news (pattern match)")
                 return cached
 
             # Fetch news from multiple sources using UnifiedNewsAggregator

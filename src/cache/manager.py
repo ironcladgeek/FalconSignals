@@ -567,3 +567,59 @@ class CacheManager:
         if not self._use_unified_prices:
             return None
         return self.price_manager.get_price_at_date(ticker, target_date, tolerance_days)
+
+    def find_latest_by_prefix(self, key_prefix: str) -> Optional[Any]:
+        """Find the most recent cache entry matching a key prefix.
+
+        Searches cache directory for files matching the given key prefix pattern.
+        Returns the data from the most recently created cache entry.
+
+        Args:
+            key_prefix: Cache key prefix to search for (e.g., "news_finbert:RELY" or "news:RELY")
+
+        Returns:
+            Cached data from the most recent matching entry, or None if not found
+        """
+        matching_files = []
+
+        # Convert key prefix to filename pattern
+        # Support flexible matching: "news:RELY" -> "RELY_news*.json"
+        # This will match RELY_news-finbert*.json, RELY_news-sentiment*.json, etc.
+        parts = key_prefix.split(":")
+        if len(parts) >= 2:
+            type_name = parts[0].replace("_", "-")
+            ticker = parts[1].upper()
+            # Use wildcard to match any news-related files
+            pattern = f"{ticker}_{type_name}*.json"
+        else:
+            # Fallback pattern
+            pattern = f"*{key_prefix}*.json"
+
+        # Find matching files
+        for file_path in self.cache_dir.glob(pattern):
+            try:
+                with open(file_path, "r") as f:
+                    cached = json.load(f)
+
+                entry = CacheEntry(
+                    key=cached["key"],
+                    data=cached["data"],
+                    ttl_hours=cached["ttl_hours"],
+                )
+                entry.created_at = datetime.fromisoformat(cached["created_at"])
+                entry.expires_at = datetime.fromisoformat(cached["expires_at"])
+
+                if not entry.is_expired():
+                    matching_files.append((entry.created_at, entry.data, entry.key))
+            except Exception as e:
+                logger.warning(f"Error reading cache file {file_path}: {e}")
+                continue
+
+        if not matching_files:
+            return None
+
+        # Return data from most recent entry
+        matching_files.sort(key=lambda x: x[0], reverse=True)
+        latest_created, latest_data, latest_key = matching_files[0]
+        logger.debug(f"Found latest cache for prefix '{key_prefix}': {latest_key}")
+        return latest_data

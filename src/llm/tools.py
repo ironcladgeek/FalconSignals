@@ -115,7 +115,9 @@ class CrewAIToolAdapter:
                     logger.warning(f"No config available, using default lookback: {days_back} days")
 
                 logger.info(f"Fetching price data for {ticker} ({days_back} days)")
-                result = self.price_fetcher.run(ticker, days_back=days_back)
+                # Use period to get exact number of TRADING days (not calendar days)
+                period = f"{days_back}d"
+                result = self.price_fetcher.run(ticker, period=period)
                 if "error" in result:
                     logger.error(f"Price fetcher returned error for {ticker}: {result['error']}")
                     return json.dumps({"error": result["error"]})
@@ -183,8 +185,48 @@ class CrewAIToolAdapter:
                 # Perform rule-based technical analysis calculations
                 result = self.technical_tool.run(prices)
                 if "error" in result:
-                    logger.error(f"Technical tool returned error for {ticker}: {result['error']}")
-                    return json.dumps({"error": result["error"]})
+                    error_msg = result["error"]
+                    # Check if it's an "Insufficient data" error
+                    if "Insufficient data" in error_msg:
+                        # Get the configured lookback period for refetch
+                        if self.config and hasattr(
+                            self.config.analysis, "historical_data_lookback_days"
+                        ):
+                            refetch_period = (
+                                f"{self.config.analysis.historical_data_lookback_days}d"
+                            )
+                        else:
+                            refetch_period = "90d"  # Fallback
+
+                        logger.warning(
+                            f"Insufficient cached data for {ticker}, refetching with period={refetch_period}"
+                        )
+                        # Refetch with period to get exactly N trading days
+                        refetch_result = self.price_fetcher.run(ticker, period=refetch_period)
+                        if "error" not in refetch_result:
+                            # Update cache and retry
+                            prices = refetch_result.get("prices", [])
+                            self._data_cache[cache_key] = prices
+                            logger.info(
+                                f"Refetched {len(prices)} price points using period={refetch_period}"
+                            )
+                            # Retry technical analysis
+                            result = self.technical_tool.run(prices)
+                            if "error" not in result:
+                                logger.info(
+                                    "Technical indicators calculated successfully after refetch"
+                                )
+                            else:
+                                logger.error(
+                                    f"Technical tool still returned error after refetch: {result['error']}"
+                                )
+                                return json.dumps({"error": result["error"]})
+                        else:
+                            logger.error(f"Failed to refetch data: {refetch_result['error']}")
+                            return json.dumps({"error": error_msg})
+                    else:
+                        logger.error(f"Technical tool returned error for {ticker}: {error_msg}")
+                        return json.dumps({"error": error_msg})
 
                 # Add interpretation hints for the LLM (but calculations are done)
                 result["analysis_type"] = "rule_based_calculations"
