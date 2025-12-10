@@ -32,7 +32,7 @@ class ReportGenerator:
         "Yahoo Finance (price data)",
         "Finnhub (news and sentiment)",
         "Technical indicators (internal calculation)",
-        "Market scanner (anomaly detection)",
+        "Filtering strategies (anomaly/volume detection)",
     ]
 
     def __init__(self, include_disclaimers: bool = True):

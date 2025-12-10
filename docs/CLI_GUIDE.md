@@ -77,7 +77,13 @@ uv run python -m src.main analyze [OPTIONS]
 |--------|-------------|
 | `--llm` | Use LLM-powered analysis (costs apply) |
 | `--debug-llm` | Save LLM inputs/outputs for debugging |
-| `--force-full-analysis` | Analyze all tickers even if no anomalies found |
+| `--strategy`, `-s` | Filtering strategy: `anomaly`, `volume`, or `all` (default: `anomaly`) |
+| `--force-full-analysis` | Use 'all' strategy regardless of specified strategy |
+
+**Available Filtering Strategies:**
+- `anomaly`: Filter tickers with price/volume anomalies (large moves, spikes, extremes)
+- `volume`: Filter tickers with significant volume activity and trends
+- `all`: Include all tickers without filtering (no cost optimization)
 
 #### Historical Analysis
 
@@ -128,6 +134,24 @@ uv run python -m src.main analyze --ticker AAPL --llm
 
 # LLM with debug mode
 uv run python -m src.main analyze --ticker AAPL --llm --debug-llm
+```
+
+**Filtering Strategy Examples:**
+```bash
+# Default anomaly strategy
+uv run python -m src.main analyze --market us --limit 50
+
+# Volume-based filtering
+uv run python -m src.main analyze --market us --limit 50 --strategy volume
+
+# No filtering (analyze all tickers)
+uv run python -m src.main analyze --group us_tech_software --strategy all
+
+# Force full analysis (override strategy)
+uv run python -m src.main analyze --market us --limit 30 --force-full-analysis
+
+# LLM with volume strategy
+uv run python -m src.main analyze --group us_ai_ml --llm --strategy volume
 ```
 
 **Category Analysis:**
