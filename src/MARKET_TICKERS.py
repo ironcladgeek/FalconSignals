@@ -332,7 +332,6 @@ US_SMALL_CAP = [
     "JOBY",  # Joby Aviation
     "LILM",  # Lilium
     "ACHR",  # Archer Aviation
-    "BLDE",  # Blade Air Mobility
     "SPCE",  # Virgin Galactic
     "RKLB",  # Rocket Lab
     "ASTR",  # Astra Space
@@ -342,7 +341,6 @@ US_SMALL_CAP = [
     "BKSY",  # BlackSky Technology
     "SATL",  # Satellogic
     "PL",  # Planet Labs
-    "LLAP",  # Terran Orbital
     "SPIR",  # Spire Global
     "S",  # SentinelOne
     "AI",  # C3.ai
@@ -1156,13 +1154,11 @@ US_SPACE_DEFENSE = [
     "ASTS",  # AST SpaceMobile
     "BKSY",  # BlackSky Technology
     "PL",  # Planet Labs
-    "LLAP",  # Terran Orbital
     "SPIR",  # Spire Global
     "SATL",  # Satellogic
     "JOBY",  # Joby Aviation
     "LILM",  # Lilium
     "ACHR",  # Archer Aviation
-    "BLDE",  # Blade Air Mobility
     "LDOS",  # Leidos Holdings
     "BAH",  # Booz Allen Hamilton
 ]
