@@ -8,4 +8,8 @@
          <loc>https://nordinvest.yourdomain.com/about/</loc>
          <lastmod>2025-12-10</lastmod>
     </url>
+    <url>
+         <loc>https://nordinvest.yourdomain.com/tickers/NVDA/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
 </urlset>
