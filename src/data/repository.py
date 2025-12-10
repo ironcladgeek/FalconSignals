@@ -562,6 +562,50 @@ class RunSessionRepository:
             logger.error(f"Error retrieving run session {session_id}: {e}")
             return None
 
+    def get_recent_sessions(self, limit: int = 10) -> list[dict]:
+        """Get recent analysis sessions.
+
+        Args:
+            limit: Maximum number of sessions to return.
+
+        Returns:
+            List of session dictionaries with key fields.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                sessions = session.exec(
+                    select(RunSession)
+                    .where(RunSession.status == "completed")
+                    .order_by(RunSession.started_at.desc())
+                    .limit(limit)
+                ).all()
+
+                result = []
+                for sess in sessions:
+                    # Get analysis date from first signal or use started_at
+                    analysis_date = sess.started_at.date().isoformat() if sess.started_at else None
+
+                    result.append(
+                        {
+                            "id": sess.id,
+                            "started_at": sess.started_at.isoformat() if sess.started_at else None,
+                            "analysis_date": analysis_date,
+                            "analysis_mode": sess.analysis_mode,
+                            "total_signals": sess.signals_generated or 0,
+                            "status": sess.status,
+                        }
+                    )
+
+                return result
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error retrieving recent sessions: {e}")
+            return []
+
 
 class RecommendationsRepository:
     """Repository for storing and retrieving investment recommendations.
@@ -868,6 +912,59 @@ class RecommendationsRepository:
         except Exception as e:
             logger.error(f"Error retrieving latest recommendation for {ticker}: {e}")
             return None
+
+    def get_recommendations_by_ticker(self, ticker: str) -> list[dict]:
+        """Get all recommendations for a specific ticker.
+
+        Args:
+            ticker: Stock ticker symbol.
+
+        Returns:
+            List of recommendation dictionaries with relevant fields.
+        """
+        try:
+            ticker = ticker.upper()
+            session = self.db_manager.get_session()
+            try:
+                # Find ticker first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    logger.warning(f"Ticker not found: {ticker}")
+                    return []
+
+                recommendations = session.exec(
+                    select(Recommendation)
+                    .where(Recommendation.ticker_id == ticker_obj.id)
+                    .order_by(Recommendation.analysis_date.desc())
+                ).all()
+
+                # Convert to dicts with key fields
+                result = []
+                for rec in recommendations:
+                    result.append(
+                        {
+                            "id": rec.id,
+                            "ticker": ticker,
+                            "recommendation": rec.recommendation,
+                            "confidence": rec.confidence,
+                            "current_price": rec.current_price,
+                            "analysis_date": rec.analysis_date.isoformat()
+                            if rec.analysis_date
+                            else None,
+                            "analysis_mode": rec.analysis_mode,
+                            "reasoning": rec.reasoning,
+                        }
+                    )
+
+                return result
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error retrieving recommendations for ticker {ticker}: {e}")
+            return []
 
 
 class PerformanceRepository:

@@ -1,0 +1,77 @@
+site_name: NordInvest Analysis
+site_description: AI-powered financial analysis and investment recommendations
+site_url: https://nordinvest.yourdomain.com
+repo_url: https://github.com/ironcladgeek/NordInvest
+repo_name: ironcladgeek/NordInvest
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.tabs
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    logo: material/chart-line
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      lang: en
+  - awesome-pages
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - Reports: reports/
+  - Tickers: tickers/
+  - Signals: signals/
+  - About: about.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ironcladgeek/NordInvest
+
+copyright: >
+  Copyright &copy; 2025 NordInvest -
+  <a href="#__consent">Change cookie settings</a>
