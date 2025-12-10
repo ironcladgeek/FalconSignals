@@ -108,17 +108,29 @@ class ProviderManager:
         providers_to_try = [self.primary_provider] + self.backup_providers
         errors = []
 
+        # Calculate period in days for Yahoo Finance (prefers period over date range)
+        days_diff = (end_date - start_date).days
+        period = f"{days_diff}d" if days_diff > 0 else "1d"
+
         for provider in providers_to_try:
             if not provider.is_available:
                 logger.debug(f"Skipping unavailable provider: {provider.name}")
                 continue
 
             try:
-                logger.debug(
-                    f"Fetching prices for {ticker} using {provider.name} "
-                    f"({start_date.date()} to {end_date.date()})"
-                )
-                prices = provider.get_stock_prices(ticker, start_date, end_date)
+                # Use period parameter for Yahoo Finance (more reliable and returns exact trading days)
+                if provider.name == "yahoo_finance":
+                    logger.debug(
+                        f"Fetching prices for {ticker} using {provider.name} "
+                        f"(period={period}, ~{days_diff} days)"
+                    )
+                    prices = provider.get_stock_prices(ticker, period=period)
+                else:
+                    logger.debug(
+                        f"Fetching prices for {ticker} using {provider.name} "
+                        f"({start_date.date()} to {end_date.date()})"
+                    )
+                    prices = provider.get_stock_prices(ticker, start_date, end_date)
 
                 if prices:
                     logger.debug(f"Successfully fetched {len(prices)} prices from {provider.name}")
