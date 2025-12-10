@@ -240,7 +240,7 @@ class WebsiteGenerator:
             if signal.metadata:
                 lines.extend(
                     [
-                        "<details>",
+                        '<details markdown="1">',
                         "<summary><strong>📊 Analysis Details</strong> (click to expand)</summary>",
                         "",
                     ]
@@ -251,6 +251,7 @@ class WebsiteGenerator:
                     tech = signal.metadata.technical_indicators
                     lines.extend(
                         [
+                            "",
                             "#### Technical Indicators",
                             "",
                             "| Indicator | Value |",
