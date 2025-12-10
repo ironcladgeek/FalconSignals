@@ -9,6 +9,7 @@ Complete guide to using the NordInvest command-line interface.
 - [Commands](#commands)
   - [analyze](#analyze)
   - [report](#report)
+  - [publish](#publish)
   - [track-performance](#track-performance)
   - [performance-report](#performance-report)
   - [list-categories](#list-categories)
@@ -241,6 +242,71 @@ uv run python -m src.main report --session-id 1 --config config/local.yaml
 - Database must be enabled in configuration
 - Session IDs are integers (auto-incremented)
 - Reports include all recommendations from the session/date
+
+---
+
+### publish
+
+Publish analysis results to static website.
+
+**Syntax:**
+```bash
+uv run python -m src.main publish [OPTIONS]
+```
+
+#### Required Options (choose one)
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--session-id` | Run session ID | `--session-id 123` |
+| `--date` | Analysis date | `--date 2025-12-10` |
+| `--ticker` | Specific ticker symbol | `--ticker NVDA` |
+
+#### Optional Settings
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--build-only` | `False` | Build site but don't deploy to GitHub Pages |
+| `--no-build` | `False` | Skip MkDocs build (for testing content) |
+| `--config`, `-c` | `config/default.yaml` | Path to configuration file |
+
+#### Examples
+
+```bash
+# Publish from session and deploy to GitHub Pages
+uv run python -m src.main publish --session-id 123
+
+# Publish all signals from specific date
+uv run python -m src.main publish --date 2025-12-10
+
+# Publish only one ticker
+uv run python -m src.main publish --ticker NVDA --date 2025-12-10
+
+# Generate content without building site (for testing)
+uv run python -m src.main publish --session-id 123 --no-build
+
+# Build site but don't deploy (for local preview)
+uv run python -m src.main publish --session-id 123 --build-only
+```
+
+**What Gets Published:**
+- Report pages with signals grouped by strength
+- Individual ticker history pages
+- Tag pages for filtering (by ticker, signal type, date)
+- Updated index page with recent reports
+
+**What Gets Removed (Privacy):**
+- Portfolio allocations
+- Watchlist additions/removals
+- Portfolio alerts
+- Personal investment amounts
+
+**Notes:**
+- Database must be enabled in configuration
+- Requires `mkdocs`, `mkdocs-material`, and `mkdocs-awesome-pages-plugin`
+- Site is deployed to `gh-pages` branch
+- Available at: `https://<username>.github.io/<repo>/`
+- See [Website Guide](WEBSITE.md) for detailed setup
 
 ---
 

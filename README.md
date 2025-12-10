@@ -11,6 +11,7 @@ NordInvest is designed to help investors make informed decisions by providing da
 **Key Features:**
 - 🤖 Multi-agent AI system with 5 specialized analysis agents
 - 📊 Dual analysis modes: LLM-powered (AI) and Rule-based (technical indicators)
+- 🌐 Static website publishing with MkDocs + GitHub Pages
 - 💰 Cost-conscious design: Target €50-90/month operational cost
 - 🌍 Global market coverage: 1000+ US, Nordic, and EU instruments
 - ⚡ Fast execution: Complete analysis in <15 minutes
@@ -145,6 +146,30 @@ uv run python -m src.main list-categories
 # Generate report from cached data
 uv run python -m src.main report --date 2024-01-15
 ```
+
+### Publish to Website
+
+Publish analysis results to a static website:
+
+```bash
+# Publish and deploy to GitHub Pages
+uv run python -m src.main publish --session-id 123
+
+# Publish specific date
+uv run python -m src.main publish --date 2025-12-10
+
+# Build only (no deployment)
+uv run python -m src.main publish --session-id 123 --build-only
+```
+
+**Features:**
+- 🌐 Static site with MkDocs + Material theme
+- 🏷️ Tag-based filtering (ticker, signal type, date)
+- 🔒 Privacy-first (removes portfolio allocations)
+- 🚀 Automated GitHub Actions deployment
+- 📱 Responsive design with dark/light mode
+
+See [Website Publishing Guide](docs/WEBSITE.md) for setup and deployment details.
 
 ### CLI Help
 

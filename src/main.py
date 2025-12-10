@@ -14,10 +14,17 @@ from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
 from src.config import load_config
 from src.data.db import init_db
+from src.data.historical import HistoricalDataFetcher
 from src.data.portfolio import PortfolioState
 from src.data.price_manager import PriceDataManager
 from src.data.provider_manager import ProviderManager
+from src.data.repository import (
+    PerformanceRepository,
+    RecommendationsRepository,
+    RunSessionRepository,
+)
 from src.filtering import FilterOrchestrator
+from src.filtering.strategies import list_strategies as get_strategies
 from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
 from src.MARKET_TICKERS import (
@@ -30,6 +37,7 @@ from src.utils.llm_check import get_fallback_warning_message, log_llm_status
 from src.utils.logging import get_logger, setup_logging
 from src.utils.resilience import RateLimiter
 from src.utils.scheduler import RunLog
+from src.website.generator import WebsiteGenerator
 
 app = typer.Typer(
     name="nordinvest",
@@ -538,8 +546,6 @@ def analyze(
             logger.debug(f"Database initialized at {config_obj.database.db_path}")
 
             # Initialize repositories for session management
-            from src.data.repository import RecommendationsRepository, RunSessionRepository
-
             session_repo = RunSessionRepository(config_obj.database.db_path)
             recommendations_repo = RecommendationsRepository(config_obj.database.db_path)
 
@@ -575,8 +581,6 @@ def analyze(
         portfolio_manager = PortfolioState(data_dir / "portfolio_state.json")
 
         # Initialize provider manager for price lookups
-        from src.data.provider_manager import ProviderManager
-
         provider_manager = ProviderManager(
             primary_provider=config_obj.data.primary_provider,
             backup_providers=config_obj.data.backup_providers,
@@ -705,9 +709,6 @@ def analyze(
         # Setup historical data fetcher if analyzing historical data
         historical_context_data = {}
         if historical_date:
-            from src.data.historical import HistoricalDataFetcher
-            from src.data.provider_manager import ProviderManager
-
             typer.echo("\n📅 Preparing historical data fetcher...")
             # Get the primary data provider
             provider_manager = ProviderManager(
@@ -1026,8 +1027,6 @@ def report(
         portfolio_manager = PortfolioState(data_dir / "portfolio_state.json")
 
         # Initialize provider manager for price lookups
-        from src.data.provider_manager import ProviderManager
-
         provider_manager = ProviderManager(
             primary_provider=config_obj.data.primary_provider,
             backup_providers=config_obj.data.backup_providers,
@@ -1094,7 +1093,7 @@ def report(
     except Exception as e:
         logger.error(f"Error generating report: {e}", exc_info=True)
         typer.echo(f"\n❌ Error generating report: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -1186,9 +1185,6 @@ def publish(
         if ticker:
             typer.echo(f"  Ticker: {ticker}")
 
-        # Import website generator
-        from src.website.generator import WebsiteGenerator
-
         # Initialize generator
         website_dir = Path("website/docs")
         generator = WebsiteGenerator(
@@ -1198,8 +1194,6 @@ def publish(
         )
 
         # Load signals from database
-        from src.data.repository import RecommendationsRepository
-
         repo = RecommendationsRepository(config_obj.database.db_path)
 
         if ticker:
@@ -1229,8 +1223,6 @@ def publish(
                 raise typer.Exit(code=1)
 
             # Convert to InvestmentSignal objects
-            from src.analysis import InvestmentSignal
-
             signal_objects = []
             for sig in signals:
                 try:
@@ -1851,9 +1843,6 @@ def track_performance(
         )
 
         # Initialize repositories
-        from src.data.provider_manager import ProviderManager
-        from src.data.repository import PerformanceRepository
-
         perf_repo = PerformanceRepository(db_path)
         provider_manager = ProviderManager(
             primary_provider=config_obj.data.primary_provider,
@@ -1940,7 +1929,7 @@ def track_performance(
     except Exception as e:
         logger.error(f"Error in performance tracking: {e}", exc_info=True)
         typer.echo(f"\n❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -2013,8 +2002,6 @@ def performance_report(
         )
 
         # Initialize repository
-        from src.data.repository import PerformanceRepository
-
         perf_repo = PerformanceRepository(db_path)
 
         # Update performance summary if requested
@@ -2116,7 +2103,6 @@ def list_strategies() -> None:
     Example:
         nordinvest list-strategies
     """
-    from src.filtering.strategies import list_strategies as get_strategies
 
     typer.echo("\n📊 Available Filtering Strategies\n")
     typer.echo("=" * 80)

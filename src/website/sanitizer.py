@@ -79,11 +79,10 @@ def get_safe_signal_summary(signal: InvestmentSignal) -> dict:
         "confidence": signal.confidence,
         "current_price": signal.current_price,
         "analysis_date": signal.analysis_date,
-        "analysis_mode": signal.analysis_mode,
         "component_scores": {
-            "technical": signal.component_scores.technical if signal.component_scores else None,
-            "fundamental": signal.component_scores.fundamental if signal.component_scores else None,
-            "sentiment": signal.component_scores.sentiment if signal.component_scores else None,
+            "technical": signal.scores.technical if signal.scores else None,
+            "fundamental": signal.scores.fundamental if signal.scores else None,
+            "sentiment": signal.scores.sentiment if signal.scores else None,
         },
-        "risk_level": signal.risk_assessment.level.value if signal.risk_assessment else None,
+        "risk_level": signal.risk.level.value if signal.risk else None,
     }

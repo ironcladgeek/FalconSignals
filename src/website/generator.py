@@ -180,34 +180,34 @@ class WebsiteGenerator:
 
         if include_details:
             # Add analysis summary
-            if signal.reasoning:
+            if signal.rationale:
                 lines.extend(
                     [
                         "**Analysis:**",
                         "",
-                        signal.reasoning,
+                        signal.rationale,
                         "",
                     ]
                 )
 
             # Add component scores
-            if signal.component_scores:
+            if signal.scores:
                 lines.extend(
                     [
-                        "**Component Scores:**",
+                        "**Scores:**",
                         "",
-                        f"- Technical: {signal.component_scores.technical:.0f}/100",
-                        f"- Fundamental: {signal.component_scores.fundamental:.0f}/100",
-                        f"- Sentiment: {signal.component_scores.sentiment:.0f}/100",
+                        f"- Technical: {signal.scores.technical:.0f}/100",
+                        f"- Fundamental: {signal.scores.fundamental:.0f}/100",
+                        f"- Sentiment: {signal.scores.sentiment:.0f}/100",
                         "",
                     ]
                 )
 
             # Add risk assessment
-            if signal.risk_assessment:
+            if signal.risk:
                 lines.extend(
                     [
-                        f"**Risk Assessment:** {signal.risk_assessment.level.value.replace('_', ' ').title()}",
+                        f"**Risk Assessment:** {signal.risk.level.value.replace('_', ' ').title()}",
                         "",
                     ]
                 )
