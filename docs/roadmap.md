@@ -216,6 +216,21 @@
     - [Phase 10 Targets (IN PROGRESS) 🔄](#phase-10-targets-in-progress-)
     - [Phase 11-15 Targets](#phase-11-15-targets)
   - [Quick Start Commands](#quick-start-commands)
+  - [Phase 16: Unified Filtering Strategy System](#phase-16-unified-filtering-strategy-system)
+    - [Objectives](#objectives-6)
+    - [Context](#context)
+    - [Implementation](#implementation)
+      - [16.1 Filtering Strategy Pattern](#161-filtering-strategy-pattern)
+      - [16.2 Filtering Orchestrator](#162-filtering-orchestrator)
+      - [16.3 Unified CLI Integration](#163-unified-cli-integration)
+      - [16.4 Architecture Simplification](#164-architecture-simplification)
+      - [16.5 Configuration Support](#165-configuration-support)
+      - [16.6 Documentation Updates](#166-documentation-updates)
+    - [Deliverables](#deliverables-10)
+    - [Code Quality Improvements](#code-quality-improvements)
+    - [Testing](#testing)
+    - [Example Usage](#example-usage)
+    - [Future Enhancements (Optional)](#future-enhancements-optional)
 
 
 ## Executive Summary
@@ -295,6 +310,7 @@ If the answer to questions 1, 3 is YES or question 2, 4 is NO → **REFACTOR FIR
 | Phase 13 | Future | Enhanced Technical Analysis | 📋 Planned |
 | Phase 14 | Future | Advanced Features & Integrations | 📋 Planned |
 | Phase 15 | Future | Backtesting Framework | 📋 Planned |
+| Phase 16 | December 2025 | Unified Filtering Strategy System | ✅ Complete |
 
 ---
 
@@ -3504,6 +3520,12 @@ uv run python -m src.main analyze --ticker AAPL --llm
 # Historical analysis (Phase 8) ✅
 uv run python -m src.main analyze --ticker AAPL --date 2024-06-01
 
+# Filtering strategies (Phase 16) ✅
+uv run python -m src.main analyze --market us --strategy anomaly
+uv run python -m src.main analyze --market us --strategy volume
+uv run python -m src.main analyze --group us_tech_software --strategy all
+uv run python -m src.main analyze --market us --force-full-analysis
+
 # Store analyst ratings (Phase 9 - HIGH PRIORITY)
 uv run python -m src.main store-analyst-ratings
 
@@ -3522,6 +3544,124 @@ uv run python -m src.main backtest --tickers AAPL,MSFT --start 2024-01-01 --end 
 # Help
 uv run python -m src.main --help
 ```
+
+---
+
+## Phase 16: Unified Filtering Strategy System
+
+**Status:** ✅ Complete (December 2025)
+
+### Objectives
+- Implement pluggable filtering strategies for ticker pre-selection
+- Unify filtering logic for both LLM and rule-based analysis modes
+- Eliminate code duplication (DRY principle compliance)
+- Provide user control over filtering strategy via CLI
+
+### Context
+Previously, the system had two separate filtering paths:
+- **LLM mode**: Used `_scan_market_for_anomalies()` with MarketScannerAgent
+- **Rule-based mode**: No pre-filtering applied
+
+This violated the DRY principle and created maintenance burden. Phase 16 addresses this by creating a single, unified filtering system used by both modes.
+
+### Implementation
+
+#### 16.1 Filtering Strategy Pattern
+- [x] Create `src/filtering/strategies.py` with strategy pattern:
+  - Abstract `FilterStrategy` base class
+  - `AnomalyStrategy`: Price/volume anomaly detection (default)
+  - `VolumeStrategy`: Volume patterns and trends
+  - `AllStrategy`: Pass-through (no filtering)
+- [x] Implement strategy registry and factory function
+- [x] Support configurable thresholds per strategy
+
+#### 16.2 Filtering Orchestrator
+- [x] Create `src/filtering/orchestrator.py` with `FilterOrchestrator`:
+  - Manages price data fetching via PriceFetcherTool
+  - Executes filtering strategy on ticker list
+  - Returns filtered tickers with detailed reasons
+  - Supports historical date filtering
+  - Progress bar integration with typer
+
+#### 16.3 Unified CLI Integration
+- [x] Replace `_scan_market_for_anomalies()` with unified `_filter_tickers()`
+- [x] Add `--strategy` parameter to analyze command:
+  - Options: `anomaly` (default), `volume`, `all`
+  - Short form: `-s`
+- [x] Update `--force-full-analysis` to override strategy to `all`
+- [x] Apply filtering before both LLM and rule-based analysis (DRY)
+
+#### 16.4 Architecture Simplification
+- [x] Remove MarketScannerAgent from main analysis flow
+- [x] Keep MarketScannerAgent class for backward compatibility
+- [x] Add `AnalysisCrew.analyze_instruments()` for pre-filtered tickers
+- [x] Update `pipeline.run_analysis()` to use `analyze_instruments()`
+- [x] Both LLM and rule-based modes now use same filtered ticker list
+
+#### 16.5 Configuration Support
+- [x] Add filtering configuration schema (optional for this phase)
+- [x] Support strategy-specific config (thresholds, lookback periods)
+- [x] Default strategy configurable in config file
+
+#### 16.6 Documentation Updates
+- [x] Update CLI_GUIDE.md with filtering strategy examples
+- [x] Document available strategies and their behavior
+- [x] Add filtering workflow examples
+- [x] Update roadmap.md with Phase 16
+
+### Deliverables
+- ✅ `src/filtering/strategies.py` with 3 strategies
+- ✅ `src/filtering/orchestrator.py` with unified orchestrator
+- ✅ Updated `main.py` with `_filter_tickers()` and `--strategy` param
+- ✅ Updated `pipeline.py` to use pre-filtered tickers
+- ✅ Updated `crew.py` with `analyze_instruments()` method
+- ✅ Updated CLI_GUIDE.md with strategy documentation
+- ✅ Updated roadmap.md with Phase 16
+
+### Code Quality Improvements
+**DRY Compliance:**
+- ✅ **Single filtering path** for both LLM and rule-based modes
+- ✅ **Single price fetching** via FilterOrchestrator
+- ✅ **Single strategy selection** logic
+- ✅ **No duplicate filtering code** between modes
+
+**Benefits:**
+- 🎯 Reduced maintenance burden (single code path to update)
+- 🐛 Lower bug risk (fixes apply to both modes)
+- 🧪 Easier testing (one filtering system to test)
+- 💰 Cost optimization (filtering reduces API/LLM usage)
+- 🔧 User control (strategy selection via CLI)
+
+### Testing
+- [x] Run test suite to identify broken tests
+- [x] Update test expectations for new filtering flow
+- [x] Ensure test fixtures work with FilterOrchestrator
+- [x] Verify both LLM and rule-based modes use unified filtering
+
+### Example Usage
+```bash
+# Default anomaly filtering
+uv run python -m src.main analyze --market us --limit 50
+
+# Volume-based filtering
+uv run python -m src.main analyze --market us --strategy volume
+
+# No filtering (all tickers)
+uv run python -m src.main analyze --group us_tech_software --strategy all
+
+# Force full analysis (override strategy)
+uv run python -m src.main analyze --market us --force-full-analysis
+
+# LLM with custom strategy
+uv run python -m src.main analyze --group us_ai_ml --llm --strategy volume
+```
+
+### Future Enhancements (Optional)
+- [ ] Add momentum-based filtering strategy
+- [ ] Add technical indicator-based filtering (RSI, MACD crossovers)
+- [ ] Add sector rotation filtering
+- [ ] Support custom user-defined strategies
+- [ ] Add filtering strategy performance analytics
 
 ---
 
