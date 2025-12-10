@@ -1,0 +1,169 @@
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m479[0m - [34m[1mDatabase initialized at data/nordinvest.db[0m
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[1mINFO    [0m | [36msrc.utils.llm_check[0m:[36mlog_llm_status[0m:[36m63[0m - [1mLLM configured: Using Anthropic for AI-powered analysis[0m
+[34m[1mDEBUG   [0m | [36msrc.utils.scheduler[0m:[36m__init__[0m:[36m272[0m - [34m[1mRun log initialized: data/runs.jsonl[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m494[0m - [34m[1mStarting NordInvest analysis (dry_run=False)[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m495[0m - [34m[1mUsing config: None[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m496[0m - [34m[1mRisk tolerance: moderate[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m497[0m - [34m[1mCapital: €2,000.00[0m
+✓ Configuration loaded successfully
+  Risk tolerance: moderate
+  Capital: €2,000.00
+  Monthly deposit: €500.00
+  Markets: nordic, eu
+
+⏳ Initializing analysis pipeline...
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36m__init__[0m:[36m72[0m - [34m[1mCache manager initialized at data/cache[0m
+[34m[1mDEBUG   [0m | [36msrc.data.portfolio[0m:[36m_load[0m:[36m337[0m - [34m[1mNo existing state file: data/portfolio_state.json[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m__init__[0m:[36m55[0m - [34m[1mAlpha Vantage provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: alpha_vantage (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: yahoo_finance[0m
+[34m[1mDEBUG   [0m | [36msrc.data.yahoo_finance[0m:[36m__init__[0m:[36m26[0m - [34m[1mYahoo Finance provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: yahoo_finance (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: finnhub[0m
+[34m[1mDEBUG   [0m | [36msrc.data.finnhub[0m:[36m__init__[0m:[36m45[0m - [34m[1mFinnhub provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: finnhub (available=True)[0m
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m__init__[0m:[36m50[0m - [34m[1mAnalyst ratings repository initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m__init__[0m:[36m54[0m - [34m[1mProvider manager initialized: primary=alpha_vantage, backups=['yahoo_finance', 'finnhub'][0m
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36m__init__[0m:[36m72[0m - [34m[1mCache manager initialized at data/cache[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: yahoo_finance[0m
+[34m[1mDEBUG   [0m | [36msrc.data.yahoo_finance[0m:[36m__init__[0m:[36m26[0m - [34m[1mYahoo Finance provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.base[0m:[36m__init__[0m:[36m40[0m - [34m[1mInitialized agent: Market Scanner[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36m__init__[0m:[36m72[0m - [34m[1mCache manager initialized at data/cache[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: yahoo_finance[0m
+[34m[1mDEBUG   [0m | [36msrc.data.yahoo_finance[0m:[36m__init__[0m:[36m26[0m - [34m[1mYahoo Finance provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.base[0m:[36m__init__[0m:[36m40[0m - [34m[1mInitialized agent: Technical Analyst[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36m__init__[0m:[36m72[0m - [34m[1mCache manager initialized at data/cache[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m__init__[0m:[36m55[0m - [34m[1mAlpha Vantage provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: alpha_vantage (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: yahoo_finance[0m
+[34m[1mDEBUG   [0m | [36msrc.data.yahoo_finance[0m:[36m__init__[0m:[36m26[0m - [34m[1mYahoo Finance provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: yahoo_finance (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: finnhub[0m
+[34m[1mDEBUG   [0m | [36msrc.data.finnhub[0m:[36m__init__[0m:[36m45[0m - [34m[1mFinnhub provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: finnhub (available=True)[0m
+[1mINFO    [0m | [36msrc.data.db[0m:[36minitialize[0m:[36m49[0m - [1mDatabase initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m__init__[0m:[36m50[0m - [34m[1mAnalyst ratings repository initialized at data/nordinvest.db[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m__init__[0m:[36m54[0m - [34m[1mProvider manager initialized: primary=alpha_vantage, backups=['yahoo_finance', 'finnhub'][0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m__init__[0m:[36m55[0m - [34m[1mAlpha Vantage provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: finnhub[0m
+[34m[1mDEBUG   [0m | [36msrc.data.finnhub[0m:[36m__init__[0m:[36m45[0m - [34m[1mFinnhub provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: yahoo_finance[0m
+[34m[1mDEBUG   [0m | [36msrc.data.yahoo_finance[0m:[36m__init__[0m:[36m26[0m - [34m[1mYahoo Finance provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.base[0m:[36m__init__[0m:[36m40[0m - [34m[1mInitialized agent: Fundamental Analyst[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36m__init__[0m:[36m72[0m - [34m[1mCache manager initialized at data/cache[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m__init__[0m:[36m55[0m - [34m[1mAlpha Vantage provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: alpha_vantage (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.providers[0m:[36mcreate[0m:[36m193[0m - [34m[1mCreating provider instance: finnhub[0m
+[34m[1mDEBUG   [0m | [36msrc.data.finnhub[0m:[36m__init__[0m:[36m45[0m - [34m[1mFinnhub provider initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m_create_provider[0m:[36m70[0m - [34m[1mCreated provider: finnhub (available=True)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36m__init__[0m:[36m54[0m - [34m[1mProvider manager initialized: primary=alpha_vantage, backups=['finnhub'][0m
+[34m[1mDEBUG   [0m | [36msrc.agents.base[0m:[36m__init__[0m:[36m40[0m - [34m[1mInitialized agent: Sentiment Analyst[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.base[0m:[36m__init__[0m:[36m40[0m - [34m[1mInitialized agent: Signal Synthesizer[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.crew[0m:[36m__init__[0m:[36m47[0m - [34m[1mAnalysis crew initialized with 5 agents using Anthropic LLM[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.risk[0m:[36m__init__[0m:[36m31[0m - [34m[1mRisk assessor initialized: high_vol=3.0%, very_high_vol=5.0%[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.allocation[0m:[36m__init__[0m:[36m38[0m - [34m[1mAllocation engine initialized: capital=2000.0€, monthly_deposit=500.0€[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.report[0m:[36m__init__[0m:[36m40[0m - [34m[1mReport generator initialized[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36m__init__[0m:[36m86[0m - [34m[1mAnalysis pipeline initialized with Anthropic LLM[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36m__init__[0m:[36m94[0m - [34m[1mAnalysis pipeline initialized[0m
+
+📊 Running analysis on 1 specified instruments...
+  Tickers: KEYS
+[34m[1mDEBUG   [0m | [36msrc.data.repository[0m:[36mcreate_session[0m:[36m484[0m - [34m[1mCreated run session: 4 (rule_based)[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m700[0m - [34m[1mCreated run session: 4[0m
+
+📊 Using rule-based analysis (technical indicators & fundamental metrics)
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m113[0m - [34m[1mStarting analysis pipeline for 1 instruments[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m119[0m - [34m[1mPhase 1: Running crew analysis[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.crew[0m:[36mscan_and_analyze[0m:[36m149[0m - [34m[1mStarting market scan for 1 instruments[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.scanner[0m:[36mexecute[0m:[36m61[0m - [34m[1mScanning 1 instruments for anomalies[0m
+🔍 Scanning instruments
+[34m[1mDEBUG   [0m | [36msrc.data.price_manager[0m:[36m__init__[0m:[36m55[0m - [34m[1mPriceDataManager initialized at data/cache/prices[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.scanner[0m:[36mexecute[0m:[36m111[0m - [34m[1mFound 1 instruments with anomalies[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.crew[0m:[36mscan_and_analyze[0m:[36m163[0m - [34m[1mFound 1 instruments with anomalies[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.crew[0m:[36manalyze_instrument[0m:[36m79[0m - [34m[1mStarting comprehensive analysis for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.analysis[0m:[36mexecute[0m:[36m57[0m - [34m[1mAnalyzing technical indicators for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.data.price_manager[0m:[36m__init__[0m:[36m55[0m - [34m[1mPriceDataManager initialized at data/cache/prices[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.analysis[0m:[36mexecute[0m:[36m252[0m - [34m[1mAnalyzing fundamentals for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36mget[0m:[36m116[0m - [34m[1mCache hit (disk): fundamental_enriched:KEYS:2025-12-08[0m
+[34m[1mDEBUG   [0m | [36msrc.tools.fetchers[0m:[36mrun[0m:[36m380[0m - [34m[1mCache hit for KEYS fundamental data[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.analysis[0m:[36mexecute[0m:[36m333[0m - [34m[1mFundamental analysis for KEYS: 67.3/100[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.sentiment[0m:[36mexecute[0m:[36m56[0m - [34m[1mAnalyzing sentiment for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36mget[0m:[36m130[0m - [34m[1mCache miss: news_sentiment:KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.tools.fetchers[0m:[36mrun[0m:[36m910[0m - [34m[1mFetching news for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36mget_news[0m:[36m211[0m - [34m[1mProviderManager: Fetching news for KEYS from primary provider: alpha_vantage (as_of_date=None)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36mget_news[0m:[36m225[0m - [34m[1mFetching news for KEYS using alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36mget_news[0m:[36m282[0m - [34m[1mFetching news sentiment for KEYS (limit=50, as_of_date=None)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36mget_news[0m:[36m312[0m - [34m[1mAlpha Vantage NEWS_SENTIMENT params: {'function': 'NEWS_SENTIMENT', 'tickers': 'KEYS', 'limit': 100, 'sort': 'LATEST'}[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m_api_call[0m:[36m214[0m - [34m[1mAPI call (attempt 1/3)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36mget_news[0m:[36m409[0m - [34m[1mRetrieved 50 news articles with sentiment for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36mget_news[0m:[36m229[0m - [34m[1mSuccessfully fetched 50 articles from alpha_vantage[0m
+[1mINFO    [0m | [36msrc.tools.fetchers[0m:[36mrun[0m:[36m926[0m - [1mApplying FinBERT sentiment to 50 articles[0m
+[1mINFO    [0m | [36msrc.sentiment.finbert[0m:[36m__init__[0m:[36m82[0m - [1mInitializing FinBERT scorer with model=ProsusAI/finbert, device=mps[0m
+[1mINFO    [0m | [36msrc.sentiment.finbert[0m:[36m_ensure_loaded[0m:[36m96[0m - [1mLoading FinBERT model: ProsusAI/finbert[0m
+[1mINFO    [0m | [36msrc.sentiment.finbert[0m:[36m_ensure_loaded[0m:[36m102[0m - [1mFinBERT model loaded successfully on mps[0m
+[1mINFO    [0m | [36msrc.sentiment.finbert[0m:[36mupdate_articles_with_scores[0m:[36m276[0m - [1mUpdated 50 articles with FinBERT sentiment scores[0m
+[1mINFO    [0m | [36msrc.tools.fetchers[0m:[36mrun[0m:[36m932[0m - [1mSentiment scoring complete using local_finbert[0m
+[34m[1mDEBUG   [0m | [36msrc.tools.fetchers[0m:[36mrun[0m:[36m955[0m - [34m[1mNews date range for KEYS: 2025-11-29 to 2025-12-06[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36mset[0m:[36m160[0m - [34m[1mCache set (disk): news_finbert:KEYS:2025-11-29:2025-12-06 (TTL: 4h)[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.sentiment[0m:[36mexecute[0m:[36m135[0m - [34m[1mSentiment analysis for KEYS: 64.95/100[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.sentiment[0m:[36mexecute[0m:[36m212[0m - [34m[1mSynthesizing signals for KEYS[0m
+[1mINFO    [0m | [36msrc.agents.sentiment[0m:[36mexecute[0m:[36m258[0m - [1mSignal synthesis for KEYS: hold (43/100, confidence: 66%)[0m
+[34m[1mDEBUG   [0m | [36msrc.agents.crew[0m:[36manalyze_instrument[0m:[36m109[0m - [34m[1mAnalysis complete for KEYS: hold (confidence: 66%)[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m129[0m - [34m[1mPhase 2: Normalizing analysis results and creating signals[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36mnormalize_rule_based_result[0m:[36m144[0m - [34m[1mNormalizing rule-based results for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36mnormalize_rule_based_result[0m:[36m147[0m - [34m[1mDEBUG normalize_rule_based_result - analysis keys: ['status', 'ticker', 'analysis', 'final_recommendation', 'confidence', 'final_score'][0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36mnormalize_rule_based_result[0m:[36m151[0m - [34m[1mDEBUG normalize_rule_based_result - analysis_data keys: ['technical', 'fundamental', 'sentiment', 'synthesis'][0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36mnormalize_rule_based_result[0m:[36m155[0m - [34m[1mDEBUG normalize_rule_based_result - technical_data: {'status': 'error', 'message': 'Insufficient data: 42 periods, need 200', 'technical_score': 0}[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36m_extract_technical_rule_based[0m:[36m743[0m - [34m[1mDEBUG _extract_technical_rule_based - tech_data keys: ['status', 'message', 'technical_score'][0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36m_extract_technical_rule_based[0m:[36m744[0m - [34m[1mDEBUG _extract_technical_rule_based - tech_data: {'status': 'error', 'message': 'Insufficient data: 42 periods, need 200', 'technical_score': 0}[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36m_extract_technical_rule_based[0m:[36m747[0m - [34m[1mDEBUG _extract_technical_rule_based - indicators: {}[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.normalizer[0m:[36m_extract_technical_rule_based[0m:[36m772[0m - [34m[1mDEBUG _extract_technical_rule_based - technical_indicators: rsi=None macd=None macd_signal=None sma_20=None sma_50=None sma_200=None volume_avg=None atr=None[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m146[0m - [34m[1mNormalized rule-based result for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.signal_creator[0m:[36mcreate_signal[0m:[36m63[0m - [34m[1mCreating signal for KEYS from rule_based mode analysis[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.signal_creator[0m:[36m_fetch_current_price[0m:[36m217[0m - [34m[1mFetching current price for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.cache.manager[0m:[36mget_latest_price[0m:[36m274[0m - [34m[1mNo price cache found for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36mget_latest_price[0m:[36m166[0m - [34m[1mFetching latest price for KEYS using alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36mget_latest_price[0m:[36m158[0m - [34m[1mFetching latest price for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36m_api_call[0m:[36m214[0m - [34m[1mAPI call (attempt 1/3)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.alpha_vantage[0m:[36mget_latest_price[0m:[36m189[0m - [34m[1mLatest price for KEYS: 210.49[0m
+[34m[1mDEBUG   [0m | [36msrc.data.provider_manager[0m:[36mget_latest_price[0m:[36m170[0m - [34m[1mSuccessfully fetched latest price from alpha_vantage[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.signal_creator[0m:[36m_fetch_current_price[0m:[36m234[0m - [34m[1mGot price for KEYS from provider: $210.49[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.metadata_extractor[0m:[36mextract_metadata_from_unified_result[0m:[36m201[0m - [34m[1mExtracting metadata from unified result for KEYS (rule_based mode)[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.metadata_extractor[0m:[36mextract_metadata_from_unified_result[0m:[36m211[0m - [34m[1mMetadata extraction: tech=True, fund=True, analyst=False, sentiment=True[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.risk[0m:[36massess_signal[0m:[36m98[0m - [34m[1mRisk assessment for KEYS: medium (volatility: normal, liquidity: normal)[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.signal_creator[0m:[36mcreate_signal[0m:[36m115[0m - [34m[1mCreated signal for KEYS: Recommendation.HOLD (score: 43.0, confidence: 66.3)[0m
+[34m[1mDEBUG   [0m | [36msrc.data.repository[0m:[36mstore_recommendation[0m:[36m690[0m - [34m[1mStored recommendation 4 for KEYS[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m177[0m - [34m[1mGenerated 1 investment signals[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mrun_analysis[0m:[36m180[0m - [34m[1mPhase 3: Generating portfolio allocation[0m
+[34m[1mDEBUG   [0m | [36msrc.data.repository[0m:[36mcomplete_session[0m:[36m528[0m - [34m[1mCompleted run session: 4 (1 signals, 0 failed)[0m
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m783[0m - [34m[1mCompleted run session: 4 (status: completed)[0m
+✓ Analysis complete: 1 signals generated
+
+📋 Generating report...
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mgenerate_daily_report[0m:[36m251[0m - [34m[1mGenerating daily report with 1 signals from in-memory[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.allocation[0m:[36mallocate_signals[0m:[36m63[0m - [34m[1mAllocating from 2000.0€ available capital (0€ already allocated)[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.allocation[0m:[36mallocate_signals[0m:[36m147[0m - [34m[1mAllocated KEYS: 50.0€ (confidence: 66.34%, score: 43.05/100)[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.allocation[0m:[36mallocate_signals[0m:[36m197[0m - [34m[1mAllocation complete: 1 positions, 2.5% allocated, diversification score: 0[0m
+[34m[1mDEBUG   [0m | [36msrc.analysis.report[0m:[36mgenerate_daily_report[0m:[36m137[0m - [34m[1mReport generated for 2025-12-08: 0 strong signals, 1 moderate signals[0m
+[34m[1mDEBUG   [0m | [36msrc.pipeline[0m:[36mgenerate_daily_report[0m:[36m279[0m - [34m[1mReport generated: 0 strong signals[0m
+
+📈 Report Summary:
+  Strong signals: 0
+  Moderate signals: 1
+  Total analyzed: 1
+  Diversification score: 0.0%
+  Recommended allocation: €50
+  Report saved: data/reports/report_2025-12-08_16-07-14.md
+[34m[1mDEBUG   [0m | [36m__main__[0m:[36manalyze[0m:[36m840[0m - [34m[1mAnalysis run completed successfully in 2.87s[0m
+
+✓ Analysis completed in 2.87s
+[34m[1mDEBUG   [0m | [36msrc.utils.scheduler[0m:[36mlog_run[0m:[36m306[0m - [34m[1mRun logged: SUCCESS (2.87s, 1 signals)[0m

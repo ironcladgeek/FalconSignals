@@ -87,7 +87,7 @@ class SentimentAgent(BaseAgent):
                     "sentiment_score": 50,  # Neutral
                 }
 
-            # Analyze sentiment
+            # Analyze sentiment with weighted scoring
             sentiment_tool = next(
                 (t for t in self.tools if hasattr(t, "name") and t.name == "SentimentAnalyzer"),
                 None,
@@ -100,7 +100,15 @@ class SentimentAgent(BaseAgent):
                     "sentiment_score": 0,
                 }
 
-            sentiment = sentiment_tool.run(news_data.get("articles", []))
+            # Set analysis date for recency weighting
+            analysis_date = context.get("analysis_date")
+            if hasattr(sentiment_tool, "analysis_date"):
+                sentiment_tool.analysis_date = analysis_date
+
+            # Run weighted sentiment analysis
+            sentiment = sentiment_tool.run(
+                news_data.get("articles", []), reference_date=analysis_date
+            )
 
             if "error" in sentiment:
                 return {
@@ -109,18 +117,30 @@ class SentimentAgent(BaseAgent):
                     "sentiment_score": 0,
                 }
 
-            # Convert sentiment to 0-100 score
-            direction = sentiment.get("sentiment_direction", "neutral")
-            avg_score = sentiment.get("avg_sentiment", 0)
+            # Check if we have pre-calculated scores or need LLM analysis
+            has_precalculated = sentiment.get("has_precalculated_scores", False)
+            requires_llm = sentiment.get("requires_llm_analysis", False)
 
-            if direction == "positive":
-                score = 50 + (avg_score * 50)  # Map -1 to 1 to 0 to 100
-            elif direction == "negative":
-                score = 50 + (avg_score * 50)
+            if requires_llm:
+                logger.info(
+                    f"{ticker}: No pre-calculated sentiment scores available. "
+                    "LLM analysis would be needed for deeper insights."
+                )
+                # Return neutral with note - LLM analysis can be added here later
+                score = 50
             else:
-                score = 50  # Neutral
+                # Use weighted sentiment score from pre-calculated data
+                weighted_score = sentiment.get("weighted_sentiment", 0.0)
 
-            score = max(0, min(100, score))
+                # Convert weighted sentiment (-1 to +1) to 0-100 score
+                # -1 -> 0, 0 -> 50, +1 -> 100
+                score = 50 + (weighted_score * 50)
+                score = max(0, min(100, score))
+
+                logger.info(
+                    f"{ticker}: Using pre-calculated sentiment scores. "
+                    f"Weighted score: {weighted_score:.3f} -> {score:.1f}/100"
+                )
 
             result = {
                 "status": "success",
@@ -129,6 +149,9 @@ class SentimentAgent(BaseAgent):
                 "sentiment_metrics": sentiment,
                 "direction": sentiment.get("sentiment_direction", "neutral"),
                 "news_count": sentiment.get("count", 0),
+                "positive_news": sentiment.get("positive", 0),
+                "negative_news": sentiment.get("negative", 0),
+                "neutral_news": sentiment.get("neutral", 0),
                 "recommendation": self._score_to_recommendation(score),
             }
 

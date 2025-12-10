@@ -76,7 +76,9 @@ class TechnicalAnalysisAgent(BaseAgent):
                     f"Set historical date {context['analysis_date']} for technical analysis"
                 )
 
-            price_data = price_fetcher.run(ticker, days_back=60)
+            # Use configured lookback period for historical data
+            lookback_days = context.get("historical_data_lookback_days", 730)
+            price_data = price_fetcher.run(ticker, days_back=lookback_days)
 
             if "error" in price_data:
                 return {
@@ -138,7 +140,7 @@ class TechnicalAnalysisAgent(BaseAgent):
         """Calculate overall technical score.
 
         Args:
-            indicators: Technical indicators
+            indicators: Technical indicators (flat structure with indicator values)
 
         Returns:
             Score from 0-100
@@ -156,11 +158,19 @@ class TechnicalAnalysisAgent(BaseAgent):
                 score += 5  # Neutral momentum
 
         # MACD histogram contribution (0-15 points)
-        if "macd" in indicators:
-            hist = indicators["macd"].get("histogram", 0)
-            if hist > 0:
+        # Handle both old nested format and new flat format
+        macd_hist = None
+        if "macd_histogram" in indicators:
+            # New flat format
+            macd_hist = indicators["macd_histogram"]
+        elif "macd" in indicators and isinstance(indicators["macd"], dict):
+            # Old nested format (backward compatibility)
+            macd_hist = indicators["macd"].get("histogram", 0)
+
+        if macd_hist is not None:
+            if macd_hist > 0:
                 score += 10
-            elif hist < 0:
+            elif macd_hist < 0:
                 score -= 10
 
         # Volume contribution (0-10 points)
@@ -176,8 +186,10 @@ class TechnicalAnalysisAgent(BaseAgent):
             score -= 15
 
         # ATR volatility (0-10 points, lower is better for stable trends)
-        if "atr" in indicators and "latest_price" in indicators:
-            atr_pct = indicators["atr"] / indicators["latest_price"] * 100
+        atr = indicators.get("atr")
+        latest_price = indicators.get("latest_price")
+        if atr is not None and latest_price is not None:
+            atr_pct = atr / latest_price * 100
             if atr_pct < 2:
                 score += 5
 

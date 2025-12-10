@@ -42,7 +42,6 @@ class TestFinancialDataFetcherTool:
         result = tool.run("TEST_UNAVAIL")
 
         assert "company_info" in result
-        assert "news_sentiment" in result
 
     def test_run_with_company_data(self):
         """Test successful fetch with company data."""
@@ -160,12 +159,11 @@ class TestFinancialDataFetcherTool:
                 f"earnings_estimates not in result. Keys: {list(result.keys())}"
             )
             assert "company_info" in result
-            assert "news_sentiment" in result
             # Verify Finnhub was actually called
             assert mock_finnhub.get_recommendation_trends.called, "Finnhub provider was not called"
 
-    def test_news_sentiment_integration(self):
-        """Test that news sentiment data is fetched from Alpha Vantage Premium."""
+    def test_news_sentiment_not_in_fundamental(self):
+        """Test that news sentiment is NOT in fundamental data (handled by SentimentAgent)."""
         tool = FinancialDataFetcherTool()
 
         mock_price = MagicMock()
@@ -178,10 +176,11 @@ class TestFinancialDataFetcherTool:
 
         result = tool.run("NEWS_TEST")
 
-        # Verify news_sentiment is in result structure
-        assert "news_sentiment" in result
+        # Verify news_sentiment is NOT included (handled separately by SentimentAgent)
+        # Fundamental data focuses on: company_info, analyst_data, price_context, metrics
         assert "price_context" in result
         assert "company_info" in result
+        assert "analyst_data" in result
 
     def test_earnings_estimates_integration(self):
         """Test that earnings estimates are fetched from Alpha Vantage Premium."""

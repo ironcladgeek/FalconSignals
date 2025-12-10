@@ -172,11 +172,11 @@ def extract_sentiment_info(analysis_data: dict[str, Any]) -> SentimentInfo | Non
         news_data = sent_data.get("news", {})
 
         return SentimentInfo(
-            news_count=news_data.get("count") or news_data.get("news_count"),
+            news_count=sent_data.get("news_count") or news_data.get("count"),
             sentiment_score=sent_data.get("sentiment_score"),
-            positive_news=news_data.get("positive_count") or news_data.get("positive"),
-            negative_news=news_data.get("negative_count") or news_data.get("negative"),
-            neutral_news=news_data.get("neutral_count") or news_data.get("neutral"),
+            positive_news=sent_data.get("positive_news") or news_data.get("positive"),
+            negative_news=sent_data.get("negative_news") or news_data.get("negative"),
+            neutral_news=sent_data.get("neutral_news") or news_data.get("neutral"),
         )
     except Exception as e:
         logger.warning(f"Failed to extract sentiment info: {e}")

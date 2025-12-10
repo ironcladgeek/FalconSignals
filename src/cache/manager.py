@@ -3,9 +3,12 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from src.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from src.data.price_manager import PriceDataManager
 
 logger = get_logger(__name__)
 
@@ -50,15 +53,22 @@ class CacheManager:
     Uses JSON format for flexibility and human-readability.
     """
 
-    def __init__(self, cache_dir: str | Path = "data/cache"):
+    def __init__(
+        self,
+        cache_dir: str | Path = "data/cache",
+        use_unified_prices: bool = True,
+    ):
         """Initialize cache manager.
 
         Args:
             cache_dir: Directory for cache files
+            use_unified_prices: If True, use PriceDataManager for price data (CSV storage)
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._memory_cache = {}
+        self._use_unified_prices = use_unified_prices
+        self._price_manager: Optional["PriceDataManager"] = None
         logger.debug(f"Cache manager initialized at {self.cache_dir}")
 
     def get(
@@ -470,3 +480,146 @@ class CacheManager:
         # Sanitize filename
         filename = filename.replace("/", "_")
         return self.cache_dir / filename
+
+    @property
+    def price_manager(self) -> "PriceDataManager":
+        """Get or create the PriceDataManager instance.
+
+        Returns:
+            PriceDataManager for unified price storage
+        """
+        if self._price_manager is None:
+            from src.data.price_manager import PriceDataManager
+
+            prices_dir = self.cache_dir / "prices"
+            self._price_manager = PriceDataManager(prices_dir=prices_dir)
+        return self._price_manager
+
+    def get_unified_prices(
+        self,
+        ticker: str,
+        start_date=None,
+        end_date=None,
+    ):
+        """Get price data from unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date (optional)
+            end_date: End date (optional)
+
+        Returns:
+            DataFrame with price data or empty DataFrame if not found
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_prices(ticker, start_date, end_date)
+
+    def store_unified_prices(
+        self,
+        ticker: str,
+        prices: list[dict],
+        append: bool = True,
+    ) -> int:
+        """Store price data in unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            prices: List of price dictionaries
+            append: If True, merge with existing data
+
+        Returns:
+            Number of rows stored
+        """
+        if not self._use_unified_prices:
+            return 0
+        return self.price_manager.store_prices(ticker, prices, append=append)
+
+    def get_unified_latest_price(self, ticker: str) -> Optional[Any]:
+        """Get latest price from unified CSV storage.
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Price data dictionary or None
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_latest_price(ticker)
+
+    def get_unified_price_at_date(
+        self,
+        ticker: str,
+        target_date,
+        tolerance_days: int = 5,
+    ) -> Optional[Any]:
+        """Get price for a specific date from unified storage.
+
+        Args:
+            ticker: Stock ticker symbol
+            target_date: Target date
+            tolerance_days: Days to look back for non-trading days
+
+        Returns:
+            Price data dictionary or None
+        """
+        if not self._use_unified_prices:
+            return None
+        return self.price_manager.get_price_at_date(ticker, target_date, tolerance_days)
+
+    def find_latest_by_prefix(self, key_prefix: str) -> Optional[Any]:
+        """Find the most recent cache entry matching a key prefix.
+
+        Searches cache directory for files matching the given key prefix pattern.
+        Returns the data from the most recently created cache entry.
+
+        Args:
+            key_prefix: Cache key prefix to search for (e.g., "news_finbert:RELY" or "news:RELY")
+
+        Returns:
+            Cached data from the most recent matching entry, or None if not found
+        """
+        matching_files = []
+
+        # Convert key prefix to filename pattern
+        # Support flexible matching: "news:RELY" -> "RELY_news*.json"
+        # This will match RELY_news-finbert*.json, RELY_news-sentiment*.json, etc.
+        parts = key_prefix.split(":")
+        if len(parts) >= 2:
+            type_name = parts[0].replace("_", "-")
+            ticker = parts[1].upper()
+            # Use wildcard to match any news-related files
+            pattern = f"{ticker}_{type_name}*.json"
+        else:
+            # Fallback pattern
+            pattern = f"*{key_prefix}*.json"
+
+        # Find matching files
+        for file_path in self.cache_dir.glob(pattern):
+            try:
+                with open(file_path, "r") as f:
+                    cached = json.load(f)
+
+                entry = CacheEntry(
+                    key=cached["key"],
+                    data=cached["data"],
+                    ttl_hours=cached["ttl_hours"],
+                )
+                entry.created_at = datetime.fromisoformat(cached["created_at"])
+                entry.expires_at = datetime.fromisoformat(cached["expires_at"])
+
+                if not entry.is_expired():
+                    matching_files.append((entry.created_at, entry.data, entry.key))
+            except Exception as e:
+                logger.warning(f"Error reading cache file {file_path}: {e}")
+                continue
+
+        if not matching_files:
+            return None
+
+        # Return data from most recent entry
+        matching_files.sort(key=lambda x: x[0], reverse=True)
+        latest_created, latest_data, latest_key = matching_files[0]
+        logger.debug(f"Found latest cache for prefix '{key_prefix}': {latest_key}")
+        return latest_data

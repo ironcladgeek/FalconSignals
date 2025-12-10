@@ -282,7 +282,6 @@ US_MID_CAP = [
     "TTD",  # Trade Desk
     "PAYC",  # Paycom
     "PCTY",  # Paylocity
-    "SMAR",  # Smartsheet
     "CFLT",  # Confluent
     "ESTC",  # Elastic
     "DT",  # Dynatrace
@@ -372,7 +371,6 @@ US_TECH_SOFTWARE = [
     "OKTA",  # Okta
     "WDAY",  # Workday
     "VEEV",  # Veeva Systems
-    "SPLK",  # Splunk
     "TEAM",  # Atlassian
     "ZM",  # Zoom
     "DOCU",  # DocuSign
@@ -383,7 +381,6 @@ US_TECH_SOFTWARE = [
     "PAYC",  # Paycom
     "PCTY",  # Paylocity
     "PATH",  # UiPath
-    "SMAR",  # Smartsheet
     "CFLT",  # Confluent
     "ESTC",  # Elastic
     "GTLB",  # GitLab
@@ -488,7 +485,6 @@ US_TECH_INTERNET = [
     "CPNG",  # Coupang
     "SE",  # Sea Limited
     "SHOP",  # Shopify
-    "SQ",  # Block (Square)
     "PYPL",  # PayPal
     "WIX",  # Wix.com
     "GDDY",  # GoDaddy
@@ -520,7 +516,6 @@ US_HEALTHCARE_PHARMA = [
     "SNY",  # Sanofi
     "ZTS",  # Zoetis
     "ALNY",  # Alnylam Pharmaceuticals
-    "SGEN",  # Seagen
     "BMRN",  # BioMarin
     "INCY",  # Incyte
     "SRPT",  # Sarepta Therapeutics
@@ -606,21 +601,18 @@ US_FINANCIALS_FINTECH = [
     "V",  # Visa
     "MA",  # Mastercard
     "PYPL",  # PayPal
-    "SQ",  # Block (Square)
     "COIN",  # Coinbase
     "AFRM",  # Affirm
     "UPST",  # Upstart
     "SOFI",  # SoFi Technologies
     "HOOD",  # Robinhood
     "AXP",  # American Express
-    "DFS",  # Discover Financial
     "COF",  # Capital One
     "SYF",  # Synchrony Financial
     "ALLY",  # Ally Financial
     "GPN",  # Global Payments
     "FIS",  # Fidelity National
     "FISV",  # Fiserv
-    "FLT",  # Fleetcor
     "WEX",  # WEX Inc
     "FOUR",  # Shift4 Payments
     "TOST",  # Toast
@@ -628,7 +620,6 @@ US_FINANCIALS_FINTECH = [
     "PAYO",  # Payoneer
     "RELY",  # Remitly Global
     "BILL",  # Bill Holdings
-    "NVEI",  # Nuvei Corporation
     "FLYW",  # Flywire
     "PSFE",  # Paysafe
     "LMND",  # Lemonade
@@ -846,7 +837,6 @@ US_CLEAN_ENERGY = [
     "SEDG",  # SolarEdge
     "FSLR",  # First Solar
     "RUN",  # Sunrun
-    "NOVA",  # Sunnova Energy
     "ARRY",  # Array Technologies
     "MAXN",  # Maxeon Solar
     "JKS",  # JinkoSolar
@@ -859,8 +849,6 @@ US_CLEAN_ENERGY = [
     "CHPT",  # ChargePoint
     "BLNK",  # Blink Charging
     "EVGO",  # EVgo Inc
-    "LEV",  # Lion Electric
-    "FSR",  # Fisker
     "LCID",  # Lucid Motors
     "RIVN",  # Rivian
     "NIO",  # NIO Inc
@@ -870,7 +858,6 @@ US_CLEAN_ENERGY = [
     "ALB",  # Albemarle
     "SQM",  # Sociedad Quimica
     "LAC",  # Lithium Americas
-    "LTHM",  # Livent
 ]
 
 US_UTILITIES = [
@@ -968,7 +955,6 @@ US_MATERIALS = [
     "EXP",  # Eagle Materials
     "USLM",  # United States Lime
     "ALB",  # Albemarle
-    "LTHM",  # Livent
     "EMN",  # Eastman Chemical
     "CE",  # Celanese
     "HUN",  # Huntsman
@@ -1106,7 +1092,6 @@ US_CYBERSECURITY = [
     "MSFT",  # Microsoft Security
     "GOOGL",  # Google Cloud Security
     "AMZN",  # AWS Security
-    "SPLK",  # Splunk
     "AKAM",  # Akamai
     "FFIV",  # F5 Networks
     "A10",  # A10 Networks
@@ -1141,7 +1126,6 @@ US_CLOUD_COMPUTING = [
     "AYX",  # Alteryx
     "HUBS",  # HubSpot
     "SHOP",  # Shopify
-    "SQ",  # Block
     "WDAY",  # Workday
     "VEEV",  # Veeva Systems
     "TEAM",  # Atlassian
@@ -1191,13 +1175,11 @@ US_EV_AUTONOMOUS = [
     "NIO",  # NIO Inc
     "XPEV",  # XPeng
     "LI",  # Li Auto
-    "FSR",  # Fisker
     "NKLA",  # Nikola
     "GOEV",  # Canoo
     "PSNY",  # Polestar
     "WKHS",  # Workhorse
     "HYLN",  # Hyliion
-    "LEV",  # Lion Electric
     "FFIE",  # Faraday Future
     "MULN",  # Mullen Automotive
     "CHPT",  # ChargePoint
@@ -1560,7 +1542,6 @@ US_PORTFOLIO_BALANCED_AGGRESSIVE = [
     "DDOG",  # Datadog
     "NET",  # Cloudflare
     # Financials Growth
-    "SQ",  # Block
     "COIN",  # Coinbase
     # Healthcare Innovation
     "LLY",  # Eli Lilly (GLP-1)
@@ -1723,7 +1704,6 @@ US_PORTFOLIO_NEXT_GEN_TECH = [
 US_PORTFOLIO_DISRUPTIVE_INNOVATION = [
     # ARK-style disruptive innovation across sectors
     # Fintech Disruption
-    "SQ",  # Block
     "COIN",  # Coinbase
     "AFRM",  # Affirm
     "SOFI",  # SoFi
@@ -1977,7 +1957,6 @@ US_PORTFOLIO_MILLENNIAL_FAVORITES = [
     "PTON",  # Peloton
     "PLNT",  # Planet Fitness
     # Fintech
-    "SQ",  # Block/Cash App
     "PYPL",  # PayPal/Venmo
     "SOFI",  # SoFi
     "HOOD",  # Robinhood

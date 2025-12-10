@@ -14,6 +14,7 @@ from src.analysis import (
 from src.analysis.normalizer import AnalysisResultNormalizer
 from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
+from src.config.schemas import Config
 from src.data.portfolio import PortfolioState
 from src.data.provider_manager import ProviderManager
 from src.utils.llm_check import check_llm_configuration
@@ -27,7 +28,7 @@ class AnalysisPipeline:
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: Config,
         cache_manager: CacheManager,
         portfolio_manager: PortfolioState | None = None,
         llm_provider: str | None = None,
@@ -39,7 +40,7 @@ class AnalysisPipeline:
         """Initialize analysis pipeline.
 
         Args:
-            config: Configuration dictionary with analysis parameters
+            config: Configuration object with all settings
             cache_manager: Cache manager for data caching
             portfolio_manager: Optional portfolio state manager for position tracking
             llm_provider: Optional LLM provider to check configuration for
@@ -64,21 +65,22 @@ class AnalysisPipeline:
 
         # Initialize components
         self.crew = AnalysisCrew(
-            llm_provider=llm_provider, test_mode_config=test_mode_config, db_path=db_path
+            llm_provider=llm_provider,
+            test_mode_config=test_mode_config,
+            db_path=db_path,
+            config=config,
         )
         self.risk_assessor = RiskAssessor(
-            volatility_threshold_high=config.get("risk_volatility_high", 3.0),
-            volatility_threshold_very_high=config.get("risk_volatility_very_high", 5.0),
+            volatility_threshold_high=3.0,
+            volatility_threshold_very_high=5.0,
         )
         self.allocation_engine = AllocationEngine(
-            total_capital=config.get("capital_starting", 2000),
-            monthly_deposit=config.get("capital_monthly_deposit", 500),
-            max_position_size_pct=config.get("max_position_size_pct", 10),
-            max_sector_concentration_pct=config.get("max_sector_concentration_pct", 20),
+            total_capital=config.capital.starting_capital_eur,
+            monthly_deposit=config.capital.monthly_deposit_eur,
+            max_position_size_pct=config.risk.max_position_size_percent,
+            max_sector_concentration_pct=config.risk.max_sector_concentration_percent,
         )
-        self.report_generator = ReportGenerator(
-            include_disclaimers=config.get("include_disclaimers", True)
-        )
+        self.report_generator = ReportGenerator(include_disclaimers=True)
 
         # Check and log LLM configuration status
         llm_configured, provider = check_llm_configuration(llm_provider)
@@ -109,6 +111,13 @@ class AnalysisPipeline:
         """
         context = context or {}
         context["tickers"] = tickers
+        # Add configured lookback period to context for agents
+        if hasattr(self.config, "analysis") and hasattr(
+            self.config.analysis, "historical_data_lookback_days"
+        ):
+            context["historical_data_lookback_days"] = (
+                self.config.analysis.historical_data_lookback_days
+            )
 
         logger.debug(f"Starting analysis pipeline for {len(tickers)} instruments")
 

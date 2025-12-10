@@ -145,11 +145,10 @@ class AnalysisResultNormalizer:
 
         # Extract component results from nested structure
         analysis_data = analysis.get("analysis", {})
+        technical_data = analysis_data.get("technical", {})
 
         # Extract technical component
-        technical = AnalysisResultNormalizer._extract_technical_rule_based(
-            analysis_data.get("technical", {})
-        )
+        technical = AnalysisResultNormalizer._extract_technical_rule_based(technical_data)
 
         # Extract fundamental component
         fundamental = AnalysisResultNormalizer._extract_fundamental_rule_based(
@@ -730,29 +729,72 @@ class AnalysisResultNormalizer:
 
     @staticmethod
     def _extract_technical_rule_based(tech_data: dict[str, Any]) -> AnalysisComponentResult:
-        """Extract technical analysis component from rule-based output."""
+        """Extract technical analysis component from rule-based output.
+
+        This method uses a GENERIC approach that automatically handles any indicator
+        without requiring code changes. It flattens nested indicator outputs into
+        parameterized field names (e.g., macd_12_26_9_line, ichimoku_9_26_52_tenkan).
+
+        Adding new indicators (like Ichimoku Cloud) requires ZERO code changes here -
+        just add them to config/local.yaml!
+        """
+        # Handle invalid input
+        if not isinstance(tech_data, dict):
+            logger.error(f"Technical data is not a dict: type={type(tech_data)}, value={tech_data}")
+            return AnalysisComponentResult(
+                component="technical",
+                score=0.0,
+                technical_indicators=None,
+                reasoning="Invalid technical data type",
+            )
+
+        # Check for error status in technical analysis result
+        if tech_data.get("status") == "error":
+            error_msg = tech_data.get("message", "Unknown error in technical analysis")
+            logger.warning(f"Technical analysis failed: {error_msg}")
+            # Return component result with error information
+            return AnalysisComponentResult(
+                component="technical",
+                score=tech_data.get("technical_score", 0.0),
+                raw_data=tech_data,
+                technical_indicators=None,
+                reasoning=f"Error: {error_msg}",
+            )
+
         indicators = tech_data.get("indicators", {})
         components = tech_data.get("components", {})
 
-        # Extract MACD values (handle both dict and float formats)
-        macd_data = indicators.get("macd")
-        if isinstance(macd_data, dict):
-            macd_value = macd_data.get("line")
-            macd_signal_value = macd_data.get("signal")
-        else:
-            macd_value = macd_data
-            macd_signal_value = indicators.get("macd_signal")
+        # Build dynamic indicator fields using GENERIC flattening approach
+        indicator_fields = {}
+
+        # Check if we have full_analysis with detailed indicators from calculate_indicators()
+        full_analysis = indicators.get("full_analysis", {})
+        detailed_indicators = full_analysis.get("indicators", {})
+
+        # GENERIC EXTRACTION: Iterate through all calculated indicators
+        # This works for ANY indicator: RSI, MACD, BBands, Ichimoku, etc.
+        for indicator_key, indicator_value in detailed_indicators.items():
+            # Flatten the indicator output into parameterized fields
+            flattened = AnalysisResultNormalizer._flatten_indicator_output(
+                indicator_key, indicator_value
+            )
+            indicator_fields.update(flattened)
+
+        # LEGACY FALLBACK: Handle old flat structure (backwards compatibility)
+        # This ensures old data continues to work
+        if not indicator_fields and indicators:
+            indicator_fields = AnalysisResultNormalizer._extract_legacy_indicators(indicators)
+
+        # Extract volume average (special case - not a technical indicator)
+        volume_avg = (
+            indicators.get("volume_avg")
+            or full_analysis.get("volume_analysis", {}).get("avg_volume")
+            or components.get("volume", {}).get("avg_volume")
+        )
 
         technical_indicators = TechnicalIndicators(
-            rsi=indicators.get("rsi"),
-            macd=macd_value,
-            macd_signal=macd_signal_value,
-            sma_20=indicators.get("sma_20"),
-            sma_50=indicators.get("sma_50"),
-            sma_200=indicators.get("sma_200"),
-            volume_avg=indicators.get("volume_avg")
-            or components.get("volume", {}).get("avg_volume"),
-            atr=indicators.get("atr") or components.get("volatility", {}).get("atr"),
+            volume_avg=volume_avg,
+            **indicator_fields,  # Add all dynamic fields
         )
 
         return AnalysisComponentResult(
@@ -766,38 +808,46 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _extract_fundamental_rule_based(fund_data: dict[str, Any]) -> AnalysisComponentResult:
         """Extract fundamental analysis component from rule-based output."""
-        metrics = fund_data.get("metrics", {})
-        analyst_ratings = fund_data.get("analyst_ratings", {})
+        # Extract metrics from nested data_sources structure
+        data_sources = fund_data.get("data_sources", {})
+        metrics = data_sources.get("metrics", {})
+        analyst_data = data_sources.get("analyst", {})
+
+        # Extract metrics from nested structure
+        valuation = metrics.get("valuation", {})
+        profitability = metrics.get("profitability", {})
+        financial_health = metrics.get("financial_health", {})
+        growth = metrics.get("growth", {})
 
         fundamental_metrics = FundamentalMetrics(
-            pe_ratio=metrics.get("pe_ratio"),
-            pb_ratio=metrics.get("pb_ratio"),
-            ps_ratio=metrics.get("ps_ratio"),
-            peg_ratio=metrics.get("peg_ratio"),
-            ev_ebitda=metrics.get("ev_ebitda"),
-            profit_margin=metrics.get("profit_margin"),
-            operating_margin=metrics.get("operating_margin"),
-            roe=metrics.get("roe"),
-            roa=metrics.get("roa"),
-            debt_to_equity=metrics.get("debt_to_equity"),
-            current_ratio=metrics.get("current_ratio"),
-            revenue_growth=metrics.get("revenue_growth"),
-            earnings_growth=metrics.get("earnings_growth"),
+            pe_ratio=valuation.get("trailing_pe") or valuation.get("forward_pe"),
+            pb_ratio=valuation.get("price_to_book"),
+            ps_ratio=valuation.get("price_to_sales"),
+            peg_ratio=valuation.get("peg_ratio"),
+            ev_ebitda=valuation.get("enterprise_to_ebitda"),
+            profit_margin=profitability.get("profit_margin"),
+            operating_margin=profitability.get("operating_margin"),
+            roe=profitability.get("return_on_equity"),
+            roa=profitability.get("return_on_assets"),
+            debt_to_equity=financial_health.get("debt_to_equity"),
+            current_ratio=financial_health.get("current_ratio"),
+            revenue_growth=growth.get("revenue_growth"),
+            earnings_growth=growth.get("earnings_growth"),
         )
 
         analyst_info = None
-        if analyst_ratings:
+        if analyst_data:
             analyst_info = AnalystInfo(
-                num_analysts=analyst_ratings.get("num_analysts"),
-                consensus_rating=analyst_ratings.get("consensus_rating"),
-                strong_buy=analyst_ratings.get("strong_buy"),
-                buy=analyst_ratings.get("buy"),
-                hold=analyst_ratings.get("hold"),
-                sell=analyst_ratings.get("sell"),
-                strong_sell=analyst_ratings.get("strong_sell"),
-                price_target=analyst_ratings.get("price_target"),
-                price_target_high=analyst_ratings.get("price_target_high"),
-                price_target_low=analyst_ratings.get("price_target_low"),
+                num_analysts=analyst_data.get("total_analysts"),
+                consensus_rating=analyst_data.get("consensus_rating"),
+                strong_buy=analyst_data.get("strong_buy"),
+                buy=analyst_data.get("buy"),
+                hold=analyst_data.get("hold"),
+                sell=analyst_data.get("sell"),
+                strong_sell=analyst_data.get("strong_sell"),
+                price_target=analyst_data.get("price_target"),
+                price_target_high=analyst_data.get("price_target_high"),
+                price_target_low=analyst_data.get("price_target_low"),
             )
 
         return AnalysisComponentResult(
@@ -915,7 +965,13 @@ class AnalysisResultNormalizer:
     def _tech_model_to_component(
         tech: "TechnicalAnalysisOutput", synth: "SignalSynthesisOutput"
     ) -> AnalysisComponentResult:
-        """Convert TechnicalAnalysisOutput Pydantic model to component result."""
+        """Convert TechnicalAnalysisOutput Pydantic model to component result.
+
+        Maps all indicator fields from simple Pydantic names (rsi, macd) to
+        parameterized database field names (rsi_14, macd_12_26_9_line).
+        This ensures ALL calculated indicators reach the database, not just the 4
+        that were hardcoded before.
+        """
         # Import here to avoid circular dependency
 
         if tech is None:
@@ -925,15 +981,88 @@ class AnalysisResultNormalizer:
                 technical_indicators=None,
             )
 
+        # Build TechnicalIndicators with ALL fields mapped from Pydantic model
+        # Map simple Pydantic field names to parameterized database field names
+        # based on standard configuration values
+        indicator_dict = {}
+
+        # RSI (default: 14-period)
+        if tech.rsi is not None:
+            indicator_dict["rsi_14"] = tech.rsi
+
+        # MACD (default: fast=12, slow=26, signal=9)
+        if tech.macd is not None:
+            indicator_dict["macd_12_26_9_line"] = tech.macd
+        if tech.macd_signal is not None:
+            indicator_dict["macd_12_26_9_signal"] = tech.macd_signal
+        if tech.macd_histogram is not None:
+            indicator_dict["macd_12_26_9_histogram"] = tech.macd_histogram
+
+        # Bollinger Bands (default: length=20, std=2.0)
+        if tech.bbands_upper is not None:
+            indicator_dict["bbands_20_2_0_upper"] = tech.bbands_upper
+        if tech.bbands_middle is not None:
+            indicator_dict["bbands_20_2_0_middle"] = tech.bbands_middle
+        if tech.bbands_lower is not None:
+            indicator_dict["bbands_20_2_0_lower"] = tech.bbands_lower
+
+        # ATR (default: 14-period)
+        if tech.atr is not None:
+            indicator_dict["atr_14"] = tech.atr
+
+        # Simple Moving Averages
+        if tech.sma_20 is not None:
+            indicator_dict["sma_20"] = tech.sma_20
+        if tech.sma_50 is not None:
+            indicator_dict["sma_50"] = tech.sma_50
+
+        # Exponential Moving Averages
+        if tech.ema_12 is not None:
+            indicator_dict["ema_12"] = tech.ema_12
+        if tech.ema_26 is not None:
+            indicator_dict["ema_26"] = tech.ema_26
+
+        # Weighted Moving Average (default: 14-period)
+        if tech.wma_14 is not None:
+            indicator_dict["wma_14"] = tech.wma_14
+
+        # ADX (default: 14-period)
+        if tech.adx is not None:
+            indicator_dict["adx_14"] = tech.adx
+        if tech.adx_dmp is not None:
+            indicator_dict["adx_14_dmp"] = tech.adx_dmp
+        if tech.adx_dmn is not None:
+            indicator_dict["adx_14_dmn"] = tech.adx_dmn
+
+        # Stochastic Oscillator (default: k=14, d=3)
+        if tech.stoch_k is not None:
+            indicator_dict["stoch_14_3_k"] = tech.stoch_k
+        if tech.stoch_d is not None:
+            indicator_dict["stoch_14_3_d"] = tech.stoch_d
+
+        # Ichimoku Cloud (default: tenkan=9, kijun=26, senkou=52)
+        if tech.ichimoku_tenkan is not None:
+            indicator_dict["ichimoku_9_26_52_tenkan"] = tech.ichimoku_tenkan
+        if tech.ichimoku_kijun is not None:
+            indicator_dict["ichimoku_9_26_52_kijun"] = tech.ichimoku_kijun
+        if tech.ichimoku_senkou_a is not None:
+            indicator_dict["ichimoku_9_26_52_senkou_a"] = tech.ichimoku_senkou_a
+        if tech.ichimoku_senkou_b is not None:
+            indicator_dict["ichimoku_9_26_52_senkou_b"] = tech.ichimoku_senkou_b
+        if tech.ichimoku_chikou is not None:
+            indicator_dict["ichimoku_9_26_52_chikou"] = tech.ichimoku_chikou
+
+        # Create TechnicalIndicators object with dynamic fields
+        technical_indicators = TechnicalIndicators(**indicator_dict)
+
+        logger.debug(
+            f"Mapped {len(indicator_dict)} indicators from Pydantic model to database fields"
+        )
+
         return AnalysisComponentResult(
             component="technical",
             score=synth.technical_score if synth else tech.technical_score,
-            technical_indicators=TechnicalIndicators(
-                rsi=tech.rsi,
-                macd=tech.macd,
-                macd_signal=tech.macd_signal,
-                atr=tech.atr,
-            ),
+            technical_indicators=technical_indicators,
             reasoning=tech.reasoning,
             confidence=tech.technical_score,
         )
@@ -1193,3 +1322,141 @@ class AnalysisResultNormalizer:
             sector=synthesis_data.get("sector"),
             market=synthesis_data.get("market"),
         )
+
+    @staticmethod
+    def _flatten_indicator_output(
+        indicator_key: str, indicator_value: Any
+    ) -> dict[str, float | None]:
+        """Flatten indicator output into parameterized field names.
+
+        This is a GENERIC method that works for ANY indicator structure:
+        - Simple value: {"value": 42.5} → {indicator_key: 42.5}
+        - Multi-component: {"upper": 100, "lower": 80} → {indicator_key_upper: 100, ...}
+        - Nested: {"tenkan": 50, "kijun": 48} → {indicator_key_tenkan: 50, ...}
+
+        Special cases:
+        - ADX: {"adx": 33, "dmp": 42, "dmn": 11} → {adx_14: 33, adx_14_dmp: 42, adx_14_dmn: 11}
+        - MACD without params: {"line": X, "signal": Y} → {macd_12_26_9_line: X, ...} (adds default params)
+
+        Examples:
+        - rsi_14: {"value": 74.44} → {"rsi_14": 74.44}
+        - macd: {"line": 8.79, "signal": 6.17, "histogram": 2.63}
+          → {"macd_12_26_9_line": 8.79, "macd_12_26_9_signal": 6.17, "macd_12_26_9_histogram": 2.63}
+        - ichimoku_9_26_52: {"tenkan": 50, "kijun": 48, "senkou_a": 49, "senkou_b": 47}
+          → {"ichimoku_9_26_52_tenkan": 50, "ichimoku_9_26_52_kijun": 48, ...}
+
+        Args:
+            indicator_key: Key from detailed_indicators (e.g., "rsi_14", "macd", "ichimoku_9_26_52")
+            indicator_value: Value - can be dict with "value", multi-component dict, or scalar
+
+        Returns:
+            Dictionary mapping field names to numeric values
+        """
+        flattened = {}
+
+        if isinstance(indicator_value, dict):
+            # Check for simple {"value": X} structure
+            if "value" in indicator_value and len(indicator_value) == 1:
+                # Simple case: {"value": 74.44} → {indicator_key: 74.44}
+                value = indicator_value["value"]
+                if isinstance(value, (int, float)):
+                    flattened[indicator_key] = float(value)
+            else:
+                # Multi-component case: flatten all numeric fields
+                # Special handling: if component name == indicator base name, use key without suffix
+                # E.g., adx_14: {"adx": 33, ...} → {adx_14: 33, ...} not {adx_14_adx: 33}
+                indicator_base = indicator_key.split("_")[0]  # "adx_14" → "adx"
+
+                for component_name, component_value in indicator_value.items():
+                    # Only process numeric values, skip strings like "percent_b", "bandwidth"
+                    if not isinstance(component_value, (int, float)):
+                        continue
+
+                    # Skip Bollinger Bands metadata fields (bandwidth, percent_b) - not needed for display
+                    if component_name in ("bandwidth", "percent_b", "percent"):
+                        continue
+
+                    # Check if component name matches indicator base (adx_14 + "adx" → just adx_14)
+                    if component_name == indicator_base:
+                        field_name = indicator_key
+                    else:
+                        # Create parameterized field name: indicator_key_component
+                        field_name = f"{indicator_key}_{component_name}"
+                    flattened[field_name] = float(component_value)
+
+                # Add default parameters if missing (e.g., macd → macd_12_26_9)
+                if indicator_base == "macd" and not any("_" in k for k in flattened.keys()):
+                    # Rename macd_* to macd_12_26_9_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "macd":
+                            continue  # Skip bare "macd"
+                        new_key = k.replace("macd_", "macd_12_26_9_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+                elif indicator_base == "bbands" and not any("_" in k for k in flattened.keys()):
+                    # Rename bbands_* to bbands_20_2_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "bbands":
+                            continue
+                        new_key = k.replace("bbands_", "bbands_20_2_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+                elif indicator_base == "stoch" and not "_" in indicator_key:
+                    # Rename stoch_* to stoch_14_3_*
+                    new_flattened = {}
+                    for k, v in flattened.items():
+                        if k == "stoch":
+                            continue
+                        new_key = k.replace("stoch_", "stoch_14_3_")
+                        new_flattened[new_key] = v
+                    flattened = new_flattened
+
+        elif isinstance(indicator_value, (int, float)):
+            # Direct numeric value (rare but possible)
+            flattened[indicator_key] = float(indicator_value)
+
+        return flattened
+
+    @staticmethod
+    def _extract_legacy_indicators(indicators: dict[str, Any]) -> dict[str, float | None]:
+        """Extract indicators from legacy flat structure (backwards compatibility).
+
+        This handles old data format where indicators were stored as:
+        {"rsi": 74.44, "macd": {...}, "bbands": {...}}
+
+        New code should use _flatten_indicator_output instead.
+        """
+        legacy_fields = {}
+
+        # RSI - simple value
+        if "rsi" in indicators:
+            legacy_fields["rsi_14"] = indicators["rsi"]
+
+        # MACD - multi-component
+        if "macd" in indicators and isinstance(indicators["macd"], dict):
+            macd = indicators["macd"]
+            legacy_fields["macd_12_26_9_line"] = macd.get("line")
+            legacy_fields["macd_12_26_9_signal"] = macd.get("signal")
+            legacy_fields["macd_12_26_9_histogram"] = macd.get("histogram")
+
+        # Bollinger Bands - multi-component
+        if "bbands" in indicators and isinstance(indicators["bbands"], dict):
+            bbands = indicators["bbands"]
+            legacy_fields["bbands_20_2_upper"] = bbands.get("upper")
+            legacy_fields["bbands_20_2_middle"] = bbands.get("middle")
+            legacy_fields["bbands_20_2_lower"] = bbands.get("lower")
+
+        # SMAs - simple values
+        for sma_key in ["sma_20", "sma_50", "sma_200"]:
+            if sma_key in indicators:
+                legacy_fields[sma_key] = indicators[sma_key]
+
+        # ATR - simple value
+        if "atr" in indicators:
+            legacy_fields["atr_14"] = indicators["atr"]
+
+        return legacy_fields

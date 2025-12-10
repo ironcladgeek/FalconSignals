@@ -68,14 +68,18 @@ def json_serial(obj):
 class CrewAIToolAdapter:
     """Adapts existing tools for use with CrewAI agents."""
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str = None, config=None):
         """Initialize tool adapters.
 
         Args:
             db_path: Optional path to database for storing analyst ratings
+            config: Configuration object with analysis settings
         """
-        self.price_fetcher = PriceFetcherTool()
-        self.technical_tool = TechnicalIndicatorTool()
+        self.config = config
+        self.price_fetcher = PriceFetcherTool(config=config)
+        # Pass config to technical tool so it uses correct indicators and min_periods
+        tech_config = config.analysis.technical_indicators if config else None
+        self.technical_tool = TechnicalIndicatorTool(config=tech_config)
         self.news_fetcher = NewsFetcherTool()
         self.fundamental_fetcher = FinancialDataFetcherTool(db_path=db_path)
         # Cache to store data between tool calls
@@ -92,19 +96,28 @@ class CrewAIToolAdapter:
 
         @tool("Fetch Price Data")
         @tool_with_timeout(timeout_seconds=15)
-        def fetch_price_data(ticker: str, days_back: int = 60) -> str:
+        def fetch_price_data(ticker: str) -> str:
             """Fetch historical and current price data for an instrument.
 
             Args:
                 ticker: Stock ticker symbol
-                days_back: Number of days of history to fetch
 
             Returns:
                 JSON string with summary of price data (full data cached for other tools)
             """
             try:
+                # Always use config value for lookback period
+                if self.config and hasattr(self.config.analysis, "historical_data_lookback_days"):
+                    days_back = self.config.analysis.historical_data_lookback_days
+                    logger.debug(f"Using config lookback: {days_back} days")
+                else:
+                    days_back = 730
+                    logger.warning(f"No config available, using default lookback: {days_back} days")
+
                 logger.info(f"Fetching price data for {ticker} ({days_back} days)")
-                result = self.price_fetcher.run(ticker, days_back=days_back)
+                # Use period to get exact number of TRADING days (not calendar days)
+                period = f"{days_back}d"
+                result = self.price_fetcher.run(ticker, period=period)
                 if "error" in result:
                     logger.error(f"Price fetcher returned error for {ticker}: {result['error']}")
                     return json.dumps({"error": result["error"]})
@@ -172,8 +185,48 @@ class CrewAIToolAdapter:
                 # Perform rule-based technical analysis calculations
                 result = self.technical_tool.run(prices)
                 if "error" in result:
-                    logger.error(f"Technical tool returned error for {ticker}: {result['error']}")
-                    return json.dumps({"error": result["error"]})
+                    error_msg = result["error"]
+                    # Check if it's an "Insufficient data" error
+                    if "Insufficient data" in error_msg:
+                        # Get the configured lookback period for refetch
+                        if self.config and hasattr(
+                            self.config.analysis, "historical_data_lookback_days"
+                        ):
+                            refetch_period = (
+                                f"{self.config.analysis.historical_data_lookback_days}d"
+                            )
+                        else:
+                            refetch_period = "90d"  # Fallback
+
+                        logger.warning(
+                            f"Insufficient cached data for {ticker}, refetching with period={refetch_period}"
+                        )
+                        # Refetch with period to get exactly N trading days
+                        refetch_result = self.price_fetcher.run(ticker, period=refetch_period)
+                        if "error" not in refetch_result:
+                            # Update cache and retry
+                            prices = refetch_result.get("prices", [])
+                            self._data_cache[cache_key] = prices
+                            logger.info(
+                                f"Refetched {len(prices)} price points using period={refetch_period}"
+                            )
+                            # Retry technical analysis
+                            result = self.technical_tool.run(prices)
+                            if "error" not in result:
+                                logger.info(
+                                    "Technical indicators calculated successfully after refetch"
+                                )
+                            else:
+                                logger.error(
+                                    f"Technical tool still returned error after refetch: {result['error']}"
+                                )
+                                return json.dumps({"error": result["error"]})
+                        else:
+                            logger.error(f"Failed to refetch data: {refetch_result['error']}")
+                            return json.dumps({"error": error_msg})
+                    else:
+                        logger.error(f"Technical tool returned error for {ticker}: {error_msg}")
+                        return json.dumps({"error": error_msg})
 
                 # Add interpretation hints for the LLM (but calculations are done)
                 result["analysis_type"] = "rule_based_calculations"
@@ -242,7 +295,8 @@ class CrewAIToolAdapter:
                         }
                     )
 
-                # Prepare articles for LLM analysis (limit fields to avoid truncation)
+                # Prepare articles for LLM analysis
+                # Preserve pre-calculated sentiment scores and importance if available
                 articles_for_analysis = [
                     {
                         "title": a.get("title", ""),
@@ -251,14 +305,65 @@ class CrewAIToolAdapter:
                         ),  # Limit summary length
                         "source": a.get("source", ""),
                         "published_date": a.get("published_date"),
+                        # Preserve pre-calculated fields for weighted scoring
+                        "sentiment": a.get("sentiment"),
+                        "sentiment_score": a.get("sentiment_score"),
+                        "importance": a.get("importance"),
                     }
-                    for a in articles[:20]  # Limit to 20 most recent to avoid truncation
+                    for a in articles  # Use all articles up to max_articles limit
                 ]
+
+                # Check if articles have pre-calculated sentiment scores
+                has_precalculated = any(
+                    a.get("sentiment") or a.get("sentiment_score") is not None
+                    for a in articles_for_analysis
+                )
+
+                # If we have pre-calculated scores, return a summary instead of raw data
+                # This prevents LLM from receiving empty/confusing prompts
+                if has_precalculated:
+                    positive = sum(
+                        1 for a in articles_for_analysis if a.get("sentiment") == "positive"
+                    )
+                    negative = sum(
+                        1 for a in articles_for_analysis if a.get("sentiment") == "negative"
+                    )
+                    neutral = sum(
+                        1 for a in articles_for_analysis if a.get("sentiment") == "neutral"
+                    )
+                    total = len(articles_for_analysis)
+
+                    avg_score = sum(
+                        a.get("sentiment_score", 0)
+                        for a in articles_for_analysis
+                        if a.get("sentiment_score") is not None
+                    ) / max(
+                        1,
+                        sum(
+                            1 for a in articles_for_analysis if a.get("sentiment_score") is not None
+                        ),
+                    )
+
+                    summary = (
+                        f"Sentiment analysis for {ticker}: {total} articles analyzed with pre-calculated sentiment scores.\n"
+                        f"Distribution: {positive} positive ({100 * positive / total:.1f}%), "
+                        f"{negative} negative ({100 * negative / total:.1f}%), "
+                        f"{neutral} neutral ({100 * neutral / total:.1f}%).\n"
+                        f"Average sentiment score: {avg_score:.3f} (range: -1 to +1).\n"
+                        f"Pre-calculated scores are available and should be used for weighted analysis "
+                        f"based on article recency and importance."
+                    )
+
+                    logger.info(
+                        f"Sentiment analysis for {ticker}: {total} articles with pre-calculated scores"
+                    )
+                    return summary
 
                 result = {
                     "ticker": ticker,
                     "articles": articles_for_analysis,
                     "total_articles": len(articles),
+                    "has_precalculated_scores": has_precalculated,
                     "analysis_type": "llm_sentiment_analysis_required",
                     "note": (
                         "Articles fetched successfully. LLM should analyze each article's title and summary "
@@ -330,13 +435,6 @@ class CrewAIToolAdapter:
                                 "total_analysts": 0,
                                 "period": "unknown",
                             },
-                            "news_sentiment": {
-                                "available": False,
-                                "positive": 0,
-                                "negative": 0,
-                                "neutral": 0,
-                                "note": "Unable to fetch sentiment data",
-                            },
                             "price_momentum": {
                                 "available": False,
                                 "change_percent": 0,
@@ -354,16 +452,12 @@ class CrewAIToolAdapter:
 
                 # Extract data components
                 analyst_data = fundamental_result.get("analyst_data", {})
-                sentiment = fundamental_result.get("sentiment", {})
                 price_context = fundamental_result.get("price_context", {})
                 metrics = fundamental_result.get("metrics", {})
                 data_availability = fundamental_result.get("data_availability", "unknown")
 
                 # Check if we have any real data
                 has_analyst_data = analyst_data and analyst_data.get("total_analysts", 0) > 0
-                has_sentiment_data = sentiment and (
-                    sentiment.get("positive", 0) + sentiment.get("negative", 0) > 0
-                )
                 has_price_data = price_context and price_context.get("change_percent") is not None
                 has_metrics = metrics and any(
                     metrics.get(k)
@@ -372,10 +466,11 @@ class CrewAIToolAdapter:
 
                 logger.debug(
                     f"Fundamental data for {ticker}: analyst={has_analyst_data}, "
-                    f"sentiment={has_sentiment_data}, price={has_price_data}, metrics={has_metrics}"
+                    f"price={has_price_data}, metrics={has_metrics}"
                 )
 
                 # Format for LLM analysis
+                # Note: News sentiment is provided separately by analyze_sentiment tool
                 result = {
                     "ticker": ticker,
                     "data_availability": data_availability,
@@ -388,17 +483,6 @@ class CrewAIToolAdapter:
                         "strong_sell": analyst_data.get("strong_sell", 0),
                         "total_analysts": analyst_data.get("total_analysts", 0),
                         "period": analyst_data.get("period", "latest"),
-                    },
-                    "news_sentiment": {
-                        "available": has_sentiment_data,
-                        "positive": sentiment.get("positive", 0),
-                        "negative": sentiment.get("negative", 0),
-                        "neutral": sentiment.get("neutral", 0),
-                        "note": (
-                            "Sentiment from news coverage analysis"
-                            if has_sentiment_data
-                            else "No sentiment data available"
-                        ),
                     },
                     "price_momentum": {
                         "available": has_price_data,
@@ -444,13 +528,6 @@ class CrewAIToolAdapter:
                             "strong_sell": 0,
                             "total_analysts": 0,
                             "period": "unknown",
-                        },
-                        "news_sentiment": {
-                            "available": False,
-                            "positive": 0,
-                            "negative": 0,
-                            "neutral": 0,
-                            "note": "Unable to fetch sentiment data",
                         },
                         "price_momentum": {
                             "available": False,

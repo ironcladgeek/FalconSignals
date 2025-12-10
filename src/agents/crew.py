@@ -19,6 +19,7 @@ class AnalysisCrew:
         llm_provider: Optional[str] = None,
         test_mode_config: Optional[Any] = None,
         db_path: Optional[str] = None,
+        config=None,
     ):
         """Initialize the analysis crew.
 
@@ -26,6 +27,7 @@ class AnalysisCrew:
             llm_provider: Optional LLM provider to check configuration for
             test_mode_config: Optional test mode configuration for fixtures/mock LLM
             db_path: Optional path to database for storing analyst ratings
+            config: Configuration object with analysis settings
         """
         self.test_mode_config = test_mode_config
 
@@ -34,7 +36,7 @@ class AnalysisCrew:
         fixture_path = getattr(test_mode_config, "fixture_path", None) if test_mode_config else None
 
         self.market_scanner = MarketScannerAgent(
-            provider_name=provider_name, fixture_path=fixture_path
+            provider_name=provider_name, fixture_path=fixture_path, config=config
         )
         self.technical_agent = TechnicalAnalysisAgent()
         self.fundamental_agent = FundamentalAnalysisAgent(db_path=db_path)

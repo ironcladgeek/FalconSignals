@@ -3,6 +3,7 @@
 import pytest
 
 from src.cache.manager import CacheManager
+from src.config import load_config
 from src.pipeline import AnalysisPipeline
 
 
@@ -18,15 +19,8 @@ class TestPipelineOrchestration:
     @pytest.fixture
     def config(self):
         """Create test configuration."""
-        return {
-            "capital_starting": 2000,
-            "capital_monthly_deposit": 500,
-            "max_position_size_pct": 10,
-            "max_sector_concentration_pct": 20,
-            "risk_volatility_high": 3.0,
-            "risk_volatility_very_high": 5.0,
-            "include_disclaimers": True,
-        }
+        # Load default config which has proper structure
+        return load_config()
 
     def test_pipeline_initialization(self, config, cache_manager):
         """Test pipeline initializes with required components."""

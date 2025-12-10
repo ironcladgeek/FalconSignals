@@ -60,16 +60,20 @@ class AllocationSuggestion(BaseModel):
 
 
 class TechnicalIndicators(BaseModel):
-    """Technical analysis indicator values."""
+    """Technical analysis indicator values with dynamic field names based on configuration.
 
-    rsi: float | None = Field(default=None, ge=0, le=100, description="RSI (14-period)")
-    macd: float | None = Field(default=None, description="MACD value")
-    macd_signal: float | None = Field(default=None, description="MACD signal line")
-    sma_20: float | None = Field(default=None, ge=0, description="20-day SMA")
-    sma_50: float | None = Field(default=None, ge=0, description="50-day SMA")
-    sma_200: float | None = Field(default=None, ge=0, description="200-day SMA")
+    Field names include parameters for self-documentation:
+    - rsi_14: RSI with 14-period
+    - macd_12_26_9: MACD with fast=12, slow=26, signal=9
+    - bbands_20_2.0: Bollinger Bands with length=20, std=2.0
+    - sma_20, sma_50, sma_200: Simple Moving Averages
+    - atr_14: Average True Range with 14-period
+    """
+
+    model_config = {"extra": "allow"}  # Allow dynamic fields
+
+    # Keep some common fields for backward compatibility
     volume_avg: int | None = Field(default=None, ge=0, description="Average volume (20-day)")
-    atr: float | None = Field(default=None, ge=0, description="Average True Range")
 
 
 class FundamentalMetrics(BaseModel):

@@ -38,6 +38,85 @@ analysis:
   # Time horizon for predictions
   time_horizon_months: 3
 
+  # Historical price data lookback (days)
+  # Default: 730 days (~2 years) - provides sufficient history for technical analysis
+  # yfinance supports up to ~5 years (1825 days) for most stocks
+  # Minimum: 30 days (enough for basic indicators like RSI-14, MACD)
+  historical_data_lookback_days: 730
+
+  # Technical analysis indicators (using pandas-ta)
+  technical_indicators:
+    use_pandas_ta: true # Use pandas-ta library for calculations
+    min_periods_required: 30 # Minimum data points needed (enough for MACD-26, RSI-14, SMA-20)
+
+    indicators:
+      # RSI - Relative Strength Index
+      - name: rsi
+        params:
+          length: 14
+        enabled: true
+
+      # MACD - Moving Average Convergence Divergence
+      - name: macd
+        params:
+          fast: 12
+          slow: 26
+          signal: 9
+        enabled: true
+
+      # Bollinger Bands
+      - name: bbands
+        params:
+          length: 20
+          std: 2.0
+        enabled: true
+
+      # ATR - Average True Range
+      - name: atr
+        params:
+          length: 14
+        enabled: true
+
+      # Simple Moving Averages
+      - name: sma
+        params:
+          length: 20
+        enabled: true
+
+      - name: sma
+        params:
+          length: 50
+        enabled: false # Disabled - requires 50 periods of data
+
+      - name: sma
+        params:
+          length: 200
+        enabled: false # Disabled - requires 200 periods of data
+
+      # Exponential Moving Averages (disabled by default)
+      - name: ema
+        params:
+          length: 12
+        enabled: false
+
+      - name: ema
+        params:
+          length: 26
+        enabled: false
+
+      # ADX - Average Directional Index (disabled by default)
+      - name: adx
+        params:
+          length: 14
+        enabled: false
+
+      # Stochastic Oscillator (disabled by default)
+      - name: stoch
+        params:
+          k: 14
+          d: 3
+        enabled: false
+
 # Output Preferences
 output:
   max_recommendations: 10
@@ -58,6 +137,33 @@ data:
   # News fetching settings
   news:
     max_articles: 50 # Maximum number of articles to fetch per ticker
+    target_article_count: 50 # Target number for analysis
+    max_age_days: 7 # Maximum age of articles
+    use_unified_aggregator: true # Use unified aggregator with deduplication
+
+    # News sources in priority order
+    sources:
+      - name: alpha_vantage
+        priority: 1 # Fetch first (has sentiment scores)
+        max_articles: 50
+        enabled: true
+
+      - name: finnhub
+        priority: 2 # Fetch if needed to reach target
+        max_articles: 50
+        enabled: true
+
+  # Sentiment analysis configuration
+  sentiment:
+    scoring_method: local # Options: 'local' (FinBERT), 'llm', 'api' (provider-based), 'hybrid'
+    llm_fallback: true # Fall back to API if local model fails
+
+    # Local FinBERT model settings (for 'local' or 'hybrid' mode)
+    local_model:
+      name: ProsusAI/finbert # Financial sentiment model
+      device: auto # Options: 'auto', 'cpu', 'cuda', 'mps'
+      batch_size: 32 # Batch size for processing
+      max_length: 512 # Maximum token length
 
   # API providers (in priority order)
   primary_provider: alpha_vantage # Alpha Vantage Premium: news sentiment + fundamentals + earnings estimates
@@ -82,29 +188,31 @@ api:
 
 # Logging
 logging:
-  level: INFO # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: DEBUG # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
   format: json # Options: json, text
   log_file: logs/nordinvest.log
   max_log_size_mb: 10
   backup_count: 5
 
-# LLM Configuration
+# LLM settings
 llm:
-  provider: anthropic # Options: anthropic, openai, local
-  model: claude-sonnet-4-20250514 # e.g., claude-sonnet-4-20250514, gpt-4, etc.
-  temperature: 0.7 # 0.0-2.0 (lower = more deterministic, higher = more creative)
+  provider: anthropic # Options: openai, anthropic, local
+  model: claude-haiku-4-5-20251001
+  temperature: 0.7
   max_tokens: 2000 # Maximum tokens per response (100-8000)
   top_p: 1.0 # Top-p nucleus sampling (0.0-1.0)
   timeout_seconds: 60 # Request timeout in seconds (10-300)
   enable_fallback: true # Fall back to rule-based analysis if LLM fails
 
 # Token Tracking & Cost Monitoring
+# claude-haiku-4-5-20251001 input: 0.001 USD/1k, output: 0.005 USD/1k
+# claude-sonnet-4-5-20250929 input: 0.003 USD/1k, output: 0.015 USD/1k
 token_tracker:
   enabled: true # Enable/disable token usage tracking
-  daily_limit: 100000 # Daily token usage limit (warn when approaching)
-  monthly_limit: 1000000 # Monthly token usage limit
-  cost_per_1k_input_tokens: 0.003 # Cost per 1k input tokens in EUR (Anthropic: 0.003)
-  cost_per_1k_output_tokens: 0.015 # Cost per 1k output tokens in EUR (Anthropic: 0.015)
+  daily_limit: 1000000 # Daily token usage limit (warn when approaching)
+  monthly_limit: 10000000 # Monthly token usage limit
+  cost_per_1k_input_tokens: 0.001 # Cost per 1k input tokens in EUR (Anthropic: 0.003)
+  cost_per_1k_output_tokens: 0.005 # Cost per 1k output tokens in EUR (Anthropic: 0.015)
   warn_on_daily_usage_percent: 0.8 # Warn when daily usage reaches 80%
 
 # Deployment & Scheduling

@@ -58,6 +58,46 @@ class MarketsConfig(BaseModel):
         return v
 
 
+class IndicatorConfig(BaseModel):
+    """Configuration for a single technical indicator."""
+
+    name: str = Field(description="Indicator name (must match pandas-ta function name)")
+    params: dict = Field(default_factory=dict, description="Parameters for the indicator")
+    enabled: bool = Field(default=True, description="Whether the indicator is enabled")
+
+
+class TechnicalIndicatorsConfig(BaseModel):
+    """Configuration for technical analysis indicators."""
+
+    indicators: list[IndicatorConfig] = Field(
+        default_factory=lambda: [
+            IndicatorConfig(name="rsi", params={"length": 14}, enabled=True),
+            IndicatorConfig(
+                name="macd", params={"fast": 12, "slow": 26, "signal": 9}, enabled=True
+            ),
+            IndicatorConfig(name="bbands", params={"length": 20, "std": 2.0}, enabled=True),
+            IndicatorConfig(name="atr", params={"length": 14}, enabled=True),
+            IndicatorConfig(name="sma", params={"length": 20}, enabled=True),
+            IndicatorConfig(name="sma", params={"length": 50}, enabled=True),
+            IndicatorConfig(name="sma", params={"length": 200}, enabled=True),
+            IndicatorConfig(name="ema", params={"length": 12}, enabled=False),
+            IndicatorConfig(name="ema", params={"length": 26}, enabled=False),
+            IndicatorConfig(name="adx", params={"length": 14}, enabled=False),
+            IndicatorConfig(name="stoch", params={"k": 14, "d": 3}, enabled=False),
+        ],
+        description="List of technical indicators to calculate",
+    )
+    min_periods_required: int = Field(
+        default=200,
+        ge=14,
+        description="Minimum periods of price data required for analysis",
+    )
+    use_pandas_ta: bool = Field(
+        default=True,
+        description="Use pandas-ta library for calculations (recommended)",
+    )
+
+
 class AnalysisConfig(BaseModel):
     """Analysis and scoring preferences."""
 
@@ -84,6 +124,16 @@ class AnalysisConfig(BaseModel):
     )
     time_horizon_months: int = Field(
         default=3, ge=1, le=60, description="Time horizon for predictions in months"
+    )
+    historical_data_lookback_days: int = Field(
+        default=730,
+        ge=30,
+        le=1825,
+        description="Days of historical price data to fetch (30-1825, ~2 years default)",
+    )
+    technical_indicators: TechnicalIndicatorsConfig = Field(
+        default_factory=TechnicalIndicatorsConfig,
+        description="Technical analysis indicator configuration",
     )
 
     @field_validator("weight_sentiment", mode="after")
@@ -140,12 +190,75 @@ class CacheTTLConfig(BaseModel):
     )
 
 
+class NewsSourceConfig(BaseModel):
+    """Configuration for a single news source."""
+
+    name: str = Field(description="Provider name (e.g., 'alpha_vantage', 'finnhub')")
+    priority: int = Field(default=1, ge=1, le=10, description="Priority order (lower = higher)")
+    enabled: bool = Field(default=True, description="Whether this source is enabled")
+    max_articles: int = Field(default=50, ge=1, le=200, description="Max articles from this source")
+
+
 class NewsConfig(BaseModel):
     """News fetching configuration."""
 
     max_articles: int = Field(
         default=50, ge=1, le=200, description="Maximum number of articles to fetch per ticker"
     )
+    target_article_count: int = Field(
+        default=50, ge=1, le=200, description="Target number of articles for analysis"
+    )
+    max_age_days: int = Field(
+        default=30, ge=1, le=352, description="Maximum age of articles in days"
+    )
+    sources: list[NewsSourceConfig] = Field(
+        default_factory=lambda: [
+            NewsSourceConfig(name="alpha_vantage", priority=1, max_articles=50),
+            NewsSourceConfig(name="finnhub", priority=2, max_articles=50),
+        ],
+        description="News sources in priority order",
+    )
+    use_unified_aggregator: bool = Field(
+        default=True, description="Use unified news aggregator with deduplication"
+    )
+
+
+class LocalSentimentModelConfig(BaseModel):
+    """Configuration for local sentiment model."""
+
+    name: str = Field(default="ProsusAI/finbert", description="Hugging Face model name")
+    device: str = Field(default="auto", description="Device: 'auto', 'cpu', 'cuda', 'mps'")
+    batch_size: int = Field(default=32, ge=1, le=128, description="Batch size for processing")
+    max_length: int = Field(default=512, ge=64, le=1024, description="Maximum token length")
+
+
+class SentimentConfig(BaseModel):
+    """Sentiment analysis configuration."""
+
+    scoring_method: str = Field(
+        default="api",
+        description="Scoring method: 'local' (FinBERT), 'llm', 'api' (provider-based), 'hybrid'",
+    )
+    local_model: LocalSentimentModelConfig = Field(
+        default_factory=LocalSentimentModelConfig,
+        description="Local FinBERT model configuration",
+    )
+    llm_fallback: bool = Field(
+        default=True, description="Use LLM if local model fails or is unavailable"
+    )
+    use_local_for_theme_extraction: bool = Field(
+        default=False,
+        description="If True, use local model for scoring but LLM for theme extraction",
+    )
+
+    @field_validator("scoring_method")
+    @classmethod
+    def validate_scoring_method(cls, v: str) -> str:
+        """Validate scoring method."""
+        allowed = {"local", "llm", "api", "hybrid"}
+        if v.lower() not in allowed:
+            raise ValueError(f"Scoring method must be one of {allowed}")
+        return v.lower()
 
 
 class DataConfig(BaseModel):
@@ -155,6 +268,9 @@ class DataConfig(BaseModel):
         default_factory=CacheTTLConfig, description="Cache expiration times"
     )
     news: NewsConfig = Field(default_factory=NewsConfig, description="News fetching settings")
+    sentiment: SentimentConfig = Field(
+        default_factory=SentimentConfig, description="Sentiment analysis configuration"
+    )
     primary_provider: str = Field(default="yahoo_finance", description="Primary data provider")
     backup_providers: list[str] = Field(
         default=["alpha_vantage", "finnhub"], description="Backup data providers"
