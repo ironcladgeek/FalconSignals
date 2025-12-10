@@ -231,6 +231,39 @@
     - [Testing](#testing)
     - [Example Usage](#example-usage)
     - [Future Enhancements (Optional)](#future-enhancements-optional)
+  - [Phase 17: Static Website Publishing with MkDocs + Material](#phase-17-static-website-publishing-with-mkdocs--material)
+    - [Objectives](#objectives-7)
+    - [Context](#context-1)
+    - [17.1 MkDocs + Material Setup](#171-mkdocs--material-setup)
+      - [Core Infrastructure](#core-infrastructure)
+    - [17.2 Website Content Generator](#172-website-content-generator)
+      - [Create WebsiteGenerator Class](#create-websitegenerator-class)
+      - [Report Page Template (No Portfolio Data)](#report-page-template-no-portfolio-data)
+      - [Ticker Pages](#ticker-pages)
+    - [17.3 CLI Integration](#173-cli-integration)
+      - [Publish Command](#publish-command)
+      - [Update Command](#update-command)
+    - [17.4 GitHub Pages Deployment](#174-github-pages-deployment)
+      - [GitHub Actions Workflow](#github-actions-workflow)
+      - [Manual Deployment Script](#manual-deployment-script)
+    - [17.5 Custom Domain Setup (GoDaddy)](#175-custom-domain-setup-godaddy)
+      - [GitHub Pages Configuration](#github-pages-configuration)
+      - [GoDaddy DNS Configuration](#godaddy-dns-configuration)
+    - [17.6 Filtering \& Navigation Features](#176-filtering--navigation-features)
+      - [Tags System](#tags-system)
+      - [Search \& Filtering](#search--filtering)
+      - [Navigation Enhancements](#navigation-enhancements)
+    - [17.7 Privacy \& Security](#177-privacy--security)
+      - [Content Filtering](#content-filtering)
+      - [Configuration](#configuration-3)
+    - [17.8 Testing \& Validation](#178-testing--validation)
+      - [Local Testing](#local-testing)
+      - [Deployment Testing](#deployment-testing)
+    - [17.9 Documentation](#179-documentation)
+    - [Deliverables](#deliverables-11)
+    - [Example Workflow](#example-workflow)
+    - [Benefits](#benefits-3)
+    - [Future Enhancements (Optional)](#future-enhancements-optional-1)
 
 
 ## Executive Summary
@@ -311,6 +344,7 @@ If the answer to questions 1, 3 is YES or question 2, 4 is NO → **REFACTOR FIR
 | Phase 14 | Future | Advanced Features & Integrations | 📋 Planned |
 | Phase 15 | Future | Backtesting Framework | 📋 Planned |
 | Phase 16 | December 2025 | Unified Filtering Strategy System | ✅ Complete |
+| Phase 17 | December 2025 | Static Website Publishing (MkDocs + Material + GitHub Pages) | 📋 Planned |
 
 ---
 
@@ -3662,6 +3696,553 @@ uv run python -m src.main analyze --group us_ai_ml --llm --strategy volume
 - [ ] Add sector rotation filtering
 - [ ] Support custom user-defined strategies
 - [ ] Add filtering strategy performance analytics
+
+---
+
+## Phase 17: Static Website Publishing with MkDocs + Material
+
+**Status:** 📋 Planned (December 2025)
+
+### Objectives
+- Generate professional static website from analysis data
+- Publish investment analysis reports to a public website
+- Enable one-command publishing workflow via CLI
+- Support filtering, tagging, and ticker-based navigation
+- Host on GitHub Pages with custom GoDaddy domain
+
+### Context
+Currently, analysis reports are only available as local markdown/JSON files. This phase adds web publishing capabilities to share analysis publicly while maintaining privacy controls (no portfolio allocations or personal positions exposed).
+
+### 17.1 MkDocs + Material Setup
+
+#### Core Infrastructure
+- [ ] **Install MkDocs and dependencies**:
+  ```bash
+  uv add mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin
+  uv add mkdocs-awesome-pages-plugin mkdocs-tags-plugin
+  ```
+
+- [ ] **Create MkDocs structure**:
+  ```
+  website/
+  ├── mkdocs.yml              # MkDocs configuration
+  ├── docs/                   # Generated markdown pages
+  │   ├── index.md           # Homepage
+  │   ├── reports/           # Analysis reports by date
+  │   ├── tickers/           # Ticker-specific pages
+  │   ├── signals/           # Signal pages
+  │   └── about.md           # About page
+  ├── overrides/             # Custom theme overrides
+  │   └── main.html
+  └── site/                  # Built static site (gitignored)
+  ```
+
+- [ ] **Configure mkdocs.yml**:
+  ```yaml
+  site_name: NordInvest Analysis
+  site_url: https://nordinvest.yourdomain.com
+  repo_url: https://github.com/yourusername/NordInvest
+
+  theme:
+    name: material
+    features:
+      - navigation.instant
+      - navigation.tracking
+      - navigation.sections
+      - navigation.top
+      - search.suggest
+      - search.highlight
+      - content.code.copy
+      - content.tabs.link
+    palette:
+      - scheme: default
+        primary: indigo
+        accent: indigo
+        toggle:
+          icon: material/brightness-7
+          name: Switch to dark mode
+      - scheme: slate
+        primary: indigo
+        accent: indigo
+        toggle:
+          icon: material/brightness-4
+          name: Switch to light mode
+
+  plugins:
+    - search
+    - tags:
+        tags_file: tags.md
+    - git-revision-date-localized:
+        enable_creation_date: true
+    - awesome-pages
+
+  markdown_extensions:
+    - admonition
+    - pymdownx.details
+    - pymdownx.superfences
+    - pymdownx.tabbed:
+        alternate_style: true
+    - tables
+    - attr_list
+    - md_in_html
+
+  nav:
+    - Home: index.md
+    - Reports: reports/
+    - Tickers: tickers/
+    - Signals: signals/
+    - Tags: tags.md
+    - About: about.md
+  ```
+
+### 17.2 Website Content Generator
+
+#### Create WebsiteGenerator Class
+- [ ] **Create `src/website/generator.py`**:
+  ```python
+  class WebsiteGenerator:
+      """Generate static website content from analysis data."""
+
+      def __init__(self, config, db_path: str, output_dir: Path):
+          self.config = config
+          self.db_path = db_path
+          self.output_dir = output_dir  # website/docs/
+          self.repo = RecommendationsRepository(db_path)
+
+      def generate_report_page(
+          self,
+          signals: list[InvestmentSignal],
+          report_date: str,
+          metadata: dict
+      ) -> Path:
+          """Generate markdown page for a report (without portfolio info)."""
+
+      def generate_ticker_page(self, ticker: str) -> Path:
+          """Generate ticker-specific page with all signals/analysis."""
+
+      def generate_index_page(self) -> Path:
+          """Generate homepage with recent reports."""
+
+      def generate_tags_index(self) -> Path:
+          """Generate tags index page."""
+
+      def update_navigation(self):
+          """Update .pages files for navigation."""
+  ```
+
+#### Report Page Template (No Portfolio Data)
+- [ ] **Design public-friendly report format**:
+  - Remove portfolio allocation suggestions
+  - Remove watchlist recommendations
+  - Remove suggested positions
+  - Keep: signals, confidence scores, analysis insights, risk assessment
+  - Add: ticker tags, signal type tags, date navigation
+
+- [ ] **Example report page structure**:
+  ```markdown
+  ---
+  tags:
+    - AAPL
+    - MSFT
+    - buy
+    - strong_buy
+    - 2025-12-10
+  ---
+
+  # Market Analysis - December 10, 2025
+
+  **Analysis Mode:** LLM
+  **Tickers Analyzed:** 15
+  **Strong Signals:** 3
+
+  ## 🎯 Strong Buy Signals
+
+  ### AAPL - Apple Inc.
+  **Recommendation:** STRONG_BUY
+  **Confidence:** 85%
+  **Current Price:** $195.50
+
+  **Analysis:**
+  [Technical/Fundamental/Sentiment insights...]
+
+  **Risk Assessment:** Moderate
+
+  ---
+
+  ## 📊 Moderate Buy Signals
+  [...]
+
+  ## 🏷️ Tags
+  - [AAPL](../tickers/AAPL.md)
+  - [MSFT](../tickers/MSFT.md)
+  - [buy](../tags/buy.md)
+  - [tech](../tags/tech.md)
+  ```
+
+#### Ticker Pages
+- [ ] **Generate ticker-specific pages**:
+  ```markdown
+  ---
+  tags:
+    - AAPL
+    - technology
+  ---
+
+  # AAPL - Apple Inc.
+
+  ## Recent Signals
+
+  | Date | Recommendation | Confidence | Price | Analysis Mode |
+  |------|---------------|------------|-------|---------------|
+  | 2025-12-10 | STRONG_BUY | 85% | $195.50 | LLM |
+  | 2025-12-05 | BUY | 72% | $192.30 | Rule-based |
+
+  ## Analysis History
+  [Link to all reports mentioning AAPL]
+
+  ## Performance
+  [If tracking data available]
+  ```
+
+### 17.3 CLI Integration
+
+#### Publish Command
+- [ ] **Add `publish` command to main.py**:
+  ```python
+  @app.command()
+  def publish(
+      session_id: int | None = typer.Option(
+          None, "--session-id", help="Publish from run session ID"
+      ),
+      date: str | None = typer.Option(
+          None, "--date", help="Publish for specific date (YYYY-MM-DD)"
+      ),
+      ticker: str | None = typer.Option(
+          None, "--ticker", help="Publish specific ticker pages only"
+      ),
+      build_only: bool = typer.Option(
+          False, "--build-only", help="Build site without deploying"
+      ),
+      deploy: bool = typer.Option(
+          True, "--deploy/--no-deploy", help="Deploy to GitHub Pages"
+      ),
+      config: Path = typer.Option(
+          None, "--config", "-c", help="Path to configuration file"
+      ),
+  ) -> None:
+      """Publish analysis reports to static website.
+
+      Examples:
+          # Publish latest session
+          publish --session-id 123
+
+          # Publish specific date
+          publish --date 2025-12-10
+
+          # Publish ticker page only
+          publish --ticker AAPL
+
+          # Build without deploying
+          publish --session-id 123 --build-only
+
+          # Full workflow (build + deploy)
+          publish --session-id 123 --deploy
+      """
+  ```
+
+- [ ] **Implement publish workflow**:
+  1. Load signals from database
+  2. Generate markdown pages (reports, tickers, tags)
+  3. Update navigation
+  4. Build MkDocs site (`mkdocs build`)
+  5. Optionally deploy to GitHub Pages
+
+#### Update Command
+- [ ] **Add `update-website` command for bulk updates**:
+  ```python
+  @app.command()
+  def update_website(
+      days: int = typer.Option(
+          30, "--days", help="Update pages from last N days"
+      ),
+      rebuild_all: bool = typer.Option(
+          False, "--rebuild-all", help="Rebuild entire website"
+      ),
+  ) -> None:
+      """Update website with recent analysis data."""
+  ```
+
+### 17.4 GitHub Pages Deployment
+
+#### GitHub Actions Workflow
+- [ ] **Create `.github/workflows/publish-website.yml`**:
+  ```yaml
+  name: Publish Website
+
+  on:
+    workflow_dispatch:  # Manual trigger
+    push:
+      branches:
+        - main
+      paths:
+        - 'website/docs/**'
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Setup Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.12'
+
+        - name: Install dependencies
+          run: |
+            pip install mkdocs mkdocs-material mkdocs-tags-plugin
+
+        - name: Build site
+          run: |
+            cd website
+            mkdocs build
+
+        - name: Deploy to GitHub Pages
+          uses: peaceiris/actions-gh-pages@v3
+          with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            publish_dir: ./website/site
+            cname: nordinvest.yourdomain.com
+  ```
+
+#### Manual Deployment Script
+- [ ] **Create `scripts/deploy_website.sh`**:
+  ```bash
+  #!/bin/bash
+  # Deploy website to GitHub Pages
+
+  cd website
+  mkdocs build
+
+  # Push to gh-pages branch
+  cd site
+  git init
+  git remote add origin https://github.com/yourusername/NordInvest.git
+  git checkout -b gh-pages
+  git add .
+  git commit -m "Deploy website"
+  git push -f origin gh-pages
+  ```
+
+### 17.5 Custom Domain Setup (GoDaddy)
+
+#### GitHub Pages Configuration
+- [ ] **Configure repository settings**:
+  - Go to Settings → Pages
+  - Source: Deploy from branch `gh-pages`
+  - Custom domain: `nordinvest.yourdomain.com`
+  - Enforce HTTPS: ✅
+
+#### GoDaddy DNS Configuration
+- [ ] **Add DNS records**:
+  ```
+  Type: CNAME
+  Name: nordinvest
+  Value: yourusername.github.io
+  TTL: 600
+  ```
+
+- [ ] **Create `website/docs/CNAME`**:
+  ```
+  nordinvest.yourdomain.com
+  ```
+
+### 17.6 Filtering & Navigation Features
+
+#### Tags System
+- [ ] **Implement tagging**:
+  - Ticker tags (e.g., `AAPL`, `MSFT`)
+  - Signal type tags (e.g., `buy`, `strong_buy`, `hold`)
+  - Sector tags (e.g., `technology`, `healthcare`)
+  - Date tags (e.g., `2025-12-10`)
+
+- [ ] **Generate tag pages**:
+  ```markdown
+  # Tag: AAPL
+
+  All analysis pages mentioning AAPL:
+
+  - [Market Analysis - Dec 10, 2025](../reports/2025-12-10.md)
+  - [Market Analysis - Dec 05, 2025](../reports/2025-12-05.md)
+  ```
+
+#### Search & Filtering
+- [ ] **Enable MkDocs search plugin** (built-in)
+- [ ] **Add custom ticker filter** (JavaScript):
+  - Click ticker → filter all pages containing that ticker
+  - Dropdown for ticker selection
+  - Recent tickers quick links
+
+#### Navigation Enhancements
+- [ ] **Date-based navigation**:
+  - Previous/Next report links
+  - Monthly archives
+  - Calendar view (optional)
+
+- [ ] **Ticker navigation**:
+  - Alphabetical ticker list
+  - Most analyzed tickers
+  - Sector grouping
+
+### 17.7 Privacy & Security
+
+#### Content Filtering
+- [ ] **Implement privacy filters**:
+  ```python
+  def sanitize_report_for_web(report: DailyReport) -> DailyReport:
+      """Remove private information before publishing."""
+      sanitized = report.copy(deep=True)
+
+      # Remove portfolio allocation
+      sanitized.allocation_suggestion = None
+
+      # Remove watchlist
+      sanitized.watchlist_additions = []
+      sanitized.watchlist_removals = []
+
+      # Remove portfolio alerts
+      sanitized.portfolio_alerts = []
+
+      return sanitized
+  ```
+
+#### Configuration
+- [ ] **Add website config to `config/default.yaml`**:
+  ```yaml
+  website:
+    enabled: true
+    output_dir: "website/docs"
+    domain: "nordinvest.yourdomain.com"
+    github_repo: "yourusername/NordInvest"
+
+    # Privacy controls
+    include_portfolio_data: false
+    include_watchlist: false
+    include_allocation_suggestions: false
+
+    # Publishing
+    auto_deploy: false
+    deployment_method: "github_actions"  # or "manual"
+
+    # Content
+    reports_retention_days: 365  # Only publish reports from last year
+    max_reports_displayed: 100
+  ```
+
+### 17.8 Testing & Validation
+
+#### Local Testing
+- [ ] **Test local build**:
+  ```bash
+  cd website
+  mkdocs serve  # Preview at http://localhost:8000
+  ```
+
+- [ ] **Verify content**:
+  - [ ] Reports render correctly
+  - [ ] Ticker pages show all signals
+  - [ ] Tags work and link properly
+  - [ ] Search finds content
+  - [ ] Navigation works
+  - [ ] No portfolio data exposed
+
+#### Deployment Testing
+- [ ] Test GitHub Actions workflow
+- [ ] Verify custom domain works
+- [ ] Check HTTPS certificate
+- [ ] Test mobile responsiveness
+- [ ] Validate SEO metadata
+
+### 17.9 Documentation
+
+- [ ] **Update CLI_GUIDE.md** with publish examples
+- [ ] **Create WEBSITE.md** with:
+  - Website architecture
+  - Publishing workflow
+  - Custom domain setup
+  - Theme customization
+  - Troubleshooting
+- [ ] **Update README.md** with website link
+
+### Deliverables
+
+**Core Features:**
+- [ ] MkDocs + Material theme setup
+- [ ] WebsiteGenerator class for content generation
+- [ ] CLI `publish` command
+- [ ] Report pages (sanitized, no portfolio data)
+- [ ] Ticker-specific pages
+- [ ] Tags and filtering system
+- [ ] GitHub Pages deployment workflow
+- [ ] Custom domain configuration (GoDaddy)
+
+**Navigation & UX:**
+- [ ] Search functionality
+- [ ] Tag-based filtering
+- [ ] Ticker click-to-filter
+- [ ] Date-based navigation
+- [ ] Mobile-responsive design
+
+**Privacy & Security:**
+- [ ] Content sanitization (no portfolio/watchlist)
+- [ ] Configuration controls
+- [ ] HTTPS enforcement
+
+**Documentation:**
+- [ ] CLI examples in CLI_GUIDE.md
+- [ ] WEBSITE.md setup guide
+- [ ] README.md updates
+
+### Example Workflow
+
+```bash
+# 1. Run analysis
+uv run python -m src.main analyze --ticker AAPL,MSFT,GOOGL --llm
+
+# 2. Publish to website (build + deploy)
+uv run python -m src.main publish --session-id 123 --deploy
+
+# 3. Test locally first
+uv run python -m src.main publish --session-id 123 --build-only
+cd website && mkdocs serve
+
+# 4. Update ticker page
+uv run python -m src.main publish --ticker AAPL
+
+# 5. Rebuild entire website
+uv run python -m src.main update-website --rebuild-all
+```
+
+### Benefits
+
+- 🌐 **Public Sharing**: Share analysis insights publicly
+- 🔍 **Discoverability**: Search and filter by ticker/tag/date
+- 📱 **Accessibility**: Mobile-friendly website
+- 🚀 **Automation**: One-command publishing
+- 🔒 **Privacy**: Portfolio data stays private
+- 💰 **Cost-effective**: Free GitHub Pages hosting
+- 📈 **Professional**: Material theme, clean design
+
+### Future Enhancements (Optional)
+
+- [ ] RSS feed for new reports
+- [ ] Email subscription for updates
+- [ ] Performance charts (Chart.js integration)
+- [ ] Interactive ticker comparison
+- [ ] Historical signal accuracy dashboard
+- [ ] API endpoint for programmatic access
+- [ ] Multi-language support
+- [ ] Dark/light theme toggle
 
 ---
 
