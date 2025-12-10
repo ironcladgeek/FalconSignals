@@ -7,7 +7,9 @@ import yfinance as yf
 
 from src.data.models import InstrumentType, Market, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
+from src.utils.errors import RateLimitException
 from src.utils.logging import get_logger
+from src.utils.resilience import retry
 
 logger = get_logger(__name__)
 
@@ -25,6 +27,12 @@ class YahooFinanceProvider(DataProvider):
         self.is_available = True
         logger.debug("Yahoo Finance provider initialized")
 
+    @retry(
+        max_attempts=5,
+        initial_delay=2.0,
+        max_delay=60.0,
+        exponential_base=2.5,
+    )
     def get_stock_prices(
         self,
         ticker: str,
@@ -38,8 +46,9 @@ class YahooFinanceProvider(DataProvider):
             ticker: Stock ticker symbol
             start_date: Start date for historical data (ignored if period is set)
             end_date: End date for historical data (ignored if period is set)
-            period: Period string like '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'
-                    or '100d' for 100 days. If set, overrides start_date/end_date.
+            period: Period string like '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y',
+                    '5y', '10y', 'ytd', 'max' or '100d' for 100 days.
+                    If set, overrides start_date/end_date.
 
         Returns:
             List of StockPrice objects sorted by date
@@ -47,6 +56,7 @@ class YahooFinanceProvider(DataProvider):
         Raises:
             ValueError: If ticker is invalid
             RuntimeError: If API call fails
+            RateLimitException: If rate limited by API
         """
         try:
             if period:
@@ -142,9 +152,25 @@ class YahooFinanceProvider(DataProvider):
         except ValueError:
             raise
         except Exception as e:
+            error_msg = str(e)
+            # Detect rate limiting errors from yfinance
+            if "rate limit" in error_msg.lower() or "too many requests" in error_msg.lower():
+                logger.warning(
+                    f"Rate limited by Yahoo Finance for {ticker}, will retry with backoff"
+                )
+                raise RateLimitException(
+                    f"Rate limited by Yahoo Finance: {error_msg}",
+                    provider="yahoo_finance",
+                ) from e
             logger.error(f"Error fetching prices for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch prices for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch prices for {ticker}: {e}") from e
 
+    @retry(
+        max_attempts=5,
+        initial_delay=2.0,
+        max_delay=60.0,
+        exponential_base=2.5,
+    )
     def get_latest_price(self, ticker: str) -> StockPrice:
         """Fetch latest stock price from Yahoo Finance.
 
@@ -157,6 +183,7 @@ class YahooFinanceProvider(DataProvider):
         Raises:
             ValueError: If ticker is invalid
             RuntimeError: If API call fails
+            RateLimitException: If rate limited by API
         """
         try:
             logger.debug(f"Fetching latest price for {ticker}")
@@ -191,8 +218,18 @@ class YahooFinanceProvider(DataProvider):
         except ValueError:
             raise
         except Exception as e:
+            error_msg = str(e)
+            # Detect rate limiting errors from yfinance
+            if "rate limit" in error_msg.lower() or "too many requests" in error_msg.lower():
+                logger.warning(
+                    f"Rate limited by Yahoo Finance for {ticker}, will retry with backoff"
+                )
+                raise RateLimitException(
+                    f"Rate limited by Yahoo Finance: {error_msg}",
+                    provider="yahoo_finance",
+                ) from e
             logger.error(f"Error fetching latest price for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch latest price for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch latest price for {ticker}: {e}") from e
 
     @staticmethod
     def _get_ticker_name(ticker: str) -> str:

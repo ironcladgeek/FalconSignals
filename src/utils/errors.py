@@ -107,6 +107,23 @@ class RetryableException(NordInvestException):
         super().__init__(message, error_code=error_code, **kwargs)
 
 
+class RateLimitException(RetryableException):
+    """Exception for API rate limit errors requiring exponential backoff."""
+
+    def __init__(self, message: str, provider: str | None = None, **kwargs):
+        """Initialize rate limit exception.
+
+        Args:
+            message: Error message
+            provider: Name of the provider that was rate limited
+            **kwargs: Additional context
+        """
+        context = kwargs.get("context", {})
+        if provider:
+            context["provider"] = provider
+        super().__init__(message, error_code="API_RATE_LIMIT", context=context, **kwargs)
+
+
 class FallbackException(NordInvestException):
     """Exception indicating fallback to alternative strategy."""
 
@@ -134,6 +151,11 @@ def is_retryable_error(error: Exception) -> bool:
 
     if isinstance(error, NordInvestException):
         return error.error_code in retryable_codes
+
+    # Check for rate limit errors in error message (yfinance RuntimeError)
+    error_msg = str(error).lower()
+    if "rate limit" in error_msg or "too many requests" in error_msg:
+        return True
 
     return False
 
