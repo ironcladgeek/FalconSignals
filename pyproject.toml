@@ -38,6 +38,7 @@ dev = [
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.6",
+    "vulture>=2.14",
 ]
 
 [tool.ruff]
