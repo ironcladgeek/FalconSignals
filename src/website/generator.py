@@ -110,7 +110,7 @@ class WebsiteGenerator:
         if buy:
             lines.extend(
                 [
-                    "## 📊 Buy Signals",
+                    "## 📈 Buy Signals",
                     "",
                 ]
             )
@@ -223,7 +223,7 @@ class WebsiteGenerator:
         elif "SELL" in recommendation:
             symbol = "🔴"
         lines = [
-            f"#### {signal.ticker} - {signal.name}",
+            f"#### [{signal.ticker} - {signal.name}](https://finance.yahoo.com/quote/{signal.ticker}/)",
             "",
             f"**Recommendation:** {symbol} {recommendation}  ",
             f"**Confidence:** {signal.confidence}%  ",
