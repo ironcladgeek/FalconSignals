@@ -815,7 +815,7 @@ class RecommendationsRepository:
             final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
-            List of InvestmentSignal Pydantic models.
+            List of InvestmentSignal Pydantic models (deduplicated by ticker+analysis_date).
         """
         try:
             session = self.db_manager.get_session()
@@ -831,8 +831,11 @@ class RecommendationsRepository:
 
                 recommendations = session.exec(query).all()
 
+                # Deduplicate by ticker+analysis_date, keeping best recommendation
+                deduplicated = self._deduplicate_recommendations(recommendations)
+
                 # Convert to InvestmentSignal objects
-                return [self._to_investment_signal(rec) for rec in recommendations]
+                return [self._to_investment_signal(rec) for rec in deduplicated]
 
             finally:
                 session.close()
@@ -860,7 +863,7 @@ class RecommendationsRepository:
             final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
-            List of InvestmentSignal Pydantic models.
+            List of InvestmentSignal Pydantic models (deduplicated by ticker+analysis_date).
         """
         try:
             # Convert string to date if needed
@@ -878,8 +881,11 @@ class RecommendationsRepository:
 
                 recommendations = session.exec(query).all()
 
+                # Deduplicate by ticker+analysis_date, keeping best recommendation
+                deduplicated = self._deduplicate_recommendations(recommendations)
+
                 # Convert to InvestmentSignal objects
-                return [self._to_investment_signal(rec) for rec in recommendations]
+                return [self._to_investment_signal(rec) for rec in deduplicated]
 
             finally:
                 session.close()
@@ -917,6 +923,50 @@ class RecommendationsRepository:
         if final_score_threshold is not None:
             query = query.where(Recommendation.final_score > final_score_threshold)
         return query
+
+    def _deduplicate_recommendations(self, recommendations: list) -> list:
+        """Deduplicate recommendations by ticker+analysis_date, keeping the best one.
+
+        For each unique (ticker_id, analysis_date) combination, keeps only the recommendation
+        with the highest final_score. If final_scores are equal, uses highest confidence.
+        This ensures reports show only one recommendation per ticker per date.
+
+        Args:
+            recommendations: List of Recommendation database objects.
+
+        Returns:
+            List of deduplicated Recommendation objects sorted by final_score desc, confidence desc.
+        """
+        if not recommendations:
+            return []
+
+        # Group by (ticker_id, analysis_date)
+        groups = {}
+        for rec in recommendations:
+            key = (rec.ticker_id, rec.analysis_date)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(rec)
+
+        # For each group, keep the best recommendation
+        deduplicated = []
+        for group_recs in groups.values():
+            # Sort by final_score desc, then confidence desc
+            best = sorted(group_recs, key=lambda r: (r.final_score, r.confidence), reverse=True)[0]
+            deduplicated.append(best)
+
+        # Sort final list by final_score and confidence for consistent ordering
+        deduplicated.sort(key=lambda r: (r.final_score, r.confidence), reverse=True)
+
+        initial_count = len(recommendations)
+        final_count = len(deduplicated)
+        if initial_count > final_count:
+            logger.info(
+                f"Deduplicated recommendations: {initial_count} -> {final_count} "
+                f"({initial_count - final_count} duplicates removed)"
+            )
+
+        return deduplicated
 
     def get_latest_recommendation(self, ticker: str) -> Recommendation | None:
         """Get most recent recommendation for a ticker.
