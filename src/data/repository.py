@@ -968,6 +968,46 @@ class RecommendationsRepository:
 
         return deduplicated
 
+    def get_existing_tickers_for_date(
+        self, analysis_date: date | str, analysis_mode: str
+    ) -> set[str]:
+        """Get ticker symbols that already have recommendations for a specific date and mode.
+
+        Args:
+            analysis_date: Date to check (date object or YYYY-MM-DD string).
+            analysis_mode: Analysis mode ('llm' or 'rule_based').
+
+        Returns:
+            Set of ticker symbols that already have recommendations.
+        """
+        try:
+            # Convert string to date if needed
+            if isinstance(analysis_date, str):
+                analysis_date = datetime.strptime(analysis_date, "%Y-%m-%d").date()
+
+            session = self.db_manager.get_session()
+            try:
+                # Query for existing recommendations
+                query = (
+                    select(Ticker.symbol)
+                    .join(Recommendation, Recommendation.ticker_id == Ticker.id)
+                    .where(
+                        Recommendation.analysis_date == analysis_date,
+                        Recommendation.analysis_mode == analysis_mode,
+                    )
+                    .distinct()
+                )
+
+                results = session.exec(query).all()
+                return set(results)
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error checking existing recommendations: {e}")
+            return set()
+
     def get_latest_recommendation(self, ticker: str) -> Recommendation | None:
         """Get most recent recommendation for a ticker.
 

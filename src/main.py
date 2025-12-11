@@ -778,6 +778,42 @@ def analyze(
             typer.echo(f"\n❌ Error: {str(e)}", err=True)
             sys.exit(1)
 
+        # Remove tickers that already have recommendations for this date and analysis mode
+        if recommendations_repo and not test:
+            analysis_mode = "llm" if use_llm else "rule_based"
+            check_date = historical_date if historical_date else datetime.now().date()
+
+            typer.echo(
+                f"\n🔍 Checking for existing recommendations (date: {check_date}, mode: {analysis_mode})..."
+            )
+            existing_tickers = recommendations_repo.get_existing_tickers_for_date(
+                check_date, analysis_mode
+            )
+
+            if existing_tickers:
+                # Filter out tickers that already have recommendations
+                original_count = len(filtered_ticker_list)
+                filtered_ticker_list = [
+                    t for t in filtered_ticker_list if t not in existing_tickers
+                ]
+                removed_count = original_count - len(filtered_ticker_list)
+
+                if removed_count > 0:
+                    typer.echo(
+                        f"  ℹ️  Skipping {removed_count} ticker(s) with existing recommendations: "
+                        f"{', '.join(sorted(existing_tickers & set(filtered_ticker_list[:original_count])))}"
+                    )
+                    typer.echo(f"  ✓ {len(filtered_ticker_list)} new ticker(s) to analyze")
+
+                if not filtered_ticker_list:
+                    typer.echo(
+                        "\n✓ All tickers already have recommendations for this date and mode."
+                    )
+                    typer.echo("  No new analysis needed.")
+                    return
+            else:
+                typer.echo("  ✓ No existing recommendations found. Proceeding with all tickers.")
+
         # Run analysis (LLM or rule-based)
         if use_llm:
             typer.echo("\n🤖 Stage 2: Deep LLM-powered analysis")
