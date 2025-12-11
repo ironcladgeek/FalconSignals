@@ -175,7 +175,7 @@ def _filter_tickers(
         logger.error(f"Error during filtering: {e}", exc_info=True)
         raise RuntimeError(
             f"Filtering error: {str(e)}\nUnable to proceed with analysis.\nCheck logs for details."
-        )
+        ) from e
 
 
 def _run_llm_analysis(
