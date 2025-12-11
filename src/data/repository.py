@@ -797,11 +797,22 @@ class RecommendationsRepository:
             metadata=metadata,
         )
 
-    def get_recommendations_by_session(self, run_session_id: int) -> list:
+    def get_recommendations_by_session(
+        self,
+        run_session_id: int,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ) -> list:
         """Get all recommendations for a specific run session.
 
         Args:
             run_session_id: Integer ID of the run session.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
             List of InvestmentSignal Pydantic models.
@@ -809,11 +820,16 @@ class RecommendationsRepository:
         try:
             session = self.db_manager.get_session()
             try:
-                recommendations = session.exec(
-                    select(Recommendation)
-                    .where(Recommendation.run_session_id == run_session_id)
-                    .order_by(Recommendation.created_at)
-                ).all()
+                # Build query with filters
+                query = select(Recommendation).where(
+                    Recommendation.run_session_id == run_session_id
+                )
+                query = self._apply_filters(
+                    query, analysis_mode, signal_type, confidence_threshold, final_score_threshold
+                )
+                query = query.order_by(Recommendation.created_at)
+
+                recommendations = session.exec(query).all()
 
                 # Convert to InvestmentSignal objects
                 return [self._to_investment_signal(rec) for rec in recommendations]
@@ -825,12 +841,23 @@ class RecommendationsRepository:
             logger.error(f"Error retrieving recommendations for session {run_session_id}: {e}")
             return []
 
-    def get_recommendations_by_date(self, report_date: date | str) -> list:
+    def get_recommendations_by_date(
+        self,
+        report_date: date | str,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ) -> list:
         """Get all recommendations created on a specific date for report generation.
 
         Args:
             report_date: Date when report is being generated (date object or YYYY-MM-DD string).
                         Retrieves recommendations created on this date, regardless of analysis_date.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
             List of InvestmentSignal Pydantic models.
@@ -842,12 +869,14 @@ class RecommendationsRepository:
 
             session = self.db_manager.get_session()
             try:
-                # Filter by analysis_date
-                recommendations = session.exec(
-                    select(Recommendation)
-                    .where(Recommendation.analysis_date == report_date)
-                    .order_by(Recommendation.created_at)
-                ).all()
+                # Build query with filters
+                query = select(Recommendation).where(Recommendation.analysis_date == report_date)
+                query = self._apply_filters(
+                    query, analysis_mode, signal_type, confidence_threshold, final_score_threshold
+                )
+                query = query.order_by(Recommendation.created_at)
+
+                recommendations = session.exec(query).all()
 
                 # Convert to InvestmentSignal objects
                 return [self._to_investment_signal(rec) for rec in recommendations]
@@ -858,6 +887,36 @@ class RecommendationsRepository:
         except Exception as e:
             logger.error(f"Error retrieving recommendations for date {report_date}: {e}")
             return []
+
+    def _apply_filters(
+        self,
+        query,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ):
+        """Apply common filters to a recommendation query.
+
+        Args:
+            query: SQLModel query to filter.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
+
+        Returns:
+            Filtered query.
+        """
+        if analysis_mode:
+            query = query.where(Recommendation.analysis_mode == analysis_mode)
+        if signal_type:
+            query = query.where(Recommendation.signal_type == signal_type)
+        if confidence_threshold is not None:
+            query = query.where(Recommendation.confidence > confidence_threshold)
+        if final_score_threshold is not None:
+            query = query.where(Recommendation.final_score > final_score_threshold)
+        return query
 
     def get_latest_recommendation(self, ticker: str) -> Recommendation | None:
         """Get most recent recommendation for a ticker.
