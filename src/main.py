@@ -365,7 +365,7 @@ def analyze(
         "-l",
         help="Maximum number of instruments to analyze per market",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -1688,7 +1688,7 @@ def download_prices(
         "-l",
         help="Maximum number of instruments to download per market",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -1875,7 +1875,7 @@ def download_prices(
 
 @app.command()
 def config_init(
-    output: Path = typer.Option(
+    output: Path = typer.Option(  # noqa: B008
         Path("config/local.yaml"),
         "--output",
         "-o",
@@ -1918,7 +1918,7 @@ def config_init(
 
 @app.command()
 def validate_config(
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -1976,7 +1976,7 @@ def track_performance(
         "-b",
         help="Benchmark ticker symbol for comparison",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -2135,7 +2135,7 @@ def performance_report(
         "-f",
         help="Output format: text or json",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
