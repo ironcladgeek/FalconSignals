@@ -185,7 +185,7 @@ class FinnhubProvider(DataProvider):
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching news for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch news for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch news for {ticker}: {e}") from e
 
     def get_company_info(self, ticker: str) -> Optional[dict]:
         """Fetch company basic information.
@@ -232,7 +232,7 @@ class FinnhubProvider(DataProvider):
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching company info for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}") from e
 
     def get_recommendation_trends(
         self, ticker: str, as_of_date: datetime | None = None

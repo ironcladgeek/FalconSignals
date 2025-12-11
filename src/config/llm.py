@@ -68,7 +68,7 @@ def _initialize_anthropic(config: LLMConfig):
         raise ValueError(
             "langchain-anthropic package not installed. "
             "Install it with: pip install langchain-anthropic"
-        )
+        ) from None
 
 
 def _initialize_openai(config: LLMConfig):
@@ -105,7 +105,7 @@ def _initialize_openai(config: LLMConfig):
     except ImportError:
         raise ValueError(
             "langchain-openai package not installed. Install it with: pip install langchain-openai"
-        )
+        ) from None
 
 
 def _initialize_local(config: LLMConfig):
@@ -134,7 +134,7 @@ def _initialize_local(config: LLMConfig):
     except ImportError:
         raise ValueError(
             "crewai or litellm package not installed. Install it with: pip install crewai litellm"
-        )
+        ) from None
     except Exception as e:
         raise ValueError(
             f"Failed to initialize local LLM. Make sure Ollama is running (ollama serve) "

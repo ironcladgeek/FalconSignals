@@ -236,23 +236,6 @@ class CacheManager:
             logger.info(f"Removed {removed} expired cache entries")
         return removed
 
-    def get_stats(self) -> dict[str, Any]:
-        """Get cache statistics.
-
-        Returns:
-            Dictionary with cache stats
-        """
-        memory_entries = len(self._memory_cache)
-        disk_entries = len(list(self.cache_dir.glob("*.json")))
-        total_size = sum(f.stat().st_size for f in self.cache_dir.glob("*.json"))
-
-        return {
-            "memory_entries": memory_entries,
-            "disk_entries": disk_entries,
-            "total_size_bytes": total_size,
-            "cache_dir": str(self.cache_dir),
-        }
-
     def get_latest_price(self, ticker: str) -> Optional[Any]:
         """Get latest price for a ticker from cache.
 

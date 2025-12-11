@@ -266,10 +266,12 @@ def _run_llm_analysis(
                 try:
                     current_task = [0]  # Use list to allow mutation in nested function
 
-                    def agent_progress_callback(current, total, task_name):
+                    def agent_progress_callback(
+                        current, total, task_name, task_tracker=current_task
+                    ):
                         """Update progress display for agent tasks."""
-                        if current > current_task[0]:
-                            current_task[0] = current
+                        if current > task_tracker[0]:
+                            task_tracker[0] = current
                             # Show which agent is working
                             agent_name = task_name.replace("_", " ").title()
                             typer_instance.echo(f"  → {agent_name} ({current}/{total})", nl=False)
@@ -1943,15 +1945,15 @@ def validate_config(
     except FileNotFoundError as e:
         logger.error(f"Configuration file not found: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except ValueError as e:
         logger.error(f"Configuration validation failed: {e}")
         typer.echo(f"❌ Configuration error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         logger.exception(f"Unexpected error validating configuration: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -2252,7 +2254,7 @@ def performance_report(
     except Exception as e:
         logger.error(f"Error generating performance report: {e}", exc_info=True)
         typer.echo(f"\n❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
