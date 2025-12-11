@@ -223,7 +223,8 @@ class WebsiteGenerator:
         elif "SELL" in recommendation:
             symbol = "🔴"
         lines = [
-            f"#### [{signal.ticker} - {signal.name}](https://finance.yahoo.com/quote/{signal.ticker}/)",
+            f"#### [{signal.ticker} - {signal.name}]"
+            f'(https://finance.yahoo.com/quote/{signal.ticker}/){{:target="_blank"}}',
             "",
             f"**Recommendation:** {symbol} {recommendation}  ",
             f"**Confidence:** {signal.confidence}%  ",
