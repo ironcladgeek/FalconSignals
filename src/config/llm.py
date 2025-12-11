@@ -1,7 +1,6 @@
 """LLM configuration and client initialization."""
 
 import os
-from typing import Optional
 
 from src.config.schemas import LLMConfig
 from src.utils.logging import get_logger
@@ -140,18 +139,3 @@ def _initialize_local(config: LLMConfig):
             f"Failed to initialize local LLM. Make sure Ollama is running (ollama serve) "
             f"and the model '{config.model}' is available (ollama list). Error: {e}"
         ) from e
-
-
-def get_llm_client(config: Optional[LLMConfig] = None):
-    """Get or create cached LLM client.
-
-    Args:
-        config: LLM configuration (uses default if not provided)
-
-    Returns:
-        LLM client instance
-    """
-    if config is None:
-        config = LLMConfig()
-
-    return initialize_llm_client(config)

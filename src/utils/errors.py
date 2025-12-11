@@ -92,24 +92,3 @@ def is_retryable_error(error: Exception) -> bool:
         return True
 
     return False
-
-
-def should_fallback(error: Exception) -> bool:
-    """Determine if fallback strategy should be used.
-
-    Args:
-        error: Exception to check
-
-    Returns:
-        True if fallback should be attempted
-    """
-    fallback_codes = [
-        "DATA_PROVIDER_ERROR",
-        "API_ERROR",
-        "CONNECTION_ERROR",
-    ]
-
-    if isinstance(error, NordInvestException):
-        return error.error_code in fallback_codes
-
-    return False

@@ -68,3 +68,21 @@ get_unified_prices
 store_unified_prices
 get_unified_latest_price
 get_unified_price_at_date
+
+# CLI commands - Typer framework commands (false positives)
+analyze
+publish
+list_categories
+list_portfolios
+download_prices
+config_init
+validate_config
+track_performance
+performance_report
+version_callback
+
+# Public API functions
+extract_analysis_metadata
+get_llm_client
+sanitize_signal_for_web
+get_safe_signal_summary

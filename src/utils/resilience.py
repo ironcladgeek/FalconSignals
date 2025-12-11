@@ -158,35 +158,6 @@ class RateLimiter:
         self.last_update = now
 
 
-def graceful_degrade(
-    default_value: Any = None,
-    log_error: bool = True,
-) -> Callable[[F], F]:
-    """Decorator for graceful degradation on error.
-
-    Args:
-        default_value: Value to return on error
-        log_error: Whether to log the error
-
-    Returns:
-        Decorated function
-    """
-
-    def decorator(func: F) -> F:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                if log_error:
-                    logger.warning(f"Operation {func.__name__} degraded to default: {e}")
-                return default_value
-
-        return wrapper  # type: ignore
-
-    return decorator
-
-
 def timeout(seconds: float) -> Callable[[F], F]:
     """Decorator for operation timeout (basic implementation).
 
