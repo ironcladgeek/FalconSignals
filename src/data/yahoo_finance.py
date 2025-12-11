@@ -29,8 +29,8 @@ class YahooFinanceProvider(DataProvider):
 
     @retry(
         max_attempts=5,
-        initial_delay=2.0,
-        max_delay=60.0,
+        initial_delay=5.0,
+        max_delay=120.0,
         exponential_base=2.5,
     )
     def get_stock_prices(

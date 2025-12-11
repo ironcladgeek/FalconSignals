@@ -4,10 +4,14 @@ Provides high-level repository interfaces for storing and retrieving historical
 analyst ratings and other time-sensitive data from the SQLite database.
 """
 
-from datetime import date, datetime
+import json
+import statistics
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import yfinance as yf
 from loguru import logger
+from sqlalchemy import func
 from sqlmodel import and_, select
 
 from src.data.db import DatabaseManager
@@ -20,6 +24,51 @@ from src.data.models import (
     RunSession,
     Ticker,
 )
+
+
+def get_or_create_ticker(session, ticker_symbol: str, name: str = "") -> Ticker:
+    """Get existing ticker or create new one.
+
+    Shared helper function used by multiple repositories to ensure consistent
+    ticker creation with automatic company name fetching.
+
+    Args:
+        session: Database session.
+        ticker_symbol: Ticker symbol (e.g., 'AAPL').
+        name: Company name (optional, will be fetched if not provided).
+
+    Returns:
+        Ticker object.
+    """
+    ticker_symbol = ticker_symbol.upper()
+
+    # Check if ticker already exists
+    existing = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+    if existing:
+        return existing
+
+    # Fetch company name if not provided or if it's just the ticker symbol
+    if not name or name == ticker_symbol:
+        try:
+            ticker_obj = yf.Ticker(ticker_symbol)
+            info = ticker_obj.info
+            name = info.get("longName") or info.get("shortName") or ticker_symbol
+            logger.debug(f"Fetched company name for {ticker_symbol}: {name}")
+        except Exception as e:
+            logger.warning(f"Could not fetch company name for {ticker_symbol}: {e}")
+            name = ticker_symbol
+
+    # Create new ticker
+    new_ticker = Ticker(
+        symbol=ticker_symbol,
+        name=name,
+        market="us",  # Default, can be overridden later
+        instrument_type="stock",
+    )
+    session.add(new_ticker)
+    session.flush()  # Flush to get the ID without committing
+    return new_ticker
 
 
 class AnalystRatingsRepository:
@@ -38,36 +87,6 @@ class AnalystRatingsRepository:
         # Create instance-specific database manager (not global) for better test isolation
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.initialize()
-
-    def _get_or_create_ticker(self, session, ticker_symbol: str, name: str = "") -> Ticker:
-        """Get existing ticker or create new one.
-
-        Args:
-            session: Database session.
-            ticker_symbol: Ticker symbol (e.g., 'AAPL').
-            name: Company name (optional, defaults to symbol).
-
-        Returns:
-            Ticker object.
-        """
-        ticker_symbol = ticker_symbol.upper()
-
-        # Check if ticker already exists
-        existing = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
-
-        if existing:
-            return existing
-
-        # Create new ticker
-        new_ticker = Ticker(
-            symbol=ticker_symbol,
-            name=name or ticker_symbol,
-            market="us",  # Default, can be overridden later
-            instrument_type="stock",
-        )
-        session.add(new_ticker)
-        session.flush()  # Flush to get the ID without committing
-        return new_ticker
 
     def store_ratings(self, ratings: AnalystRating, data_source: str = "unknown") -> bool:
         """Store analyst ratings for a specific month.
@@ -96,7 +115,7 @@ class AnalystRatingsRepository:
             session = self.db_manager.get_session()
             try:
                 # Get or create ticker (handles foreign key relationship)
-                ticker_obj = self._get_or_create_ticker(session, ticker, ratings.name)
+                ticker_obj = get_or_create_ticker(session, ticker, ratings.name)
 
                 # Check if record exists
                 existing = session.exec(
@@ -332,8 +351,6 @@ class AnalystRatingsRepository:
             session = self.db_manager.get_session()
             try:
                 # SQLModel doesn't have count() directly, so use func.count()
-                from sqlalchemy import func
-
                 count = session.exec(select(func.count(AnalystData.id))).one()
                 return count or 0
 
@@ -455,7 +472,6 @@ class RunSessionRepository:
         Returns:
             Session ID (auto-incrementing integer).
         """
-        import json
 
         try:
             session = self.db_manager.get_session()
@@ -623,36 +639,6 @@ class RecommendationsRepository:
         self.db_manager = DatabaseManager(db_path)
         self.db_manager.initialize()
 
-    def _get_or_create_ticker(self, session, ticker_symbol: str, name: str = "") -> Ticker:
-        """Get existing ticker or create new one.
-
-        Args:
-            session: Database session.
-            ticker_symbol: Ticker symbol (e.g., 'AAPL').
-            name: Company name (optional, defaults to symbol).
-
-        Returns:
-            Ticker object.
-        """
-        ticker_symbol = ticker_symbol.upper()
-
-        # Check if ticker already exists
-        existing = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
-
-        if existing:
-            return existing
-
-        # Create new ticker
-        new_ticker = Ticker(
-            symbol=ticker_symbol,
-            name=name or ticker_symbol,
-            market="us",  # Default, can be overridden later
-            instrument_type="stock",
-        )
-        session.add(new_ticker)
-        session.flush()  # Flush to get the ID without committing
-        return new_ticker
-
     def store_recommendation(
         self,
         signal,  # InvestmentSignal type (imported dynamically to avoid circular import)
@@ -671,14 +657,12 @@ class RecommendationsRepository:
         Returns:
             recommendation_id (auto-incrementing integer).
         """
-        import json
-        from datetime import datetime
 
         try:
             session = self.db_manager.get_session()
             try:
                 # Get or create ticker
-                ticker_obj = self._get_or_create_ticker(session, signal.ticker, signal.name)
+                ticker_obj = get_or_create_ticker(session, signal.ticker, signal.name)
 
                 # Convert analysis_date string to date object
                 if isinstance(signal.analysis_date, str):
@@ -750,8 +734,6 @@ class RecommendationsRepository:
         Returns:
             InvestmentSignal Pydantic model.
         """
-        import json
-
         from src.analysis import InvestmentSignal
         from src.analysis.models import AnalysisMetadata, ComponentScores, RiskAssessment, RiskLevel
         from src.analysis.models import Recommendation as RecommendationType
@@ -815,26 +797,45 @@ class RecommendationsRepository:
             metadata=metadata,
         )
 
-    def get_recommendations_by_session(self, run_session_id: int) -> list:
+    def get_recommendations_by_session(
+        self,
+        run_session_id: int,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ) -> list:
         """Get all recommendations for a specific run session.
 
         Args:
             run_session_id: Integer ID of the run session.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
-            List of InvestmentSignal Pydantic models.
+            List of InvestmentSignal Pydantic models (deduplicated by ticker+analysis_date).
         """
         try:
             session = self.db_manager.get_session()
             try:
-                recommendations = session.exec(
-                    select(Recommendation)
-                    .where(Recommendation.run_session_id == run_session_id)
-                    .order_by(Recommendation.created_at)
-                ).all()
+                # Build query with filters
+                query = select(Recommendation).where(
+                    Recommendation.run_session_id == run_session_id
+                )
+                query = self._apply_filters(
+                    query, analysis_mode, signal_type, confidence_threshold, final_score_threshold
+                )
+                query = query.order_by(Recommendation.created_at)
+
+                recommendations = session.exec(query).all()
+
+                # Deduplicate by ticker+analysis_date, keeping best recommendation
+                deduplicated = self._deduplicate_recommendations(recommendations)
 
                 # Convert to InvestmentSignal objects
-                return [self._to_investment_signal(rec) for rec in recommendations]
+                return [self._to_investment_signal(rec) for rec in deduplicated]
 
             finally:
                 session.close()
@@ -843,18 +844,27 @@ class RecommendationsRepository:
             logger.error(f"Error retrieving recommendations for session {run_session_id}: {e}")
             return []
 
-    def get_recommendations_by_date(self, report_date: date | str) -> list:
+    def get_recommendations_by_date(
+        self,
+        report_date: date | str,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ) -> list:
         """Get all recommendations created on a specific date for report generation.
 
         Args:
             report_date: Date when report is being generated (date object or YYYY-MM-DD string).
                         Retrieves recommendations created on this date, regardless of analysis_date.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
 
         Returns:
-            List of InvestmentSignal Pydantic models.
+            List of InvestmentSignal Pydantic models (deduplicated by ticker+analysis_date).
         """
-        from datetime import datetime
-
         try:
             # Convert string to date if needed
             if isinstance(report_date, str):
@@ -862,15 +872,20 @@ class RecommendationsRepository:
 
             session = self.db_manager.get_session()
             try:
-                # Filter by analysis_date
-                recommendations = session.exec(
-                    select(Recommendation)
-                    .where(Recommendation.analysis_date == report_date)
-                    .order_by(Recommendation.created_at)
-                ).all()
+                # Build query with filters
+                query = select(Recommendation).where(Recommendation.analysis_date == report_date)
+                query = self._apply_filters(
+                    query, analysis_mode, signal_type, confidence_threshold, final_score_threshold
+                )
+                query = query.order_by(Recommendation.created_at)
+
+                recommendations = session.exec(query).all()
+
+                # Deduplicate by ticker+analysis_date, keeping best recommendation
+                deduplicated = self._deduplicate_recommendations(recommendations)
 
                 # Convert to InvestmentSignal objects
-                return [self._to_investment_signal(rec) for rec in recommendations]
+                return [self._to_investment_signal(rec) for rec in deduplicated]
 
             finally:
                 session.close()
@@ -878,6 +893,120 @@ class RecommendationsRepository:
         except Exception as e:
             logger.error(f"Error retrieving recommendations for date {report_date}: {e}")
             return []
+
+    def _apply_filters(
+        self,
+        query,
+        analysis_mode: str | None = None,
+        signal_type: str | None = None,
+        confidence_threshold: float | None = None,
+        final_score_threshold: float | None = None,
+    ):
+        """Apply common filters to a recommendation query.
+
+        Args:
+            query: SQLModel query to filter.
+            analysis_mode: Filter by analysis mode ('llm' or 'rule_based').
+            signal_type: Filter by signal type (e.g., 'strong_buy', 'buy', 'hold').
+            confidence_threshold: Minimum confidence score (e.g., 70 means confidence > 70).
+            final_score_threshold: Minimum final score (e.g., 70 means final_score > 70).
+
+        Returns:
+            Filtered query.
+        """
+        if analysis_mode:
+            query = query.where(Recommendation.analysis_mode == analysis_mode)
+        if signal_type:
+            query = query.where(Recommendation.signal_type == signal_type)
+        if confidence_threshold is not None:
+            query = query.where(Recommendation.confidence > confidence_threshold)
+        if final_score_threshold is not None:
+            query = query.where(Recommendation.final_score > final_score_threshold)
+        return query
+
+    def _deduplicate_recommendations(self, recommendations: list) -> list:
+        """Deduplicate recommendations by ticker+analysis_date, keeping the best one.
+
+        For each unique (ticker_id, analysis_date) combination, keeps only the recommendation
+        with the highest final_score. If final_scores are equal, uses highest confidence.
+        This ensures reports show only one recommendation per ticker per date.
+
+        Args:
+            recommendations: List of Recommendation database objects.
+
+        Returns:
+            List of deduplicated Recommendation objects sorted by final_score desc, confidence desc.
+        """
+        if not recommendations:
+            return []
+
+        # Group by (ticker_id, analysis_date)
+        groups = {}
+        for rec in recommendations:
+            key = (rec.ticker_id, rec.analysis_date)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(rec)
+
+        # For each group, keep the best recommendation
+        deduplicated = []
+        for group_recs in groups.values():
+            # Sort by final_score desc, then confidence desc
+            best = sorted(group_recs, key=lambda r: (r.final_score, r.confidence), reverse=True)[0]
+            deduplicated.append(best)
+
+        # Sort final list by final_score and confidence for consistent ordering
+        deduplicated.sort(key=lambda r: (r.final_score, r.confidence), reverse=True)
+
+        initial_count = len(recommendations)
+        final_count = len(deduplicated)
+        if initial_count > final_count:
+            logger.info(
+                f"Deduplicated recommendations: {initial_count} -> {final_count} "
+                f"({initial_count - final_count} duplicates removed)"
+            )
+
+        return deduplicated
+
+    def get_existing_tickers_for_date(
+        self, analysis_date: date | str, analysis_mode: str
+    ) -> set[str]:
+        """Get ticker symbols that already have recommendations for a specific date and mode.
+
+        Args:
+            analysis_date: Date to check (date object or YYYY-MM-DD string).
+            analysis_mode: Analysis mode ('llm' or 'rule_based').
+
+        Returns:
+            Set of ticker symbols that already have recommendations.
+        """
+        try:
+            # Convert string to date if needed
+            if isinstance(analysis_date, str):
+                analysis_date = datetime.strptime(analysis_date, "%Y-%m-%d").date()
+
+            session = self.db_manager.get_session()
+            try:
+                # Query for existing recommendations
+                query = (
+                    select(Ticker.symbol)
+                    .join(Recommendation, Recommendation.ticker_id == Ticker.id)
+                    .where(
+                        Recommendation.analysis_date == analysis_date,
+                        Recommendation.analysis_mode == analysis_mode,
+                    )
+                    .distinct()
+                )
+
+                results = session.exec(query).all()
+                return set(results)
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error checking existing recommendations: {e}")
+            return set()
 
     def get_latest_recommendation(self, ticker: str) -> Recommendation | None:
         """Get most recent recommendation for a ticker.
@@ -1160,10 +1289,6 @@ class PerformanceRepository:
             session = self.db_manager.get_session()
             try:
                 # Calculate cutoff date
-                from datetime import timedelta
-
-                from sqlmodel import select
-
                 cutoff_date = date.today() - timedelta(days=max_age_days)
 
                 # Build query with eager loading of ticker relationship
@@ -1213,8 +1338,6 @@ class PerformanceRepository:
             session = self.db_manager.get_session()
             try:
                 # Build query to get recommendations and their tracking data
-                from datetime import timedelta
-
                 cutoff_date = date.today() - timedelta(days=period_days)
 
                 # Base query for recommendations
@@ -1257,8 +1380,6 @@ class PerformanceRepository:
                     confidences.append(rec.confidence)
 
                 # Calculate metrics
-                import statistics
-
                 total_recommendations = len(recommendations)
                 avg_return = statistics.mean(returns) if returns else None
                 median_return = statistics.median(returns) if returns else None

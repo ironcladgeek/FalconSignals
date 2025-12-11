@@ -214,6 +214,19 @@ uv run python -m src.main report [OPTIONS]
 | `--session-id` | Run session ID (integer) | `--session-id 1` |
 | `--date` | Analysis date | `--date 2025-12-04` |
 
+#### Optional Filtering
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--analysis-mode` | Filter by analysis mode | `--analysis-mode llm` |
+| `--signal-type` | Filter by signal type | `--signal-type strong_buy` |
+| `--confidence-threshold` | Minimum confidence score (exclusive) | `--confidence-threshold 70` |
+| `--final-score-threshold` | Minimum final score (exclusive) | `--final-score-threshold 70` |
+
+**Valid analysis modes:** `llm`, `rule_based`
+
+**Valid signal types:** `strong_buy`, `buy`, `hold_bullish`, `hold`, `hold_bearish`, `sell`, `strong_sell`
+
 #### Optional Settings
 
 | Option | Default | Description |
@@ -231,6 +244,21 @@ uv run python -m src.main report --session-id 1
 # Generate report for specific date
 uv run python -m src.main report --date 2025-12-04
 
+# Filter by analysis mode
+uv run python -m src.main report --date 2025-12-04 --analysis-mode llm
+
+# Filter by signal type
+uv run python -m src.main report --date 2025-12-04 --signal-type strong_buy
+
+# Filter by confidence threshold (only signals with confidence > 70)
+uv run python -m src.main report --date 2025-12-04 --confidence-threshold 70
+
+# Filter by final score threshold (only signals with final_score > 80)
+uv run python -m src.main report --session-id 1 --final-score-threshold 80
+
+# Combine multiple filters
+uv run python -m src.main report --date 2025-12-04 --analysis-mode llm --confidence-threshold 80 --signal-type buy
+
 # JSON format without saving
 uv run python -m src.main report --session-id 1 --format json --no-save
 
@@ -241,7 +269,8 @@ uv run python -m src.main report --session-id 1 --config config/local.yaml
 **Notes:**
 - Database must be enabled in configuration
 - Session IDs are integers (auto-incremented)
-- Reports include all recommendations from the session/date
+- Reports include recommendations matching the specified filters
+- Threshold filters are exclusive (e.g., `--confidence-threshold 70` means confidence > 70)
 
 ---
 
@@ -262,6 +291,19 @@ uv run python -m src.main publish [OPTIONS]
 | `--date` | Analysis date | `--date 2025-12-10` |
 | `--ticker` | Specific ticker symbol | `--ticker NVDA` |
 
+#### Optional Filtering
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--analysis-mode` | Filter by analysis mode | `--analysis-mode llm` |
+| `--signal-type` | Filter by signal type | `--signal-type strong_buy` |
+| `--confidence-threshold` | Minimum confidence score (exclusive) | `--confidence-threshold 70` |
+| `--final-score-threshold` | Minimum final score (exclusive) | `--final-score-threshold 70` |
+
+**Valid analysis modes:** `llm`, `rule_based`
+
+**Valid signal types:** `strong_buy`, `buy`, `hold_bullish`, `hold`, `hold_bearish`, `sell`, `strong_sell`
+
 #### Optional Settings
 
 | Option | Default | Description |
@@ -281,6 +323,21 @@ uv run python -m src.main publish --date 2025-12-10
 
 # Publish only one ticker
 uv run python -m src.main publish --ticker NVDA --date 2025-12-10
+
+# Filter by analysis mode
+uv run python -m src.main publish --date 2025-12-10 --analysis-mode llm
+
+# Filter by signal type
+uv run python -m src.main publish --date 2025-12-10 --signal-type strong_buy
+
+# Filter by confidence threshold (only signals with confidence > 80)
+uv run python -m src.main publish --date 2025-12-10 --confidence-threshold 80
+
+# Filter by final score threshold (only signals with final_score > 70)
+uv run python -m src.main publish --session-id 123 --final-score-threshold 70
+
+# Combine multiple filters
+uv run python -m src.main publish --date 2025-12-10 --analysis-mode llm --confidence-threshold 80 --signal-type buy
 
 # Generate content without building site (for testing)
 uv run python -m src.main publish --session-id 123 --no-build

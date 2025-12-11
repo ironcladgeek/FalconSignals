@@ -57,6 +57,10 @@ class WebsiteGenerator:
         strong_buy = [s for s in signals if s.recommendation.value == "strong_buy"]
         buy = [s for s in signals if s.recommendation.value == "buy"]
         hold_bullish = [s for s in signals if s.recommendation.value == "hold_bullish"]
+        hold = [s for s in signals if s.recommendation.value == "hold"]
+        hold_bearish = [s for s in signals if s.recommendation.value == "hold_bearish"]
+        sell = [s for s in signals if s.recommendation.value == "sell"]
+        strong_sell = [s for s in signals if s.recommendation.value == "strong_sell"]
 
         # Generate tags
         tickers = list(set(s.ticker for s in signals))
@@ -106,15 +110,15 @@ class WebsiteGenerator:
         if buy:
             lines.extend(
                 [
-                    "## 📊 Buy Signals",
+                    "## 📈 Buy Signals",
                     "",
                 ]
             )
             for signal in buy:
                 lines.extend(self._format_signal(signal))
 
-        # Hold Signals (optional, only if not too many)
-        if hold_bullish and len(hold_bullish) <= 5:
+        # Hold Bullish Signals
+        if hold_bullish:
             lines.extend(
                 [
                     "## ⏸️ Hold (Bullish) Signals",
@@ -122,7 +126,51 @@ class WebsiteGenerator:
                 ]
             )
             for signal in hold_bullish:
-                lines.extend(self._format_signal(signal, include_details=True))  # Changed to True
+                lines.extend(self._format_signal(signal, include_details=True))
+
+        # Hold Signals
+        if hold:
+            lines.extend(
+                [
+                    "## ⏸️ Hold Signals",
+                    "",
+                ]
+            )
+            for signal in hold:
+                lines.extend(self._format_signal(signal, include_details=True))
+
+        # Hold Bearish Signals
+        if hold_bearish:
+            lines.extend(
+                [
+                    "## ⏸️ Hold (Bearish) Signals",
+                    "",
+                ]
+            )
+            for signal in hold_bearish:
+                lines.extend(self._format_signal(signal, include_details=True))
+
+        # Sell Signals
+        if sell:
+            lines.extend(
+                [
+                    "## 📉 Sell Signals",
+                    "",
+                ]
+            )
+            for signal in sell:
+                lines.extend(self._format_signal(signal, include_details=True))
+
+        # Strong Sell Signals
+        if strong_sell:
+            lines.extend(
+                [
+                    "## 🔴 Strong Sell Signals",
+                    "",
+                ]
+            )
+            for signal in strong_sell:
+                lines.extend(self._format_signal(signal, include_details=True))
 
         # Add tags section
         lines.extend(
@@ -175,7 +223,8 @@ class WebsiteGenerator:
         elif "SELL" in recommendation:
             symbol = "🔴"
         lines = [
-            f"#### {signal.ticker} - {signal.name}",
+            f"#### [{signal.ticker} - {signal.name}]"
+            f'(https://finance.yahoo.com/quote/{signal.ticker}/){{:target="_blank"}}',
             "",
             f"**Recommendation:** {symbol} {recommendation}  ",
             f"**Confidence:** {signal.confidence}%  ",

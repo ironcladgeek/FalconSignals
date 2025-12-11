@@ -175,7 +175,7 @@ def _filter_tickers(
         logger.error(f"Error during filtering: {e}", exc_info=True)
         raise RuntimeError(
             f"Filtering error: {str(e)}\nUnable to proceed with analysis.\nCheck logs for details."
-        )
+        ) from e
 
 
 def _run_llm_analysis(
@@ -778,6 +778,42 @@ def analyze(
             typer.echo(f"\n❌ Error: {str(e)}", err=True)
             sys.exit(1)
 
+        # Remove tickers that already have recommendations for this date and analysis mode
+        if recommendations_repo and not test:
+            analysis_mode = "llm" if use_llm else "rule_based"
+            check_date = historical_date if historical_date else datetime.now().date()
+
+            typer.echo(
+                f"\n🔍 Checking for existing recommendations (date: {check_date}, mode: {analysis_mode})..."
+            )
+            existing_tickers = recommendations_repo.get_existing_tickers_for_date(
+                check_date, analysis_mode
+            )
+
+            if existing_tickers:
+                # Filter out tickers that already have recommendations
+                original_count = len(filtered_ticker_list)
+                filtered_ticker_list = [
+                    t for t in filtered_ticker_list if t not in existing_tickers
+                ]
+                removed_count = original_count - len(filtered_ticker_list)
+
+                if removed_count > 0:
+                    typer.echo(
+                        f"  ℹ️  Skipping {removed_count} ticker(s) with existing recommendations: "
+                        f"{', '.join(sorted(existing_tickers & set(filtered_ticker_list[:original_count])))}"
+                    )
+                    typer.echo(f"  ✓ {len(filtered_ticker_list)} new ticker(s) to analyze")
+
+                if not filtered_ticker_list:
+                    typer.echo(
+                        "\n✓ All tickers already have recommendations for this date and mode."
+                    )
+                    typer.echo("  No new analysis needed.")
+                    return
+            else:
+                typer.echo("  ✓ No existing recommendations found. Proceeding with all tickers.")
+
         # Run analysis (LLM or rule-based)
         if use_llm:
             typer.echo("\n🤖 Stage 2: Deep LLM-powered analysis")
@@ -910,7 +946,7 @@ def analyze(
                 signal_count=signals_count,
                 error_message=str(e),
             )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except ValueError as e:
         logger.error(f"Configuration validation error: {e}")
         typer.echo(f"❌ Configuration error: {e}", err=True)
@@ -922,7 +958,7 @@ def analyze(
                 signal_count=signals_count,
                 error_message=str(e),
             )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         logger.exception(f"Unexpected error during analysis run: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
@@ -934,7 +970,7 @@ def analyze(
                 signal_count=signals_count,
                 error_message=str(e),
             )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -944,6 +980,29 @@ def report(
     ),
     date: str | None = typer.Option(
         None, "--date", help="Generate report for specific date (YYYY-MM-DD)"
+    ),
+    analysis_mode: str | None = typer.Option(
+        None,
+        "--analysis-mode",
+        help="Filter by analysis mode: 'llm' or 'rule_based'",
+    ),
+    signal_type: str | None = typer.Option(
+        None,
+        "--signal-type",
+        help=(
+            "Filter by signal type: 'strong_buy', 'buy', 'hold_bullish', 'hold', 'hold_bearish', "
+            "'sell', 'strong_sell'"
+        ),
+    ),
+    confidence_threshold: float | None = typer.Option(
+        None,
+        "--confidence-threshold",
+        help="Minimum confidence score (e.g., 70 means confidence > 70)",
+    ),
+    final_score_threshold: float | None = typer.Option(
+        None,
+        "--final-score-threshold",
+        help="Minimum final score (e.g., 70 means final_score > 70)",
     ),
     output_format: str = typer.Option(
         "markdown", "--format", help="Output format: markdown or json"
@@ -965,13 +1024,25 @@ def report(
 
     Examples:
         # Generate report from a specific session
-        report --session-id 02a27c22-a123-4378-8654-95c592a66e2f
+        report --session-id 123
 
         # Generate report for all signals from a specific date
         report --date 2025-12-04
 
+        # Filter by analysis mode
+        report --date 2025-12-04 --analysis-mode llm
+
+        # Filter by signal type
+        report --date 2025-12-04 --signal-type strong_buy
+
+        # Filter by confidence threshold
+        report --date 2025-12-04 --confidence-threshold 70
+
+        # Combine multiple filters
+        report --date 2025-12-04 --analysis-mode llm --confidence-threshold 80 --signal-type buy
+
         # Generate JSON report instead of markdown
-        report --session-id abc123 --format json
+        report --session-id 123 --format json
     """
     try:
         # Validate inputs
@@ -1021,6 +1092,20 @@ def report(
         else:
             typer.echo(f"  Date: {date}")
 
+        # Display active filters
+        filters_applied = []
+        if analysis_mode:
+            filters_applied.append(f"analysis_mode={analysis_mode}")
+        if signal_type:
+            filters_applied.append(f"signal_type={signal_type}")
+        if confidence_threshold is not None:
+            filters_applied.append(f"confidence>{confidence_threshold}")
+        if final_score_threshold is not None:
+            filters_applied.append(f"final_score>{final_score_threshold}")
+
+        if filters_applied:
+            typer.echo(f"  Filters: {', '.join(filters_applied)}")
+
         # Initialize components
         data_dir = Path("data")
         cache_manager = CacheManager(str(data_dir / "cache"))
@@ -1034,6 +1119,32 @@ def report(
             historical_data_lookback_days=config_obj.analysis.historical_data_lookback_days,
         )
 
+        # Load filtered signals from database
+        repo = RecommendationsRepository(config_obj.database.db_path)
+
+        if session_id:
+            signals = repo.get_recommendations_by_session(
+                run_session_id=session_id,
+                analysis_mode=analysis_mode,
+                signal_type=signal_type,
+                confidence_threshold=confidence_threshold,
+                final_score_threshold=final_score_threshold,
+            )
+        else:
+            signals = repo.get_recommendations_by_date(
+                report_date=date,
+                analysis_mode=analysis_mode,
+                signal_type=signal_type,
+                confidence_threshold=confidence_threshold,
+                final_score_threshold=final_score_threshold,
+            )
+
+        if not signals:
+            typer.echo("⚠️  No signals found matching the specified criteria")
+            raise typer.Exit(code=0)
+
+        typer.echo(f"  Loaded {len(signals)} signal(s) from database")
+
         pipeline = AnalysisPipeline(
             config_obj,
             cache_manager,
@@ -1045,11 +1156,11 @@ def report(
             provider_manager=provider_manager,
         )
 
-        # Generate report from database
+        # Generate report from loaded signals
         report_obj = pipeline.generate_daily_report(
-            signals=None,  # Load from database
+            signals=signals,  # Pass filtered signals
             generate_allocation=True,
-            report_date=date,
+            report_date=date if date else signals[0].analysis_date if signals else None,
             run_session_id=session_id,
         )
 
@@ -1107,6 +1218,29 @@ def publish(
     ticker: str | None = typer.Option(
         None, "--ticker", help="Publish only for specific ticker symbol"
     ),
+    analysis_mode: str | None = typer.Option(
+        None,
+        "--analysis-mode",
+        help="Filter by analysis mode: 'llm' or 'rule_based'",
+    ),
+    signal_type: str | None = typer.Option(
+        None,
+        "--signal-type",
+        help=(
+            "Filter by signal type: 'strong_buy', 'buy', 'hold_bullish', 'hold', 'hold_bearish', "
+            "'sell', 'strong_sell'"
+        ),
+    ),
+    confidence_threshold: float | None = typer.Option(
+        None,
+        "--confidence-threshold",
+        help="Minimum confidence score (e.g., 70 means confidence > 70)",
+    ),
+    final_score_threshold: float | None = typer.Option(
+        None,
+        "--final-score-threshold",
+        help="Minimum final score (e.g., 70 means final_score > 70)",
+    ),
     build_only: bool = typer.Option(
         False, "--build-only", help="Only build site, don't deploy to GitHub Pages"
     ),
@@ -1136,6 +1270,18 @@ def publish(
         # Publish only one ticker
         publish --ticker NVDA --date 2025-12-10
 
+        # Filter by analysis mode
+        publish --date 2025-12-10 --analysis-mode llm
+
+        # Filter by signal type
+        publish --date 2025-12-10 --signal-type strong_buy
+
+        # Filter by confidence threshold
+        publish --date 2025-12-10 --confidence-threshold 80
+
+        # Combine multiple filters
+        publish --date 2025-12-10 --analysis-mode llm --confidence-threshold 80 --signal-type buy
+
         # Generate content without building site
         publish --session-id 123 --no-build
 
@@ -1156,9 +1302,9 @@ def publish(
         if date:
             try:
                 datetime.strptime(date, "%Y-%m-%d")
-            except ValueError:
+            except ValueError as e:
                 typer.echo(f"❌ Error: Invalid date format '{date}'. Use YYYY-MM-DD", err=True)
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
 
         # Load configuration
         config_obj = load_config(config)
@@ -1185,6 +1331,20 @@ def publish(
         if ticker:
             typer.echo(f"  Ticker: {ticker}")
 
+        # Display active filters
+        filters_applied = []
+        if analysis_mode:
+            filters_applied.append(f"analysis_mode={analysis_mode}")
+        if signal_type:
+            filters_applied.append(f"signal_type={signal_type}")
+        if confidence_threshold is not None:
+            filters_applied.append(f"confidence>{confidence_threshold}")
+        if final_score_threshold is not None:
+            filters_applied.append(f"final_score>{final_score_threshold}")
+
+        if filters_applied:
+            typer.echo(f"  Filters: {', '.join(filters_applied)}")
+
         # Initialize generator
         website_dir = Path("website/docs")
         generator = WebsiteGenerator(
@@ -1209,32 +1369,36 @@ def publish(
             typer.echo(f"  ✓ Created: {ticker_path}")
 
         elif session_id or date:
-            # Load signals by session or date
+            # Load signals by session or date with filters
             if session_id:
-                signals = repo.get_recommendations_by_session(session_id)
+                signals = repo.get_recommendations_by_session(
+                    run_session_id=session_id,
+                    analysis_mode=analysis_mode,
+                    signal_type=signal_type,
+                    confidence_threshold=confidence_threshold,
+                    final_score_threshold=final_score_threshold,
+                )
             else:
-                signals = repo.get_recommendations_by_date(date)
+                signals = repo.get_recommendations_by_date(
+                    report_date=date,
+                    analysis_mode=analysis_mode,
+                    signal_type=signal_type,
+                    confidence_threshold=confidence_threshold,
+                    final_score_threshold=final_score_threshold,
+                )
 
             if not signals:
+                filters_desc = "matching the specified filters" if filters_applied else ""
                 typer.echo(
-                    f"❌ No signals found for {'session ' + str(session_id) if session_id else 'date ' + date}",
+                    f"❌ No signals found for {'session ' + str(session_id) if session_id else 'date ' + date} {filters_desc}",
                     err=True,
                 )
                 raise typer.Exit(code=1)
 
-            # Convert to InvestmentSignal objects
-            signal_objects = []
-            for sig in signals:
-                try:
-                    signal_obj = InvestmentSignal.model_validate(sig)
-                    signal_objects.append(signal_obj)
-                except Exception as e:
-                    logger.warning(f"Failed to load signal {sig.get('ticker', 'unknown')}: {e}")
-                    continue
+            typer.echo(f"  Loaded {len(signals)} signal(s) from database")
 
-            if not signal_objects:
-                typer.echo("❌ No valid signals could be loaded", err=True)
-                raise typer.Exit(code=1)
+            # Signals are already InvestmentSignal objects from repository
+            signal_objects = signals
 
             # Generate report page
             report_date_str = date if date else signal_objects[0].analysis_date
@@ -1329,7 +1493,7 @@ def publish(
     except Exception as e:
         logger.error(f"Error publishing website: {e}", exc_info=True)
         typer.echo(f"\n❌ Error publishing website: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -1696,15 +1860,15 @@ def download_prices(
     except FileNotFoundError as e:
         logger.error(f"Configuration error: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except ValueError as e:
         logger.error(f"Configuration validation error: {e}")
         typer.echo(f"❌ Configuration error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         logger.exception(f"Unexpected error during download: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -1747,7 +1911,7 @@ def config_init(
     except Exception as e:
         logger.exception(f"Error initializing configuration: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
