@@ -134,7 +134,7 @@ class TestPerformanceRepository:
         dates = [date.today() - timedelta(days=i) for i in range(5)]
         prices = [150.0 + i * 2 for i in range(5)]
 
-        for tracking_date, price in zip(dates, prices):
+        for tracking_date, price in zip(dates, prices, strict=True):
             result = perf_repo.track_price(
                 recommendation_id=sample_recommendation,
                 tracking_date=tracking_date,

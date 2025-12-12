@@ -2191,7 +2191,7 @@ US_TICKERS = list(
 # =============================================================================
 
 
-def get_tickers_for_markets(markets: list[str], limit: int = None) -> list[str]:
+def get_tickers_for_markets(markets: list[str], limit: int | None = None) -> list[str]:
     """
     Get ticker list for specified markets.
 
@@ -2228,7 +2228,7 @@ def get_tickers_for_markets(markets: list[str], limit: int = None) -> list[str]:
     return list(set(tickers))
 
 
-def get_us_tickers_by_category(category: str, limit: int = None) -> list[str]:
+def get_us_tickers_by_category(category: str, limit: int | None = None) -> list[str]:
     """
     Get US tickers filtered by category.
 
@@ -2448,7 +2448,9 @@ def get_market_stats() -> dict:
 
 
 def get_tickers_for_analysis(
-    markets: list[str] = None, categories: list[str] = None, limit_per_category: int = None
+    markets: list[str] | None = None,
+    categories: list[str] | None = None,
+    limit_per_category: int | None = None,
 ) -> list[str]:
     """
     Get a comprehensive ticker list for analysis combining markets and categories.

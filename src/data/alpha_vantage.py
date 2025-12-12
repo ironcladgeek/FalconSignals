@@ -127,7 +127,7 @@ class AlphaVantageProvider(DataProvider):
                     logger.debug(f"Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
-                    raise RuntimeError("API call failed after retries (timeout)")
+                    raise RuntimeError("API call failed after retries (timeout)") from None
 
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Request error on attempt {attempt + 1}: {e}")
@@ -136,7 +136,7 @@ class AlphaVantageProvider(DataProvider):
                     logger.debug(f"Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                 else:
-                    raise RuntimeError(f"API call failed after retries: {e}")
+                    raise RuntimeError(f"API call failed after retries: {e}") from e
 
     def get_news(
         self,
@@ -305,7 +305,7 @@ class AlphaVantageProvider(DataProvider):
             raise
         except Exception as e:
             logger.error(f"Error fetching news for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch news for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch news for {ticker}: {e}") from e
 
     def get_company_info(self, ticker: str) -> Optional[dict]:
         """Fetch company overview and fundamental data.
@@ -407,7 +407,7 @@ class AlphaVantageProvider(DataProvider):
             raise
         except Exception as e:
             logger.error(f"Error fetching company info for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch company info for {ticker}: {e}") from e
 
     def get_earnings_estimates(
         self, ticker: str, as_of_date: Optional[datetime] = None
@@ -521,7 +521,7 @@ class AlphaVantageProvider(DataProvider):
             raise
         except Exception as e:
             logger.error(f"Error fetching earnings estimates for {ticker}: {e}")
-            raise RuntimeError(f"Failed to fetch earnings estimates for {ticker}: {e}")
+            raise RuntimeError(f"Failed to fetch earnings estimates for {ticker}: {e}") from e
 
     @staticmethod
     def _parse_earnings_estimate(estimate: dict) -> dict:

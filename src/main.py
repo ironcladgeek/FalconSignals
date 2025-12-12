@@ -266,10 +266,12 @@ def _run_llm_analysis(
                 try:
                     current_task = [0]  # Use list to allow mutation in nested function
 
-                    def agent_progress_callback(current, total, task_name):
+                    def agent_progress_callback(
+                        current, total, task_name, task_tracker=current_task
+                    ):
                         """Update progress display for agent tasks."""
-                        if current > current_task[0]:
-                            current_task[0] = current
+                        if current > task_tracker[0]:
+                            task_tracker[0] = current
                             # Show which agent is working
                             agent_name = task_name.replace("_", " ").title()
                             typer_instance.echo(f"  → {agent_name} ({current}/{total})", nl=False)
@@ -363,7 +365,7 @@ def analyze(
         "-l",
         help="Maximum number of instruments to analyze per market",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -743,9 +745,9 @@ def analyze(
                 analysis_mode="llm" if use_llm else "rule_based",
                 analyzed_category=analyzed_group,
                 analyzed_market=analyzed_market,
-                analyzed_tickers_specified=analyzed_tickers_specified
-                if analyzed_tickers_specified
-                else None,
+                analyzed_tickers_specified=(
+                    analyzed_tickers_specified if analyzed_tickers_specified else None
+                ),
                 initial_tickers_count=len(ticker_list),
                 anomalies_count=0,  # Will be updated after filtering
                 force_full_analysis=force_full_analysis,
@@ -1686,7 +1688,7 @@ def download_prices(
         "-l",
         help="Maximum number of instruments to download per market",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -1873,7 +1875,7 @@ def download_prices(
 
 @app.command()
 def config_init(
-    output: Path = typer.Option(
+    output: Path = typer.Option(  # noqa: B008
         Path("config/local.yaml"),
         "--output",
         "-o",
@@ -1916,7 +1918,7 @@ def config_init(
 
 @app.command()
 def validate_config(
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -1943,15 +1945,15 @@ def validate_config(
     except FileNotFoundError as e:
         logger.error(f"Configuration file not found: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except ValueError as e:
         logger.error(f"Configuration validation failed: {e}")
         typer.echo(f"❌ Configuration error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
         logger.exception(f"Unexpected error validating configuration: {e}")
         typer.echo(f"❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -1974,7 +1976,7 @@ def track_performance(
         "-b",
         help="Benchmark ticker symbol for comparison",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -2133,7 +2135,7 @@ def performance_report(
         "-f",
         help="Output format: text or json",
     ),
-    config: Path = typer.Option(
+    config: Path = typer.Option(  # noqa: B008
         None,
         "--config",
         "-c",
@@ -2252,7 +2254,7 @@ def performance_report(
     except Exception as e:
         logger.error(f"Error generating performance report: {e}", exc_info=True)
         typer.echo(f"\n❌ Error: {e}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()

@@ -526,15 +526,14 @@ class WebsiteGenerator:
             Path to generated index file
         """
         if recent_reports is None:
-            # Get recent sessions from database
-            recent_sessions = self.sessions_repo.get_recent_sessions(limit=10)
+            # Get recent analysis dates from recommendations (more accurate than run sessions)
+            recent_dates = self.recommendations_repo.get_recent_analysis_dates(limit=5)
             recent_reports = [
                 {
-                    "date": session.get("analysis_date", session.get("started_at", "")[:10]),
-                    "signals_count": session.get("total_signals", 0),
-                    "session_id": session.get("id"),
+                    "date": item["date"],
+                    "signals_count": item["signals_count"],
                 }
-                for session in recent_sessions
+                for item in recent_dates
             ]
 
         lines = [

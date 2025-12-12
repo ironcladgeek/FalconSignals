@@ -763,9 +763,11 @@ class RecommendationsRepository:
 
         # Create RiskAssessment
         risk = RiskAssessment(
-            level=RiskLevel(recommendation.risk_level)
-            if recommendation.risk_level
-            else RiskLevel.MEDIUM,
+            level=(
+                RiskLevel(recommendation.risk_level)
+                if recommendation.risk_level
+                else RiskLevel.MEDIUM
+            ),
             volatility=recommendation.risk_volatility or "normal",
             volatility_pct=recommendation.risk_volatility_pct or 0.0,
             liquidity="normal",  # Default - not stored in recommendations table
@@ -1078,9 +1080,9 @@ class RecommendationsRepository:
                             "recommendation": rec.signal_type,
                             "confidence": rec.confidence,
                             "current_price": rec.current_price,
-                            "analysis_date": rec.analysis_date.isoformat()
-                            if rec.analysis_date
-                            else None,
+                            "analysis_date": (
+                                rec.analysis_date.isoformat() if rec.analysis_date else None
+                            ),
                             "analysis_mode": rec.analysis_mode,
                             "reasoning": rec.rationale,
                         }
@@ -1093,6 +1095,48 @@ class RecommendationsRepository:
 
         except Exception as e:
             logger.error(f"Error retrieving recommendations for ticker {ticker}: {e}")
+            return []
+
+    def get_recent_analysis_dates(self, limit: int = 10) -> list[dict]:
+        """Get recent analysis dates with signal counts.
+
+        This method retrieves distinct analysis dates from recommendations,
+        ordered by most recent first, with the count of signals for each date.
+
+        Args:
+            limit: Maximum number of dates to return
+
+        Returns:
+            List of dicts with 'date' and 'signals_count' keys
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                from sqlalchemy import func
+
+                # Query to get distinct analysis dates with counts
+                stmt = (
+                    select(
+                        Recommendation.analysis_date,
+                        func.count(Recommendation.id).label("count"),
+                    )
+                    .group_by(Recommendation.analysis_date)
+                    .order_by(Recommendation.analysis_date.desc())
+                    .limit(limit)
+                )
+
+                results = session.exec(stmt).all()
+
+                return [
+                    {"date": result[0].isoformat(), "signals_count": result[1]}
+                    for result in results
+                ]
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error retrieving recent analysis dates: {e}")
             return []
 
 

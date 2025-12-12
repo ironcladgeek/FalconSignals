@@ -1,0 +1,88 @@
+# Vulture whitelist for false positives
+# These methods are not actually unused - they're called by frameworks,
+# used in tests, or are part of public APIs
+
+# Pydantic validators - called automatically by framework
+validate_tolerance
+validate_lists_not_empty
+validate_weights_sum
+validate_format
+validate_scoring_method
+validate_level
+validate_provider
+validate_default_strategy
+
+# Methods tested in unit tests - part of public API
+time_to_expiry
+cleanup_expired
+validate_ticker
+validate_date
+
+# Public API methods - documented in roadmap, may be used externally
+unrealized_return
+add_position
+remove_position
+get_position
+add_to_watchlist
+remove_from_watchlist
+get_watchlist_item
+portfolio_summary
+
+# Database/Repository methods - part of repository pattern
+get_session_generator
+get_latest_ratings
+get_ratings_history
+delete_ratings
+get_all_tickers_with_data
+get_data_count
+get_latest_recommendation
+get_performance_data
+
+# Utility methods - may be used for debugging/monitoring
+get_stats
+get_health_status
+get_sentiment_summary
+get_source_stats
+cleanup_old_data
+validate_data
+update_from_provider
+
+# Screening/filtering methods - part of filtering API
+filter_prices
+filter_instruments
+get_unique_tickers
+
+# Provider methods - part of provider interface
+get_available
+reset
+
+# Scheduler methods - part of RunLog API
+get_run_statistics
+export_logs
+
+# Configuration loader
+get_config_path
+
+# Cache unified price methods - part of price management API
+get_unified_prices
+store_unified_prices
+get_unified_latest_price
+get_unified_price_at_date
+
+# CLI commands - Typer framework commands (false positives)
+analyze
+publish
+list_categories
+list_portfolios
+download_prices
+config_init
+validate_config
+track_performance
+performance_report
+version_callback
+
+# Public API functions
+extract_analysis_metadata
+get_llm_client
+sanitize_signal_for_web
+get_safe_signal_summary

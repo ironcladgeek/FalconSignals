@@ -14,10 +14,17 @@ repos:
     rev: v0.14.6
     hooks:
       - id: ruff
+        name: ruff-sort-imports
         args: [--fix, --select, I]
       - id: ruff
         name: ruff-unused-imports
         args: [--fix, --select, F]
+      - id: ruff
+        name: ruff-bugbear
+        args: [--fix, --select, B]
+      - id: ruff
+        name: ruff-whitespace
+        args: [--fix, --select, W]
       - id: ruff-format
 
   - repo: https://github.com/compilerla/conventional-pre-commit

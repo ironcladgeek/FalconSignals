@@ -35,9 +35,11 @@ dev = [
     "notebook>=7.5.0",
     "poethepoet>=0.38.0",
     "pre-commit>=4.5.0",
+    "pyright>=1.1.407",
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.6",
+    "vulture>=2.14",
 ]
 
 [tool.ruff]
@@ -69,7 +71,7 @@ filterwarnings = [
 # Poethepoet task definitions
 # Usage: uv run poe <task>
 [tool.poe.tasks]
-lint = "sh -c 'ruff check --select I --select F --fix && ruff format'"
+lint = "sh -c 'ruff check --select I --select F --select B --select W --fix && ruff format'"
 pre-commit = "pre-commit run --all-files"
 rmpycache = "find . -type d -name '__pycache__' -exec rm -rf {} +"
 rmdatacache = "find data/cache \\( -name '*.json' -o -name '*.csv' \\) -exec rm -f {} +"

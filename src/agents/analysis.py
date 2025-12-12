@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 class TechnicalAnalysisAgent(BaseAgent):
     """Agent for technical analysis of instruments."""
 
-    def __init__(self, tools: list = None):
+    def __init__(self, tools: list | None = None):
         """Initialize Technical Analysis agent.
 
         Args:
@@ -33,7 +33,7 @@ class TechnicalAnalysisAgent(BaseAgent):
         default_tools = [PriceFetcherTool(), TechnicalIndicatorTool()]
         super().__init__(config, tools or default_tools)
 
-    def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def execute(self, task: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute technical analysis.
 
         Args:
@@ -220,7 +220,7 @@ class TechnicalAnalysisAgent(BaseAgent):
 class FundamentalAnalysisAgent(BaseAgent):
     """Agent for fundamental analysis of companies."""
 
-    def __init__(self, tools: list = None, db_path: str = None):
+    def __init__(self, tools: list | None = None, db_path: str | None = None):
         """Initialize Fundamental Analysis agent.
 
         Args:
@@ -240,7 +240,7 @@ class FundamentalAnalysisAgent(BaseAgent):
         default_tools = [FinancialDataFetcherTool(db_path=db_path)]
         super().__init__(config, tools or default_tools)
 
-    def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def execute(self, task: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute fundamental analysis.
 
         Args:
@@ -303,7 +303,7 @@ class FundamentalAnalysisAgent(BaseAgent):
             scoring_result = FundamentalAnalyzer.calculate_enhanced_score(
                 analyst_data=analyst_data,
                 price_context=price_context,
-                sentiment_score=None,  # Will default to 50 (neutral)
+                sentiment_score=50.0,  # Neutral default (analyzed separately by News & Sentiment Agent)
                 metrics_data=metrics_data,  # yfinance metrics
             )
 

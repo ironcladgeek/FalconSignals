@@ -1401,7 +1401,7 @@ class AnalysisResultNormalizer:
                         new_flattened[new_key] = v
                     flattened = new_flattened
 
-                elif indicator_base == "stoch" and not "_" in indicator_key:
+                elif indicator_base == "stoch" and "_" not in indicator_key:
                     # Rename stoch_* to stoch_14_3_*
                     new_flattened = {}
                     for k, v in flattened.items():

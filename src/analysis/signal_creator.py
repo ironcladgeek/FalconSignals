@@ -115,9 +115,11 @@ class SignalCreator:
                 risk=risk_assessment,
                 allocation=None,  # Will be calculated later by allocation module
                 generated_at=datetime.now(),
-                analysis_date=analysis_date.strftime("%Y-%m-%d")
-                if analysis_date
-                else datetime.now().strftime("%Y-%m-%d"),
+                analysis_date=(
+                    analysis_date.strftime("%Y-%m-%d")
+                    if analysis_date
+                    else datetime.now().strftime("%Y-%m-%d")
+                ),
                 rationale=result.rationale,
                 caveats=result.caveats,
                 metadata=metadata,

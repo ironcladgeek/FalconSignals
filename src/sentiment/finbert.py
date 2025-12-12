@@ -205,7 +205,7 @@ class FinBERTSentimentScorer:
 
         scores = self.score_articles(articles)
 
-        for article, score in zip(articles, scores):
+        for article, score in zip(articles, scores, strict=False):
             article.sentiment = score.sentiment
             article.sentiment_score = score.score
 
