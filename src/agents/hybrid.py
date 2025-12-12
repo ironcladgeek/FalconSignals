@@ -100,6 +100,7 @@ class HybridAnalysisAgent:
         except Exception as e:
             self.last_error = str(e)
             logger.warning(f"LLM task failed: {e}")
+            logger.debug(f"Context at failure: {context}")
 
             # Try fallback if enabled
             if self.enable_fallback and self.fallback_agent:
