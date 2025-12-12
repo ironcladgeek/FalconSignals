@@ -1,0 +1,224 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1a365d', 'primaryTextColor': '#fff', 'primaryBorderColor': '#2d4a6f', 'lineColor': '#4a5568', 'secondaryColor': '#2d3748', 'tertiaryColor': '#4a5568', 'background': '#0d1117', 'mainBkg': '#1a365d', 'nodeBorder': '#4a5568', 'clusterBkg': '#161b22', 'clusterBorder': '#30363d', 'titleColor': '#e2e8f0', 'edgeLabelBackground': '#21262d'}}}%%
+
+flowchart TB
+    %% ============================================
+    %% NORDINVEST SYSTEM ARCHITECTURE
+    %% AI-Powered Financial Analysis System
+    %% Phase 6 Complete - CrewAI & LLM Integration
+    %% ============================================
+
+    subgraph CONFIG["⚙️ Configuration Layer"]
+        direction LR
+        CLI["CLI Interface<br/>(Typer)"]
+        YAML["Config Files<br/>(YAML)"]
+        PARAMS["Parameters<br/>• Capital & Risk<br/>• Markets<br/>• LLM Settings"]
+        ENV["Environment<br/>Variables<br/>(.env)"]
+    end
+
+    subgraph DATA_SOURCES["📊 Data Sources & APIs"]
+        direction TB
+        subgraph MARKET_DATA["Market Data"]
+            YAHOO["Yahoo Finance<br/>(Primary)"]
+            ALPHA["Alpha Vantage<br/>(Backup)"]
+        end
+        subgraph NEWS_DATA["News & Sentiment"]
+            FINNHUB["Finnhub<br/>(News/Sentiment)"]
+        end
+        subgraph LLM_PROVIDERS["LLM Providers"]
+            ANTHROPIC["Anthropic<br/>(Claude)"]
+            OPENAI["OpenAI<br/>(GPT-4)"]
+            LOCAL_LLM["Local<br/>(Ollama)"]
+        end
+    end
+
+    subgraph CACHE_LAYER["💾 Caching & Storage Layer"]
+        direction LR
+        API_CACHE["API Response Cache<br/>(JSON)"]
+        FEATURE_CACHE["Feature Cache<br/>(Preprocessed Data)"]
+        TOKEN_STORE["Token Usage<br/>(Cost Tracking)"]
+        PORTFOLIO_DB["Portfolio State<br/>(JSON)"]
+    end
+
+    subgraph ANALYSIS_MODE["🔀 Analysis Mode Selection"]
+        direction TB
+        MODE_CHECK{"--llm flag?"}
+        RULE_PATH["Rule-Based<br/>Analysis"]
+        LLM_PATH["LLM-Powered<br/>Analysis"]
+    end
+
+    %% ============================================
+    %% CREWAI AGENT SYSTEM (LLM MODE)
+    %% ============================================
+    subgraph CREWAI["🤖 CrewAI Agent System (LLM Mode)"]
+        direction TB
+
+        subgraph COLLECTION_AGENTS["Stage 1: Market Scan"]
+            SCANNER["🔍 Market Scanner Agent<br/>• Fetch daily data<br/>• Screen instruments<br/>• Detect anomalies<br/>• Filter for deep analysis"]
+        end
+
+        subgraph ANALYSIS_AGENTS["Stage 2: Analysis Agents (Parallel)"]
+            direction LR
+            FUNDAMENTAL["📈 Fundamental<br/>Analysis Agent<br/>• Earnings analysis<br/>• Valuation scores<br/>• Financial health<br/>• Cash flow quality"]
+            TECHNICAL["📉 Technical<br/>Analysis Agent<br/>• Trend indicators<br/>• Momentum signals<br/>• Pattern detection<br/>• Support/Resistance"]
+            SENTIMENT["📰 News &<br/>Sentiment Agent<br/>• Event detection<br/>• Sentiment scoring<br/>• News summarization<br/>• Catalyst identification"]
+        end
+
+        subgraph SYNTHESIS_AGENTS["Stage 3: Signal Generation"]
+            SIGNAL["⚡ Signal Synthesis Agent<br/>• Merge all scores (35/35/30)<br/>• Generate Buy/Hold/Avoid<br/>• Confidence metrics<br/>• Investment thesis<br/>• Risk assessment"]
+        end
+
+        subgraph HYBRID["🔄 Hybrid Intelligence"]
+            HYBRID_WRAP["Hybrid Wrapper<br/>• LLM execution<br/>• Fallback handling<br/>• Token tracking"]
+            FALLBACK["Rule-Based<br/>Fallback"]
+        end
+    end
+
+    %% ============================================
+    %% RULE-BASED ANALYSIS SYSTEM
+    %% ============================================
+    subgraph RULE_ANALYSIS["📊 Rule-Based Analysis System"]
+        direction TB
+
+        subgraph RULE_AGENTS["Analysis Agents"]
+            direction LR
+            RB_SCANNER["Market Scanner<br/>• Anomaly detection<br/>• Volume analysis"]
+            RB_TECH["Technical Analysis<br/>• SMA 20/50/200<br/>• RSI, MACD, ATR"]
+            RB_FUND["Fundamental Analysis<br/>• P/E, EV/EBITDA<br/>• Margins, Growth"]
+            RB_SENT["Sentiment Analysis<br/>• News classification<br/>• Score aggregation"]
+        end
+
+        subgraph RULE_SYNTHESIS["Signal Synthesis"]
+            RB_COMBINE["Weighted Scoring<br/>35% Technical<br/>35% Fundamental<br/>30% Sentiment"]
+        end
+    end
+
+    %% ============================================
+    %% TOOLS AND UTILITIES
+    %% ============================================
+    subgraph TOOLS["🔧 CrewAI Tools"]
+        direction LR
+        PRICE_TOOL["Price Fetcher"]
+        NEWS_TOOL["News Fetcher"]
+        CALC_TOOL["Indicator Calculator"]
+        FUND_TOOL["Fundamental Fetcher"]
+    end
+
+    subgraph LLM_INFRA["🧠 LLM Infrastructure"]
+        direction LR
+        TOKEN_TRACKER["Token Tracker<br/>• Daily/Monthly limits<br/>• Cost calculation (EUR)"]
+        PROMPTS["Prompt Templates<br/>• Agent prompts<br/>• JSON schemas"]
+        LLM_CLIENT["LLM Client<br/>• Provider abstraction<br/>• Error handling"]
+    end
+
+    %% ============================================
+    %% OUTPUT LAYER
+    %% ============================================
+    subgraph PIPELINE["📋 Analysis Pipeline"]
+        direction TB
+        ORCHESTRATOR["Pipeline Orchestrator<br/>• End-to-end flow<br/>• Error handling<br/>• Resilience patterns"]
+        ALLOCATION["Allocation Engine<br/>• Kelly criterion<br/>• Position sizing<br/>• Diversification"]
+        RISK["Risk Assessor<br/>• Volatility flags<br/>• Concentration risk<br/>• Sector exposure"]
+    end
+
+    subgraph OUTPUT["📤 Output Layer"]
+        direction TB
+        DAILY_REPORT["Daily Report<br/>(Markdown/HTML)"]
+        SIGNALS["Investment Signals<br/>(JSON)"]
+        ALERTS["Portfolio Alerts"]
+        COST_REPORT["Cost Summary<br/>(Token Usage)"]
+    end
+
+    subgraph USER["👤 User Interface"]
+        direction LR
+        TERMINAL["Terminal/CLI"]
+        FILES["Report Files<br/>data/reports/"]
+    end
+
+    %% ============================================
+    %% CONNECTIONS
+    %% ============================================
+
+    %% Configuration flow
+    CONFIG --> ANALYSIS_MODE
+    ENV --> LLM_PROVIDERS
+
+    %% Data source connections
+    DATA_SOURCES --> CACHE_LAYER
+    CACHE_LAYER --> ANALYSIS_MODE
+
+    %% Mode decision
+    MODE_CHECK --> RULE_PATH
+    MODE_CHECK --> LLM_PATH
+    RULE_PATH --> RULE_ANALYSIS
+    LLM_PATH --> CREWAI
+
+    %% CrewAI internal flow
+    SCANNER --> FUNDAMENTAL
+    SCANNER --> TECHNICAL
+    SCANNER --> SENTIMENT
+
+    FUNDAMENTAL --> SIGNAL
+    TECHNICAL --> SIGNAL
+    SENTIMENT --> SIGNAL
+
+    HYBRID_WRAP --> FALLBACK
+    SIGNAL --> HYBRID_WRAP
+
+    %% Rule-based flow
+    RB_SCANNER --> RB_TECH
+    RB_SCANNER --> RB_FUND
+    RB_SCANNER --> RB_SENT
+    RB_TECH --> RB_COMBINE
+    RB_FUND --> RB_COMBINE
+    RB_SENT --> RB_COMBINE
+
+    %% Tools connections
+    TOOLS -.-> COLLECTION_AGENTS
+    TOOLS -.-> ANALYSIS_AGENTS
+    TOOLS -.-> RULE_AGENTS
+
+    %% LLM Infrastructure
+    LLM_INFRA -.-> CREWAI
+    TOKEN_TRACKER --> TOKEN_STORE
+
+    %% Pipeline connections
+    HYBRID_WRAP --> ORCHESTRATOR
+    RB_COMBINE --> ORCHESTRATOR
+    FALLBACK --> ORCHESTRATOR
+
+    ORCHESTRATOR --> ALLOCATION
+    ALLOCATION --> RISK
+    RISK --> OUTPUT
+
+    %% Output connections
+    OUTPUT --> USER
+
+    %% Feedback loops
+    PORTFOLIO_DB -.-> ALLOCATION
+
+    %% ============================================
+    %% STYLING
+    %% ============================================
+    classDef configStyle fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    classDef dataStyle fill:#1a365d,stroke:#2d4a6f,color:#e2e8f0
+    classDef cacheStyle fill:#234e52,stroke:#2c7a7b,color:#e2e8f0
+    classDef modeStyle fill:#744210,stroke:#b7791f,color:#e2e8f0
+    classDef agentStyle fill:#322659,stroke:#805ad5,color:#e2e8f0
+    classDef ruleStyle fill:#22543d,stroke:#38a169,color:#e2e8f0
+    classDef toolStyle fill:#553c9a,stroke:#805ad5,color:#e2e8f0
+    classDef llmStyle fill:#5b21b6,stroke:#7c3aed,color:#e2e8f0
+    classDef pipelineStyle fill:#1e3a5f,stroke:#3182ce,color:#e2e8f0
+    classDef outputStyle fill:#1a4731,stroke:#276749,color:#e2e8f0
+    classDef userStyle fill:#702459,stroke:#97266d,color:#e2e8f0
+
+    class CONFIG configStyle
+    class DATA_SOURCES,MARKET_DATA,NEWS_DATA,LLM_PROVIDERS dataStyle
+    class CACHE_LAYER cacheStyle
+    class ANALYSIS_MODE modeStyle
+    class CREWAI,COLLECTION_AGENTS,ANALYSIS_AGENTS,SYNTHESIS_AGENTS,HYBRID agentStyle
+    class RULE_ANALYSIS,RULE_AGENTS,RULE_SYNTHESIS ruleStyle
+    class TOOLS toolStyle
+    class LLM_INFRA llmStyle
+    class PIPELINE pipelineStyle
+    class OUTPUT outputStyle
+    class USER userStyle

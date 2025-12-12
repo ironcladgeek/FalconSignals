@@ -1,0 +1,388 @@
+"""Models for analysis signals and allocation recommendations."""
+
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class Recommendation(str, Enum):
+    """Investment recommendation levels."""
+
+    STRONG_BUY = "strong_buy"
+    BUY = "buy"
+    HOLD_BULLISH = "hold_bullish"
+    HOLD = "hold"
+    HOLD_BEARISH = "hold_bearish"
+    SELL = "sell"
+    STRONG_SELL = "strong_sell"
+
+
+class RiskLevel(str, Enum):
+    """Risk assessment levels."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+
+class ComponentScores(BaseModel):
+    """Individual component analysis scores."""
+
+    technical: float = Field(ge=0, le=100, description="Technical analysis score 0-100")
+    fundamental: float = Field(ge=0, le=100, description="Fundamental analysis score 0-100")
+    sentiment: float = Field(ge=0, le=100, description="Sentiment analysis score 0-100")
+
+
+class RiskAssessment(BaseModel):
+    """Risk assessment for an instrument."""
+
+    level: RiskLevel = Field(description="Overall risk level")
+    volatility: str = Field(description="Volatility assessment: low, normal, high")
+    volatility_pct: float = Field(ge=0, description="ATR volatility as % of price")
+    liquidity: str = Field(description="Liquidity assessment: illiquid, normal, highly_liquid")
+    concentration_risk: bool = Field(description="Position concentration warning")
+    sector_risk: str | None = Field(default=None, description="Sector-specific risks")
+    flags: list[str] = Field(default_factory=list, description="Risk warning flags")
+
+
+class AllocationSuggestion(BaseModel):
+    """Position allocation suggestion."""
+
+    ticker: str = Field(description="Stock ticker symbol")
+    eur: float = Field(ge=0, description="Suggested allocation in EUR")
+    percentage: float = Field(ge=0, le=100, description="Percentage of capital")
+    shares: float | None = Field(
+        default=None, ge=0, description="Number of shares at current price"
+    )
+
+
+class TechnicalIndicators(BaseModel):
+    """Technical analysis indicator values with dynamic field names based on configuration.
+
+    Field names include parameters for self-documentation:
+    - rsi_14: RSI with 14-period
+    - macd_12_26_9: MACD with fast=12, slow=26, signal=9
+    - bbands_20_2.0: Bollinger Bands with length=20, std=2.0
+    - sma_20, sma_50, sma_200: Simple Moving Averages
+    - atr_14: Average True Range with 14-period
+    """
+
+    model_config = {"extra": "allow"}  # Allow dynamic fields
+
+    # Keep some common fields for backward compatibility
+    volume_avg: int | None = Field(default=None, ge=0, description="Average volume (20-day)")
+
+
+class FundamentalMetrics(BaseModel):
+    """Fundamental analysis metric values."""
+
+    pe_ratio: float | None = Field(default=None, description="Price-to-Earnings ratio")
+    pb_ratio: float | None = Field(default=None, description="Price-to-Book ratio")
+    ps_ratio: float | None = Field(default=None, description="Price-to-Sales ratio")
+    peg_ratio: float | None = Field(default=None, description="PEG ratio")
+    ev_ebitda: float | None = Field(default=None, description="EV/EBITDA")
+    profit_margin: float | None = Field(default=None, description="Profit margin %")
+    operating_margin: float | None = Field(default=None, description="Operating margin %")
+    roe: float | None = Field(default=None, description="Return on Equity %")
+    roa: float | None = Field(default=None, description="Return on Assets %")
+    debt_to_equity: float | None = Field(default=None, description="Debt-to-Equity ratio")
+    current_ratio: float | None = Field(default=None, description="Current ratio")
+    revenue_growth: float | None = Field(default=None, description="Revenue growth %")
+    earnings_growth: float | None = Field(default=None, description="Earnings growth %")
+
+
+class AnalystInfo(BaseModel):
+    """Analyst ratings and consensus information."""
+
+    num_analysts: int | None = Field(default=None, ge=0, description="Number of analysts")
+    consensus_rating: str | None = Field(
+        default=None, description="Consensus: strong_buy, buy, hold, sell, strong_sell"
+    )
+    strong_buy: int | None = Field(default=None, ge=0, description="Strong buy count")
+    buy: int | None = Field(default=None, ge=0, description="Buy count")
+    hold: int | None = Field(default=None, ge=0, description="Hold count")
+    sell: int | None = Field(default=None, ge=0, description="Sell count")
+    strong_sell: int | None = Field(default=None, ge=0, description="Strong sell count")
+    price_target: float | None = Field(default=None, ge=0, description="Average price target")
+    price_target_high: float | None = Field(default=None, ge=0, description="High price target")
+    price_target_low: float | None = Field(default=None, ge=0, description="Low price target")
+
+
+class SentimentInfo(BaseModel):
+    """News and sentiment information."""
+
+    news_count: int | None = Field(default=None, ge=0, description="Number of recent news articles")
+    sentiment_score: float | None = Field(
+        default=None, ge=-1, le=1, description="Sentiment score (-1 to 1)"
+    )
+    positive_news: int | None = Field(default=None, ge=0, description="Positive news count")
+    negative_news: int | None = Field(default=None, ge=0, description="Negative news count")
+    neutral_news: int | None = Field(default=None, ge=0, description="Neutral news count")
+
+
+class AnalysisMetadata(BaseModel):
+    """Comprehensive analysis metadata for display and assessment."""
+
+    technical_indicators: TechnicalIndicators | None = Field(
+        default=None, description="Technical indicator values"
+    )
+    fundamental_metrics: FundamentalMetrics | None = Field(
+        default=None, description="Fundamental metric values"
+    )
+    analyst_info: AnalystInfo | None = Field(default=None, description="Analyst ratings info")
+    sentiment_info: SentimentInfo | None = Field(default=None, description="News/sentiment info")
+
+
+class InvestmentSignal(BaseModel):
+    """Complete investment signal with all analysis data."""
+
+    ticker: str = Field(description="Stock ticker symbol")
+    name: str = Field(description="Company or instrument name")
+    market: str = Field(description="Market classification")
+    sector: str | None = Field(default=None, description="Business sector")
+    current_price: float = Field(ge=0, description="Current market price")
+    currency: str = Field(default="EUR", description="Price currency")
+
+    # Analysis scores
+    scores: ComponentScores = Field(description="Individual component scores")
+    final_score: float = Field(ge=0, le=100, description="Final composite score 0-100")
+
+    # Recommendation and confidence
+    recommendation: Recommendation = Field(description="Investment recommendation")
+    confidence: float = Field(ge=0, le=100, description="Confidence level in recommendation")
+    time_horizon: str = Field(default="3M", description="Time horizon: 1W, 1M, 3M, 6M, 1Y")
+
+    # Expected return
+    expected_return_min: float = Field(description="Expected return minimum %")
+    expected_return_max: float = Field(description="Expected return maximum %")
+
+    # Key reasons for signal
+    key_reasons: list[str] = Field(description="Main factors supporting the recommendation")
+
+    # Risk assessment
+    risk: RiskAssessment = Field(description="Risk assessment details")
+
+    # Allocation
+    allocation: AllocationSuggestion | None = Field(
+        default=None, description="Suggested position allocation"
+    )
+
+    # Analysis metadata
+    generated_at: datetime = Field(description="Signal generation timestamp")
+    analysis_date: str = Field(description="Date of analysis (YYYY-MM-DD)")
+
+    # Additional context
+    rationale: str | None = Field(
+        default=None, description="Detailed rationale for the recommendation"
+    )
+    caveats: list[str] = Field(default_factory=list, description="Important caveats or limitations")
+
+    # Enhanced metadata for display and quality assessment
+    metadata: AnalysisMetadata | None = Field(
+        default=None,
+        description="Comprehensive analysis metadata (technical, fundamental, analyst, sentiment)",
+    )
+
+
+class AnalysisComponentResult(BaseModel):
+    """Unified result structure for any analysis component (technical, fundamental, sentiment).
+
+    This model preserves all detailed metrics from both LLM and rule-based modes,
+    enabling consistent metadata extraction and signal creation.
+    """
+
+    component: str = Field(description="Component name: 'technical', 'fundamental', or 'sentiment'")
+    score: float = Field(ge=0, le=100, description="Component score 0-100")
+
+    # Raw analysis data (preserved for debugging and flexibility)
+    raw_data: dict[str, Any] | None = Field(
+        default=None, description="Raw component data from agent"
+    )
+
+    # Structured metadata (extracted and normalized)
+    technical_indicators: TechnicalIndicators | None = Field(
+        default=None, description="Technical indicators (if component is technical)"
+    )
+    fundamental_metrics: FundamentalMetrics | None = Field(
+        default=None, description="Fundamental metrics (if component is fundamental)"
+    )
+    analyst_info: AnalystInfo | None = Field(
+        default=None, description="Analyst ratings (if component is fundamental)"
+    )
+    sentiment_info: SentimentInfo | None = Field(
+        default=None, description="Sentiment info (if component is sentiment)"
+    )
+
+    # Optional analysis reasoning/explanation
+    reasoning: str | None = Field(default=None, description="Component analysis reasoning")
+    confidence: float | None = Field(default=None, ge=0, le=100, description="Component confidence")
+
+
+class UnifiedAnalysisResult(BaseModel):
+    """Unified analysis result structure for both LLM and rule-based modes.
+
+    This model serves as the single source of truth for analysis results,
+    ensuring both modes produce identical data structures.
+    """
+
+    ticker: str = Field(description="Stock ticker symbol")
+    mode: str = Field(description="Analysis mode: 'llm' or 'rule_based'")
+
+    # Component results with full detail (same structure for both modes)
+    technical: AnalysisComponentResult = Field(description="Technical analysis results")
+    fundamental: AnalysisComponentResult = Field(description="Fundamental analysis results")
+    sentiment: AnalysisComponentResult = Field(description="Sentiment analysis results")
+
+    # Synthesis (final recommendation and scores)
+    final_score: float = Field(ge=0, le=100, description="Final composite score 0-100")
+    recommendation: str = Field(description="Investment recommendation")
+    confidence: float = Field(ge=0, le=100, description="Overall confidence 0-100")
+
+    # Metadata for signal creation
+    company_name: str | None = Field(default=None, description="Company name")
+    market: str | None = Field(default=None, description="Market classification")
+    sector: str | None = Field(default=None, description="Business sector")
+
+    # Risk assessment
+    risk_assessment: RiskAssessment | None = Field(
+        default=None, description="Risk assessment details"
+    )
+
+    # Reasoning and context
+    key_reasons: list[str] = Field(
+        default_factory=list, description="Main reasons for recommendation"
+    )
+    rationale: str | None = Field(default=None, description="Detailed investment thesis")
+    caveats: list[str] = Field(default_factory=list, description="Important caveats or limitations")
+
+    # Expected returns
+    expected_return_min: float = Field(description="Expected return minimum %")
+    expected_return_max: float = Field(description="Expected return maximum %")
+
+    # Time horizon
+    time_horizon: str = Field(default="3M", description="Time horizon: 1W, 1M, 3M, 6M, 1Y")
+
+
+class PortfolioAllocation(BaseModel):
+    """Portfolio allocation suggestion."""
+
+    total_capital: float = Field(ge=0, description="Total capital available in EUR")
+    monthly_deposit: float = Field(ge=0, description="Monthly deposit in EUR")
+    available_for_allocation: float = Field(
+        ge=0, description="Capital available for new allocations"
+    )
+
+    # Suggested positions
+    suggested_positions: list[AllocationSuggestion] = Field(
+        description="List of suggested positions"
+    )
+
+    # Diversification
+    diversification_score: float = Field(
+        ge=0, le=100, description="Portfolio diversification score 0-100"
+    )
+    market_diversification: dict[str, float] = Field(
+        description="Capital allocation by market (market: percentage)"
+    )
+    sector_diversification: dict[str, float] = Field(
+        description="Capital allocation by sector (sector: percentage)"
+    )
+    instrument_diversification: dict[str, float] = Field(
+        description="Capital allocation by type (type: percentage)"
+    )
+
+    # Summary
+    total_allocated: float = Field(ge=0, description="Total EUR allocated in suggestions")
+    total_allocated_pct: float = Field(ge=0, le=100, description="Percentage of capital allocated")
+    unallocated: float = Field(ge=0, description="Unallocated capital remaining in EUR")
+
+    # Constraints applied
+    constraints_applied: dict[str, float] = Field(
+        description="Constraints enforced (max_position_size, max_sector, etc.)"
+    )
+
+    generated_at: datetime = Field(description="Allocation generation timestamp")
+
+
+class DailyReport(BaseModel):
+    """Daily market analysis report."""
+
+    report_date: str = Field(description="Report date (YYYY-MM-DD)")
+    report_time: datetime = Field(description="Report generation time")
+    analysis_date: str | None = Field(
+        default=None,
+        description="Analysis date (YYYY-MM-DD) - for backtesting, may differ from report_date",
+    )
+
+    # Market overview
+    market_overview: str = Field(description="Summary of market conditions")
+
+    # Market movements
+    market_indices: dict[str, dict[str, float]] = Field(
+        description="Market index movements {index: {change_pct: X, direction: up/down}}"
+    )
+
+    # Top signals
+    strong_signals: list[InvestmentSignal] = Field(
+        description="High-confidence buy opportunities (top 10)"
+    )
+    moderate_signals: list[InvestmentSignal] = Field(
+        default_factory=list, description="Moderate confidence signals (confidence 50-70)"
+    )
+
+    # Portfolio alerts
+    portfolio_alerts: list[dict[str, str]] = Field(
+        description="Important alerts for portfolio positions"
+    )
+
+    # News summary
+    key_news: list[dict[str, str]] = Field(description="Important news items with sentiment tags")
+
+    # Watchlist
+    watchlist_additions: list[str] = Field(description="Tickers recommended for watchlist addition")
+    watchlist_removals: list[str] = Field(description="Tickers recommended for watchlist removal")
+
+    # Portfolio suggestions
+    allocation_suggestion: PortfolioAllocation | None = Field(
+        default=None, description="Portfolio allocation suggestion"
+    )
+
+    # Summary statistics
+    total_signals_generated: int = Field(ge=0, description="Total signals analyzed")
+    strong_signals_count: int = Field(ge=0, description="Number of strong signals")
+    moderate_signals_count: int = Field(ge=0, description="Number of moderate signals")
+
+    # Disclaimers
+    disclaimers: list[str] = Field(description="Important disclaimers and risk warnings")
+
+    # Metadata
+    data_sources: list[str] = Field(description="Data sources used for analysis")
+    next_update: str | None = Field(default=None, description="Expected time of next update")
+    analysis_mode: str = Field(
+        default="rule_based", description="Analysis mode: 'llm' or 'rule_based'"
+    )
+
+    # Analysis context
+    analyzed_category: str | None = Field(
+        default=None, description="Category analyzed (e.g., us_tech_software, us_cybersecurity)"
+    )
+    analyzed_market: str | None = Field(
+        default=None, description="Market analyzed (e.g., us, nordic, eu, global)"
+    )
+    analyzed_tickers_specified: list[str] = Field(
+        default_factory=list, description="Specific tickers analyzed (if --ticker was used)"
+    )
+    initial_tickers: list[str] = Field(
+        default_factory=list, description="Complete list of initial tickers before filtering"
+    )
+    tickers_with_anomalies: list[str] = Field(
+        default_factory=list,
+        description="Tickers with anomalies from Stage 1 market scan (LLM mode)",
+    )
+    force_full_analysis_used: bool = Field(
+        default=False,
+        description="Whether --force-full-analysis flag was provided to override empty anomaly results",
+    )

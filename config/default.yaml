@@ -1,0 +1,260 @@
+# NordInvest Configuration Template
+# Copy this file to config/local.yaml and customize for your preferences
+
+# Capital Settings
+capital:
+  starting_capital_eur: 2000
+  monthly_deposit_eur: 500
+
+# Risk Tolerance (conservative, moderate, aggressive)
+risk:
+  tolerance: moderate
+  max_position_size_percent: 10
+  max_sector_concentration_percent: 20
+
+# Market Preferences
+markets:
+  included: [nordic, eu] # Options: nordic, eu, us
+  excluded_markets: []
+
+  # Instrument type preferences
+  included_instruments: [stocks, etfs] # Options: stocks, etfs, funds
+  exclude_penny_stocks: true
+  min_liquidity_usd: 1000000 # Minimum daily trading volume
+
+# Analysis Preferences
+analysis:
+  # Signal synthesis weights
+  weight_fundamental: 0.35
+  weight_technical: 0.35
+  weight_sentiment: 0.30
+
+  # Signal thresholds
+  buy_threshold: 70
+  buy_confidence_threshold: 0.60
+  hold_lower_threshold: 40
+  hold_upper_threshold: 70
+
+  # Time horizon for predictions
+  time_horizon_months: 3
+
+  # Historical price data lookback (days)
+  # Default: 730 days (~2 years) - provides sufficient history for technical analysis
+  # yfinance supports up to ~5 years (1825 days) for most stocks
+  # Minimum: 30 days (enough for basic indicators like RSI-14, MACD)
+  historical_data_lookback_days: 730
+
+  # Technical analysis indicators (using pandas-ta)
+  technical_indicators:
+    use_pandas_ta: true # Use pandas-ta library for calculations
+    min_periods_required: 30 # Minimum data points needed (enough for MACD-26, RSI-14, SMA-20)
+
+    indicators:
+      # RSI - Relative Strength Index
+      - name: rsi
+        params:
+          length: 14
+        enabled: true
+
+      # MACD - Moving Average Convergence Divergence
+      - name: macd
+        params:
+          fast: 12
+          slow: 26
+          signal: 9
+        enabled: true
+
+      # Bollinger Bands
+      - name: bbands
+        params:
+          length: 20
+          std: 2.0
+        enabled: true
+
+      # ATR - Average True Range
+      - name: atr
+        params:
+          length: 14
+        enabled: true
+
+      # Simple Moving Averages
+      - name: sma
+        params:
+          length: 20
+        enabled: true
+
+      - name: sma
+        params:
+          length: 50
+        enabled: false # Disabled - requires 50 periods of data
+
+      - name: sma
+        params:
+          length: 200
+        enabled: false # Disabled - requires 200 periods of data
+
+      # Exponential Moving Averages (disabled by default)
+      - name: ema
+        params:
+          length: 12
+        enabled: false
+
+      - name: ema
+        params:
+          length: 26
+        enabled: false
+
+      # ADX - Average Directional Index (disabled by default)
+      - name: adx
+        params:
+          length: 14
+        enabled: false
+
+      # Stochastic Oscillator (disabled by default)
+      - name: stoch
+        params:
+          k: 14
+          d: 3
+        enabled: false
+
+# Output Preferences
+output:
+  max_recommendations: 10
+  report_format: markdown # Options: markdown, html, json
+  include_confidence_scores: true
+  include_risk_assessment: true
+
+# Data & Caching
+data:
+  # Cache expiration times (in hours)
+  cache_ttl:
+    price_data_market_hours: 1
+    price_data_overnight: 24
+    news: 4
+    fundamentals: 24
+    financial_statements: 168 # 7 days
+
+  # News fetching settings
+  news:
+    max_articles: 50 # Maximum number of articles to fetch per ticker
+    target_article_count: 50 # Target number for analysis
+    max_age_days: 7 # Maximum age of articles
+    use_unified_aggregator: true # Use unified aggregator with deduplication
+
+    # News sources in priority order
+    sources:
+      - name: alpha_vantage
+        priority: 1 # Fetch first (has sentiment scores)
+        max_articles: 50
+        enabled: true
+
+      - name: finnhub
+        priority: 2 # Fetch if needed to reach target
+        max_articles: 50
+        enabled: true
+
+  # Sentiment analysis configuration
+  sentiment:
+    scoring_method: local # Options: 'local' (FinBERT), 'llm', 'api' (provider-based), 'hybrid'
+    llm_fallback: true # Fall back to API if local model fails
+
+    # Local FinBERT model settings (for 'local' or 'hybrid' mode)
+    local_model:
+      name: ProsusAI/finbert # Financial sentiment model
+      device: auto # Options: 'auto', 'cpu', 'cuda', 'mps'
+      batch_size: 32 # Batch size for processing
+      max_length: 512 # Maximum token length
+
+  # API providers (in priority order)
+  # Primary: Yahoo Finance for price data (free, reliable, comprehensive)
+  # Backup: Alpha Vantage for news sentiment, fundamentals, and earnings estimates
+  primary_provider: yahoo_finance # Yahoo Finance: comprehensive price data (free)
+  backup_providers:
+    - alpha_vantage # Alpha Vantage: news sentiment + fundamentals + earnings (API key required)
+
+database:
+  enabled: true
+  db_path: data/nordinvest.db
+
+api:
+  # Set these via environment variables
+  # anthropic_api_key: ${ANTHROPIC_API_KEY}
+  # finnhub_api_key: ${FINNHUB_API_KEY}
+  # openai_api_key: ${OPENAI_API_KEY}
+
+  # API rate limits and retry settings
+  max_retries: 3
+  retry_backoff_factor: 2
+  timeout_seconds: 30
+
+# Logging
+logging:
+  level: DEBUG # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: json # Options: json, text
+  log_file: logs/nordinvest.log
+  max_log_size_mb: 10
+  backup_count: 5
+
+# LLM settings
+llm:
+  provider: anthropic # Options: openai, anthropic, local
+  model: claude-haiku-4-5-20251001
+  temperature: 0.7
+  max_tokens: 2000 # Maximum tokens per response (100-8000)
+  top_p: 1.0 # Top-p nucleus sampling (0.0-1.0)
+  timeout_seconds: 60 # Request timeout in seconds (10-300)
+  enable_fallback: true # Fall back to rule-based analysis if LLM fails
+
+# Token Tracking & Cost Monitoring
+# claude-haiku-4-5-20251001 input: 0.001 USD/1k, output: 0.005 USD/1k
+# claude-sonnet-4-5-20250929 input: 0.003 USD/1k, output: 0.015 USD/1k
+token_tracker:
+  enabled: true # Enable/disable token usage tracking
+  daily_limit: 1000000 # Daily token usage limit (warn when approaching)
+  monthly_limit: 10000000 # Monthly token usage limit
+  cost_per_1k_input_tokens: 0.001 # Cost per 1k input tokens in EUR (Anthropic: 0.003)
+  cost_per_1k_output_tokens: 0.005 # Cost per 1k output tokens in EUR (Anthropic: 0.015)
+  warn_on_daily_usage_percent: 0.8 # Warn when daily usage reaches 80%
+
+# Deployment & Scheduling
+deployment:
+  run_time: "08:00" # UTC, daily run time
+  timezone: Europe/Stockholm
+  cost_limit_eur_per_month: 100
+  cost_check_interval: daily
+
+# Filtering Configuration
+filtering:
+  default_strategy: anomaly # Options: anomaly, volume, momentum, volatility, breakout, gap, all
+
+  # Strategy-specific configuration
+  strategies:
+    anomaly:
+      daily_change_threshold: 5.0 # Trigger on ±5% daily price change
+      weekly_change_threshold: 15.0 # Trigger on ±15% weekly price change
+      volume_spike_multiplier: 1.5 # Trigger on 1.5x average volume
+      lookback_days_high_low: 30 # Check 30-day highs/lows
+
+    volume:
+      min_volume_ratio: 1.2 # Minimum 1.2x average volume
+      volume_trend_days: 10 # Calculate trend over 10 days
+      min_trend_slope: 10.0 # Minimum 10% volume trend change
+
+    momentum:
+      min_consecutive_days: 3 # Minimum 3 consecutive days in same direction
+      min_total_change: 8.0 # Minimum 8% total change over period
+      lookback_days: 10 # Analyze 10 days for momentum
+
+    volatility:
+      min_avg_daily_range: 3.0 # Minimum 3% average daily range
+      volatility_multiplier: 1.5 # Trigger on 1.5x volatility spike
+      lookback_days: 20 # Analyze 20 days for volatility
+
+    breakout:
+      lookback_days: 30 # Days to identify support/resistance
+      breakout_threshold: 2.0 # 2% above/below for breakout confirmation
+      min_volume_ratio: 1.3 # Minimum 1.3x volume for confirmation
+
+    gap:
+      min_gap_percent: 3.0 # Minimum 3% gap size
+      lookback_days: 5 # Check last 5 days for gaps
