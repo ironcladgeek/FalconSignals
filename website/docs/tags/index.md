@@ -5,16 +5,21 @@ Browse analysis by ticker, signal type, or date.
 ## By Ticker
 
 - [ADBE](ADBE.md)
+- [AEVA](AEVA.md)
 - [AI](AI.md)
 - [ALNY](ALNY.md)
 - [ARWR](ARWR.md)
 - [ASTS](ASTS.md)
 - [AXON](AXON.md)
+- [BLNK](BLNK.md)
 - [BMY](BMY.md)
 - [CFLT](CFLT.md)
+- [CHPT](CHPT.md)
 - [CRM](CRM.md)
+- [EL](EL.md)
 - [MNTS](MNTS.md)
 - [NVDA](NVDA.md)
+- [OUST](OUST.md)
 - [PATH](PATH.md)
 - [PL](PL.md)
 - [PLTR](PLTR.md)
@@ -26,8 +31,11 @@ Browse analysis by ticker, signal type, or date.
 - [SNY](SNY.md)
 - [SPCE](SPCE.md)
 - [SRPT](SRPT.md)
+- [STZ](STZ.md)
 - [TDG](TDG.md)
 - [TXT](TXT.md)
+- [WKHS](WKHS.md)
+- [XPEV](XPEV.md)
 
 ## By Signal Type
 
@@ -35,9 +43,11 @@ Browse analysis by ticker, signal type, or date.
 - [Hold](hold.md)
 - [Hold Bearish](hold_bearish.md)
 - [Hold Bullish](hold_bullish.md)
+- [Sell](sell.md)
 - [Strong Sell](strong_sell.md)
 
 ## By Date
 
+- [2025-12-12](2025-12-12.md)
 - [2025-12-11](2025-12-11.md)
 - [2025-12-10](2025-12-10.md)
