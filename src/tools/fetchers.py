@@ -495,7 +495,7 @@ class FinancialDataFetcherTool(BaseTool):
     - Finnhub: analyst recommendations only
     """
 
-    def __init__(self, cache_manager: CacheManager = None, db_path: str = None):
+    def __init__(self, cache_manager: CacheManager | None = None, db_path: str | None = None):
         """Initialize financial data fetcher.
 
         Args:
