@@ -232,6 +232,7 @@
     - [Example Usage](#example-usage)
     - [Future Enhancements (Optional)](#future-enhancements-optional)
   - [Phase 17: Static Website Publishing with MkDocs + Material](#phase-17-static-website-publishing-with-mkdocs--material)
+    - [✅ **COMPLETE** (December 2025)](#-complete-december-2025)
     - [Objectives](#objectives-7)
     - [Context](#context-1)
     - [17.1 MkDocs + Material Setup](#171-mkdocs--material-setup)
@@ -264,6 +265,21 @@
     - [Example Workflow](#example-workflow)
     - [Benefits](#benefits-3)
     - [Future Enhancements (Optional)](#future-enhancements-optional-1)
+  - [Phase 18: Automated Scheduling \& Daily Runs](#phase-18-automated-scheduling--daily-runs)
+    - [📋 **PLANNED** - Infrastructure for Production Deployment](#-planned---infrastructure-for-production-deployment)
+    - [Objectives](#objectives-8)
+    - [Context](#context-2)
+    - [18.1 Scheduler Infrastructure](#181-scheduler-infrastructure)
+      - [Tasks](#tasks-16)
+    - [18.2 Health Monitoring](#182-health-monitoring)
+      - [Tasks](#tasks-17)
+    - [18.3 CLI Commands](#183-cli-commands)
+    - [18.4 Deployment Scripts](#184-deployment-scripts)
+    - [18.5 Documentation](#185-documentation)
+    - [Deliverables](#deliverables-12)
+    - [Example Daily Workflow](#example-daily-workflow)
+    - [Benefits](#benefits-4)
+    - [Future Enhancements](#future-enhancements)
 
 
 ## Executive Summary
@@ -287,12 +303,14 @@ This roadmap outlines the implementation plan for building an AI-driven financia
 - ✅ **Single database storage** - one location for persisting data
 - ✅ **Single source of truth** for each data structure or algorithm
 
-**Current Status** (as of December 2025):
-- ❌ **VIOLATION**: Two separate execution paths exist (LLM vs rule-based flows in `pipeline.py` and `main.py`)
-- ❌ **VIOLATION**: Duplicate signal creation in `pipeline.py` and `main.py`
-- ❌ **VIOLATION**: Duplicate database storage in `pipeline.py` and `main.py`
-- ⚠️ **ACTION REQUIRED**: Refactoring to eliminate duplication (see [ARCHITECTURE_ANALYSIS.md](./ARCHITECTURE_ANALYSIS.md))
-- ℹ️ **Note**: Issue #1 (LLM agents not completing) was resolved via Pydantic structured output; architectural duplication remains separate concern
+**Current Status** (as of December 12, 2025):
+- ⚠️ **PARTIAL VIOLATION**: Two separate execution paths still exist (LLM vs rule-based flows in `pipeline.py` and `main.py`)
+- ⚠️ **PARTIAL VIOLATION**: Duplicate signal creation in `pipeline.py` and `main.py` (though now using SignalCreator)
+- ⚠️ **PARTIAL VIOLATION**: Duplicate database storage in `pipeline.py` and `main.py`
+- 📋 **ACTION PENDING**: Phase 10 refactoring partially complete but full unification pending (see [ARCHITECTURE_ANALYSIS.md](./ARCHITECTURE_ANALYSIS.md))
+- ✅ **RESOLVED**: Issue #1 (LLM agents not completing) was resolved via Pydantic structured output
+- ✅ **IMPROVED**: SignalCreator now centralizes signal creation logic, reducing some duplication
+- ⚠️ **REMAINING**: `_run_llm_analysis()` function in main.py should be eliminated in favor of unified pipeline path
 
 **Why This Matters**:
 - 🐛 **Bug risk**: Bugs must be fixed in multiple places (often missed)
@@ -336,15 +354,16 @@ If the answer to questions 1, 3 is YES or question 2, 4 is NO → **REFACTOR FIR
 | Phase 6 | Days 15-18 | CrewAI & LLM Integration | ✅ Complete |
 | Phase 7 | Days 19-20 | True Test Mode | ✅ Complete |
 | Phase 8 | Complete | Historical Date Analysis | ✅ Complete |
-| Phase 9 | Complete | Historical Database & Performance Tracking | Partial |
-| Phase 10 | December 2025 | Architecture Refactoring: Unified Analysis Pipeline | ✅ Complete |
+| Phase 9 | Complete | Historical Database & Performance Tracking | ✅ Complete |
+| Phase 10 | December 2025 | Architecture Refactoring: Unified Analysis Pipeline | 🔄 Partial |
 | Phase 11 | Future | Per-Agent LLM Model Configuration | 📋 Planned |
 | Phase 12 | Future | Devil's Advocate Agent | 📋 Planned |
 | Phase 13 | Future | Enhanced Technical Analysis | 📋 Planned |
 | Phase 14 | Future | Advanced Features & Integrations | 📋 Planned |
 | Phase 15 | Future | Backtesting Framework | 📋 Planned |
 | Phase 16 | December 2025 | Unified Filtering Strategy System | ✅ Complete |
-| Phase 17 | December 2025 | Static Website Publishing (MkDocs + Material + GitHub Pages) | 📋 Planned |
+| Phase 17 | December 2025 | Static Website Publishing (MkDocs + Material + GitHub Pages) | ✅ Complete |
+| Phase 18 | Future | Automated Scheduling & Daily Runs | 📋 Planned |
 
 ---
 
@@ -3701,7 +3720,7 @@ uv run python -m src.main analyze --group us_ai_ml --llm --strategy volume
 
 ## Phase 17: Static Website Publishing with MkDocs + Material
 
-**Status:** 📋 Planned (December 2025)
+### ✅ **COMPLETE** (December 2025)
 
 ### Objectives
 - Generate professional static website from analysis data
@@ -4243,6 +4262,298 @@ uv run python -m src.main update-website --rebuild-all
 - [ ] API endpoint for programmatic access
 - [ ] Multi-language support
 - [ ] Dark/light theme toggle
+
+---
+
+## Phase 18: Automated Scheduling & Daily Runs
+
+### 📋 **PLANNED** - Infrastructure for Production Deployment
+
+### Objectives
+- Implement automated daily analysis runs
+- Create scheduling infrastructure (cron/systemd)
+- Add health monitoring and alerting
+- Enable unattended operation
+
+### Context
+
+Currently on branch `feat/scheduling` but implementation hasn't started yet. The system has all the building blocks for automated runs:
+- ✅ RunLog for tracking execution history
+- ✅ Database for storing results
+- ✅ CLI commands that work reliably
+- ✅ Error handling and resilience patterns
+
+What's missing is the scheduling/automation layer.
+
+### 18.1 Scheduler Infrastructure
+
+#### Tasks
+- [ ] **Create scheduling configuration**:
+  ```yaml
+  scheduler:
+    enabled: true
+    schedule_cron: "0 16 * * 1-5"  # 4 PM weekdays (after market close)
+    timezone: "US/Eastern"
+
+    daily_analysis:
+      market: "us"
+      strategy: "anomaly"
+      limit: 50
+      use_llm: true
+
+    performance_tracking:
+      enabled: true
+      run_after_analysis: true
+
+    website_publishing:
+      enabled: true
+      auto_deploy: true
+  ```
+
+- [ ] **Implement scheduler class** (`src/utils/scheduler.py`):
+  ```python
+  class DailyScheduler:
+      """Orchestrates daily analysis, tracking, and publishing."""
+
+      def run_daily_workflow(self):
+          """Execute complete daily workflow."""
+          # 1. Run analysis
+          # 2. Track performance
+          # 3. Publish website
+          # 4. Log results
+
+      def check_health(self):
+          """Health check for monitoring."""
+
+      def send_alert(self, message):
+          """Send alert on failure."""
+  ```
+
+- [ ] **Create systemd service** (for Linux deployment):
+  ```ini
+  [Unit]
+  Description=NordInvest Daily Analysis
+  After=network.target
+
+  [Service]
+  Type=oneshot
+  User=nordinvest
+  WorkingDirectory=/opt/nordinvest
+  ExecStart=/usr/local/bin/uv run python -m src.utils.scheduler
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+
+- [ ] **Create systemd timer** (for scheduling):
+  ```ini
+  [Unit]
+  Description=NordInvest Daily Analysis Timer
+
+  [Timer]
+  OnCalendar=Mon-Fri 16:00:00
+  Persistent=true
+
+  [Install]
+  WantedBy=timers.target
+  ```
+
+- [ ] **Create launchd plist** (for macOS):
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+      "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+      <key>Label</key>
+      <string>com.nordinvest.daily</string>
+      <key>ProgramArguments</key>
+      <array>
+          <string>/usr/local/bin/uv</string>
+          <string>run</string>
+          <string>python</string>
+          <string>-m</string>
+          <string>src.utils.scheduler</string>
+      </array>
+      <key>StartCalendarInterval</key>
+      <dict>
+          <key>Hour</key>
+          <integer>16</integer>
+          <key>Minute</key>
+          <integer>0</integer>
+          <key>Weekday</key>
+          <integer>1</integer> <!-- Monday -->
+      </dict>
+      <key>WorkingDirectory</key>
+      <string>/Users/username/NordInvest</string>
+  </dict>
+  </plist>
+  ```
+
+### 18.2 Health Monitoring
+
+#### Tasks
+- [ ] **Add health check endpoint**:
+  ```python
+  def check_health() -> dict:
+      """Check system health status."""
+      return {
+          "database": check_db_connection(),
+          "api_keys": check_api_keys(),
+          "disk_space": check_disk_space(),
+          "last_run": get_last_run_status(),
+          "cache_size": get_cache_size(),
+      }
+  ```
+
+- [ ] **Implement alerting** (email/Slack/webhook):
+  ```python
+  class Alerter:
+      def send_failure_alert(self, run_log, error):
+          """Send alert when daily run fails."""
+
+      def send_success_summary(self, run_log):
+          """Send success summary after daily run."""
+  ```
+
+- [ ] **Add metrics tracking**:
+  - Run duration
+  - Signals generated
+  - Errors encountered
+  - Token costs (LLM mode)
+  - Cache hit rate
+
+### 18.3 CLI Commands
+
+- [ ] **Add scheduler management commands**:
+  ```bash
+  # Test scheduler (dry run)
+  uv run python -m src.main scheduler --test
+
+  # Run daily workflow manually
+  uv run python -m src.main scheduler --run-now
+
+  # Check health
+  uv run python -m src.main scheduler --health
+
+  # Show last runs
+  uv run python -m src.main scheduler --history
+
+  # Install systemd service (Linux)
+  sudo uv run python -m src.main scheduler --install-service
+
+  # Install launchd service (macOS)
+  uv run python -m src.main scheduler --install-service
+  ```
+
+### 18.4 Deployment Scripts
+
+- [ ] **Create deployment script** (`scripts/deploy.sh`):
+  ```bash
+  #!/bin/bash
+  # Deploy NordInvest to production server
+
+  # Pull latest code
+  # Install dependencies
+  # Run migrations
+  # Install scheduler service
+  # Start service
+  ```
+
+- [ ] **Create backup script** (`scripts/backup.sh`):
+  ```bash
+  #!/bin/bash
+  # Backup database and cache
+
+  # Create timestamped backup
+  # Upload to S3/cloud storage
+  # Clean old backups
+  ```
+
+### 18.5 Documentation
+
+- [ ] **Create deployment guide** (`docs/DEPLOYMENT.md`):
+  - Server requirements
+  - Installation steps
+  - Scheduler setup (systemd vs launchd vs cron)
+  - Monitoring setup
+  - Backup procedures
+  - Troubleshooting
+
+- [ ] **Update README.md** with:
+  - Production deployment section
+  - Scheduler configuration
+  - Monitoring examples
+
+### Deliverables
+
+**Core:**
+- [ ] DailyScheduler implementation
+- [ ] Health check system
+- [ ] Alerting integration
+- [ ] Scheduler CLI commands
+- [ ] systemd service files (Linux)
+- [ ] launchd plist files (macOS)
+
+**Documentation:**
+- [ ] DEPLOYMENT.md guide
+- [ ] Scheduler configuration reference
+- [ ] Monitoring setup guide
+
+**Testing:**
+- [ ] Scheduler dry-run tests
+- [ ] Health check validation
+- [ ] Alert delivery tests
+
+### Example Daily Workflow
+
+```python
+# Automated daily run (triggered by scheduler)
+def daily_workflow():
+    logger.info("Starting daily workflow...")
+
+    # 1. Run analysis (Stage 1: Filter + Stage 2: Deep analysis)
+    result = run_command([
+        "analyze",
+        "--market", "us",
+        "--strategy", "anomaly",
+        "--limit", "50",
+        "--llm"
+    ])
+
+    # 2. Track performance of existing recommendations
+    if result.success:
+        run_command(["track-performance"])
+
+    # 3. Publish to website
+    if result.success:
+        run_command([
+            "publish",
+            f"--session-id", result.session_id,
+            "--deploy"
+        ])
+
+    # 4. Send notification
+    send_notification(result)
+```
+
+### Benefits
+
+- 🤖 **Automation**: Daily analysis without manual intervention
+- 📊 **Consistency**: Runs at same time every day
+- 🔔 **Alerts**: Notification on failures or important signals
+- 📈 **Monitoring**: Health metrics and run statistics
+- 🔄 **Reliability**: Automatic retry and error recovery
+- 💾 **Backups**: Automated database backups
+
+### Future Enhancements
+
+- [ ] Web dashboard for run monitoring
+- [ ] Slack/Discord bot integration
+- [ ] Multiple schedule profiles (intraday, weekly, etc.)
+- [ ] Distributed execution (multiple markets in parallel)
+- [ ] Cloud deployment (AWS Lambda, Cloud Run)
+- [ ] Kubernetes deployment manifests
 
 ---
 
