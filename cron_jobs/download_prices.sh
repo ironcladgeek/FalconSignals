@@ -18,7 +18,7 @@ mkdir -p "$LOG_DIR"
 GROUP="${1:-us_biotech_genomics}"
 
 # Log file with timestamp
-LOG_FILE="$LOG_DIR/price_download_${GROUP}_$(date +%Y%m%d).log"
+LOG_FILE="$LOG_DIR/price_download_${GROUP}_$(date +%Y%m%d_%H%M%S).log"
 
 echo "=== Starting price download for $GROUP at $(date) ===" >> "$LOG_FILE"
 
