@@ -222,12 +222,8 @@ config/local.yaml
 data/nordinvest.db
 
 # Generated website content
-website/docs/reports/*.md
-!website/docs/reports/index.md
-website/docs/tickers/*.md
-!website/docs/tickers/index.md
-website/docs/tags/*.md
-!website/docs/tags/index.md
+website/docs/*.md
+website/docs/**/*.md
 
 # Built site
 website/site/
