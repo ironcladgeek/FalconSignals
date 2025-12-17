@@ -467,3 +467,29 @@ class PerformanceSummary(SQLModel, table=True):
     ticker_obj: Ticker | None = Relationship(back_populates="performance_summaries")
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class Watchlist(SQLModel, table=True):
+    """Watchlist for tracking selected tickers.
+
+    Stores tickers that the user wants to monitor closely. Each ticker can only
+    appear once in the watchlist (enforced via unique constraint on ticker_id).
+    """
+
+    __tablename__ = "watchlist"
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
+    ticker_id: int = SQLField(
+        foreign_key="tickers.id", unique=True, index=True, description="Foreign key to ticker"
+    )
+    recommendation_id: int | None = SQLField(
+        foreign_key="recommendations.id",
+        default=None,
+        index=True,
+        description="Optional foreign key to recommendation that triggered watchlist addition",
+    )
+    created_at: datetime = SQLField(
+        default_factory=datetime.now, description="When ticker was added to watchlist"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
