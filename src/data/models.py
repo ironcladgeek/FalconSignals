@@ -518,10 +518,22 @@ class WatchlistSignal(SQLModel, table=True):
     confidence: float = SQLField(description="Confidence level in the analysis (0-100)")
     current_price: float = SQLField(description="Stock price at time of analysis")
     currency: str = SQLField(default="USD", description="Price currency")
+    action: str | None = SQLField(default=None, description="Suggested action: Buy, Wait, Remove")
+    entry_price: float | None = SQLField(
+        default=None, description="Suggested entry price for Buy actions"
+    )
+    stop_loss: float | None = SQLField(
+        default=None, description="Suggested stop loss level for Buy actions"
+    )
+    take_profit: float | None = SQLField(
+        default=None, description="Suggested take profit target for Buy actions"
+    )
+    wait_for_price: float | None = SQLField(
+        default=None, description="Price level to wait for if action is Wait"
+    )
     rationale: str | None = SQLField(
         default=None, description="Explanation of the technical analysis and signal"
     )
-    action: str | None = SQLField(default=None, description="Suggested action: Buy, Wait, Remove")
     created_at: datetime = SQLField(
         default_factory=datetime.now, description="When signal was created"
     )

@@ -1877,6 +1877,10 @@ class WatchlistSignalRepository:
         rationale: str | None = None,
         action: str | None = None,
         currency: str = "USD",
+        entry_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        wait_for_price: float | None = None,
     ) -> tuple[bool, str]:
         """Store technical analysis signal for a watchlist ticker.
 
@@ -1889,6 +1893,10 @@ class WatchlistSignalRepository:
             rationale: Explanation of the technical analysis.
             action: Suggested action (Buy, Wait, Remove).
             currency: Price currency (default: USD).
+            entry_price: Suggested entry price for Buy actions.
+            stop_loss: Suggested stop loss level for Buy actions.
+            take_profit: Suggested take profit target for Buy actions.
+            wait_for_price: Price level to wait for if action is Wait.
 
         Returns:
             Tuple of (success, message).
@@ -1928,6 +1936,10 @@ class WatchlistSignalRepository:
                     existing.currency = currency
                     existing.rationale = rationale
                     existing.action = action
+                    existing.entry_price = entry_price
+                    existing.stop_loss = stop_loss
+                    existing.take_profit = take_profit
+                    existing.wait_for_price = wait_for_price
                     existing.watchlist_id = watchlist_entry.id  # Update in case it changed
                     session.add(existing)
                     message = f"Updated signal for {ticker_symbol} on {analysis_date}"
@@ -1943,6 +1955,10 @@ class WatchlistSignalRepository:
                         currency=currency,
                         rationale=rationale,
                         action=action,
+                        entry_price=entry_price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        wait_for_price=wait_for_price,
                     )
                     session.add(signal)
                     message = f"Stored signal for {ticker_symbol} on {analysis_date}"
