@@ -459,6 +459,7 @@ uv run python -m src.main watchlist-scan --ticker MSFT --config config/local.yam
 ```
 
 **What It Does:**
+- **Refreshes price data**: Downloads latest historical prices for all tickers (force refresh)
 - Uses AI-powered `AITechnicalAnalysisAgent` with tactical prompt mode
 - Analyzes technical indicators, price action, and volume patterns
 - Generates actionable recommendations: **Buy**, **Wait**, or **Remove**
@@ -479,8 +480,8 @@ uv run python -m src.main watchlist-scan --ticker MSFT --config config/local.yam
 **Notes:**
 - Requires LLM API key (Anthropic or OpenAI)
 - Database must be enabled in configuration
-- Costs approximately €0.50-0.80 per ticker analyzed
-- Tickers must exist in watchlist (use `watchlist-add` first)
+- Automatically downloads fresh price data before analysis (force refresh)
+- Tickers must exist in watchlist (use `watchlist --add-ticker` first)
 - Results can be viewed with `watchlist-report` command
 
 ---
