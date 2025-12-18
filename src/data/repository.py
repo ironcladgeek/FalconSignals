@@ -2014,6 +2014,11 @@ class WatchlistSignalRepository:
                     "current_price": signal.current_price,
                     "currency": signal.currency,
                     "rationale": signal.rationale,
+                    "action": signal.action,
+                    "entry_price": signal.entry_price,
+                    "stop_loss": signal.stop_loss,
+                    "take_profit": signal.take_profit,
+                    "wait_for_price": signal.wait_for_price,
                     "created_at": signal.created_at,
                 }
 
@@ -2069,6 +2074,11 @@ class WatchlistSignalRepository:
                         "current_price": signal.current_price,
                         "currency": signal.currency,
                         "rationale": signal.rationale,
+                        "action": signal.action,
+                        "entry_price": signal.entry_price,
+                        "stop_loss": signal.stop_loss,
+                        "take_profit": signal.take_profit,
+                        "wait_for_price": signal.wait_for_price,
                         "created_at": signal.created_at,
                     }
                     for signal in signals
@@ -2209,6 +2219,11 @@ class WatchlistSignalRepository:
                             "current_price": latest_signal.current_price,
                             "currency": latest_signal.currency,
                             "rationale": latest_signal.rationale,
+                            "action": latest_signal.action,
+                            "entry_price": latest_signal.entry_price,
+                            "stop_loss": latest_signal.stop_loss,
+                            "take_profit": latest_signal.take_profit,
+                            "wait_for_price": latest_signal.wait_for_price,
                         }
 
                     result.append(entry_data)
