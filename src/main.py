@@ -11,10 +11,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from src.agents.ai_technical_agent import AITechnicalAnalysisAgent
 from src.analysis import InvestmentSignal
 from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
 from src.config import load_config
+from src.config.llm import initialize_llm_client
 from src.data.db import init_db
 from src.data.historical import HistoricalDataFetcher
 from src.data.portfolio import PortfolioState
@@ -24,6 +26,8 @@ from src.data.repository import (
     PerformanceRepository,
     RecommendationsRepository,
     RunSessionRepository,
+    WatchlistRepository,
+    WatchlistSignalRepository,
 )
 from src.filtering import FilterOrchestrator
 from src.filtering.strategies import list_strategies as get_strategies
@@ -2429,6 +2433,281 @@ def watchlist(
 
     except Exception as e:
         logger.error(f"Watchlist command error: {e}", exc_info=True)
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1) from e
+
+
+def _run_watchlist_scan(
+    ticker_list: list[str],
+    config_obj,
+    watchlist_repo,
+    signal_repo,
+    typer_instance,
+) -> tuple[int, int]:
+    """Run AI technical analysis on watchlist tickers.
+
+    Args:
+        ticker_list: List of ticker symbols to analyze
+        config_obj: Configuration object
+        watchlist_repo: Watchlist repository instance
+        signal_repo: Watchlist signal repository instance
+        typer_instance: Typer instance for output
+
+    Returns:
+        Tuple of (success_count, error_count)
+    """
+    # Initialize LLM client for AI analysis using centralized initialization
+    llm_client = initialize_llm_client(config_obj.llm)
+
+    # Initialize AI technical analysis agent in tactical mode for specific trading guidance
+    agent = AITechnicalAnalysisAgent(
+        llm_client=llm_client, config=config_obj, prompt_mode="tactical"
+    )
+    analysis_date = date.today()
+
+    # Prepare context with lookback period and LLM client
+    context = {
+        "historical_data_lookback_days": config_obj.analysis.historical_data_lookback_days
+        if hasattr(config_obj, "analysis")
+        and hasattr(config_obj.analysis, "historical_data_lookback_days")
+        else 730,
+        "analysis_date": analysis_date,
+        "llm_client": llm_client,
+    }
+
+    # Track results
+    success_count = 0
+    error_count = 0
+
+    # Create results table
+    table = Table(
+        title=f"📊 Technical Analysis Results - {analysis_date}",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Ticker", style="green", width=8)
+    table.add_column("Score", justify="right", style="yellow", width=8)
+    table.add_column("Action", style="magenta", width=10)
+    table.add_column("Trend", style="cyan", width=10)
+    table.add_column("RSI", justify="right", style="white", width=6)
+    table.add_column("Status", style="blue", width=10)
+
+    # Analyze each ticker
+    for ticker_symbol in ticker_list:
+        try:
+            typer_instance.echo(f"  Analyzing {ticker_symbol}...", nl=False)
+
+            # Update context with current ticker
+            context["ticker"] = ticker_symbol
+
+            # Execute technical analysis
+            result = agent.execute("Analyze technical indicators", context)
+
+            if result.get("status") == "error":
+                typer_instance.echo(f" ❌ Error: {result.get('message', 'Unknown error')}")
+                error_count += 1
+                table.add_row(ticker_symbol, "-", "-", "-", "-", "❌ Error")
+                continue
+
+            # Extract results from AI agent (already includes confidence and action)
+            score = result.get("technical_score", 0)
+            confidence = result.get("confidence", 60.0)  # AI agent provides confidence
+            action = result.get("action", "Wait")  # AI agent provides action directly
+            rationale = result.get("rationale", "No rationale provided")
+            trend = result.get("trend", "unknown")
+
+            # Get current price from result or indicators
+            current_price = result.get("current_price", 0)
+            if not current_price:
+                indicators = result.get("indicators", {})
+                current_price = indicators.get("latest_price", 0)
+
+            # Get RSI for display (from indicators if not in main result)
+            rsi = result.get("rsi")
+            if not rsi and "indicators" in result:
+                indicators_dict = result.get("indicators", {})
+                rsi = indicators_dict.get("rsi")
+
+            # Extract tactical trading levels from AI analysis
+            entry_price = result.get("entry_price")
+            stop_loss = result.get("stop_loss")
+            take_profit = result.get("take_profit")
+            wait_for_price = result.get("wait_for_price")
+
+            # Store signal in database with tactical levels
+            success, message = signal_repo.store_signal(
+                ticker_symbol=ticker_symbol,
+                analysis_date=analysis_date,
+                score=score,
+                confidence=confidence,
+                current_price=current_price,
+                rationale=rationale,
+                action=action,
+                currency="USD",
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                wait_for_price=wait_for_price,
+            )
+
+            if success:
+                typer_instance.echo(f" ✅ Score: {score:.0f}/100 | Action: {action}")
+                success_count += 1
+
+                # Add to table
+                rsi_str = f"{rsi:.0f}" if rsi else "-"
+                table.add_row(
+                    ticker_symbol,
+                    f"{score:.0f}",
+                    action,
+                    trend.capitalize(),
+                    rsi_str,
+                    "✅ Saved",
+                )
+            else:
+                typer_instance.echo(f" ⚠️  Analysis complete but storage failed: {message}")
+                error_count += 1
+                rsi_str = f"{rsi:.0f}" if rsi else "-"
+                table.add_row(
+                    ticker_symbol,
+                    f"{score:.0f}",
+                    action,
+                    trend.capitalize(),
+                    rsi_str,
+                    "⚠️  Warning",
+                )
+
+        except Exception as e:
+            typer_instance.echo(f" ❌ Error: {e}")
+            logger.error(f"Error analyzing {ticker_symbol}: {e}", exc_info=True)
+            error_count += 1
+            table.add_row(ticker_symbol, "-", "-", "-", "-", "❌ Error")
+
+    # Display results table
+    console = Console()
+    console.print("\n")
+    console.print(table)
+    console.print(f"\n✅ Successfully analyzed: {success_count} ticker(s)", style="bold green")
+    if error_count > 0:
+        console.print(f"❌ Errors: {error_count} ticker(s)", style="bold red")
+    console.print("\n")
+
+    # Show entry opportunities
+    opportunities = signal_repo.get_entry_opportunities(min_score=60.0, min_confidence=65.0)
+    if opportunities:
+        opp_table = Table(
+            title="💡 Entry Opportunities (Score ≥60, Confidence ≥65%)",
+            show_header=True,
+            header_style="bold green",
+        )
+        opp_table.add_column("Ticker", style="green", width=8)
+        opp_table.add_column("Score", justify="right", style="yellow", width=8)
+        opp_table.add_column("Confidence", justify="right", style="cyan", width=12)
+        opp_table.add_column("Action", style="magenta", width=10)
+        opp_table.add_column("Price", justify="right", style="white", width=10)
+
+        for opp in opportunities:
+            opp_table.add_row(
+                opp["ticker"],
+                f"{opp['score']:.0f}",
+                f"{opp['confidence']:.0f}%",
+                opp.get("action", "N/A"),
+                f"${opp['current_price']:.2f}",
+            )
+
+        console.print(opp_table)
+        console.print(f"\n{len(opportunities)} opportunity(ies) identified\n", style="bold green")
+
+    return success_count, error_count
+
+
+@app.command()
+def watchlist_scan(
+    ticker: str = typer.Option(
+        None,
+        "--ticker",
+        "-t",
+        help="Comma-separated list of specific tickers to scan (e.g., AAPL,NVDA)",
+    ),
+    config: Path = typer.Option(  # noqa: B008
+        None,
+        "--config",
+        "-c",
+        help="Path to configuration file",
+        exists=True,
+    ),
+) -> None:
+    """Run technical analysis on watchlist tickers.
+
+    Performs technical analysis on all tickers in the watchlist (or specific tickers)
+    and stores the results including technical score, confidence, rationale, and
+    suggested action (Buy, Wait, Remove) in the watchlist_signals table.
+
+    Examples:
+        # Scan all watchlist tickers
+        watchlist-scan
+
+        # Scan specific tickers
+        watchlist-scan --ticker AAPL,NVDA
+    """
+    try:
+        # Load config
+        config_obj = load_config(config)
+        setup_logging(config_obj.logging)
+
+        # Initialize database
+        db_path = (
+            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+        )
+        init_db(db_path)
+
+        # Create repositories
+        watchlist_repo = WatchlistRepository(db_path)
+        signal_repo = WatchlistSignalRepository(db_path)
+
+        # Get tickers to scan
+        if ticker:
+            # Specific tickers provided
+            ticker_list = [t.strip().upper() for t in ticker.split(",")]
+            typer.echo(f"🔍 Scanning {len(ticker_list)} specified ticker(s)...")
+
+            # Verify all tickers are in watchlist
+            watchlist_items = watchlist_repo.get_watchlist()
+            watchlist_symbols = {item["ticker"] for item in watchlist_items}
+
+            for t in ticker_list:
+                if t not in watchlist_symbols:
+                    typer.echo(f"⚠️  Warning: {t} is not in watchlist, skipping", err=True)
+
+            ticker_list = [t for t in ticker_list if t in watchlist_symbols]
+
+            if not ticker_list:
+                typer.echo("❌ No valid watchlist tickers to scan", err=True)
+                raise typer.Exit(code=1)
+        else:
+            # Scan all watchlist tickers
+            watchlist_items = watchlist_repo.get_watchlist()
+
+            if not watchlist_items:
+                typer.echo(
+                    "📝 Watchlist is empty. Add tickers with 'watchlist --add-ticker <TICKER>'"
+                )
+                raise typer.Exit(code=0)
+
+            ticker_list = [item["ticker"] for item in watchlist_items]
+            typer.echo(f"🔍 Scanning {len(ticker_list)} watchlist ticker(s)...")
+
+        # Run AI-powered watchlist scan
+        success_count, error_count = _run_watchlist_scan(
+            ticker_list=ticker_list,
+            config_obj=config_obj,
+            watchlist_repo=watchlist_repo,
+            signal_repo=signal_repo,
+            typer_instance=typer,
+        )
+
+    except Exception as e:
+        logger.error(f"Watchlist scan error: {e}", exc_info=True)
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1) from e
 
