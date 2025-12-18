@@ -2592,32 +2592,6 @@ def _run_watchlist_scan(
         console.print(f"❌ Errors: {error_count} ticker(s)", style="bold red")
     console.print("\n")
 
-    # Show entry opportunities
-    opportunities = signal_repo.get_entry_opportunities(min_score=60.0, min_confidence=65.0)
-    if opportunities:
-        opp_table = Table(
-            title="💡 Entry Opportunities (Score ≥60, Confidence ≥65%)",
-            show_header=True,
-            header_style="bold green",
-        )
-        opp_table.add_column("Ticker", style="green", width=8)
-        opp_table.add_column("Score", justify="right", style="yellow", width=8)
-        opp_table.add_column("Confidence", justify="right", style="cyan", width=12)
-        opp_table.add_column("Action", style="magenta", width=10)
-        opp_table.add_column("Price", justify="right", style="white", width=10)
-
-        for opp in opportunities:
-            opp_table.add_row(
-                opp["ticker"],
-                f"{opp['score']:.0f}",
-                f"{opp['confidence']:.0f}%",
-                opp.get("action", "N/A"),
-                f"${opp['current_price']:.2f}",
-            )
-
-        console.print(opp_table)
-        console.print(f"\n{len(opportunities)} opportunity(ies) identified\n", style="bold green")
-
     return success_count, error_count
 
 
