@@ -118,7 +118,9 @@ class ReportGeneratorTool(BaseTool):
         if "technical" in data:
             lines.append("## Technical Analysis")
             tech = data["technical"]
-            lines.append(f"- **Trend:** {tech.get('trend', 'N/A').title()}")
+            trend = tech.get("trend", "N/A")
+            trend_str = trend.title() if trend and trend != "N/A" else "N/A"
+            lines.append(f"- **Trend:** {trend_str}")
             lines.append(f"- **RSI (14):** {tech.get('rsi', 'N/A')}")
             lines.append(f"- **MACD:** {tech.get('macd', {}).get('histogram', 'N/A')}")
 
@@ -127,7 +129,9 @@ class ReportGeneratorTool(BaseTool):
             sent = data["sentiment"]
             lines.append(f"- **Positive:** {sent.get('positive_pct', 0)}%")
             lines.append(f"- **Negative:** {sent.get('negative_pct', 0)}%")
-            lines.append(f"- **Direction:** {sent.get('sentiment_direction', 'N/A').title()}")
+            direction = sent.get("sentiment_direction", "N/A")
+            direction_str = direction.title() if direction and direction != "N/A" else "N/A"
+            lines.append(f"- **Direction:** {direction_str}")
 
         if "recommendation" in data:
             lines.append("## Recommendation")
