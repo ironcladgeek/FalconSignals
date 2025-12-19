@@ -467,3 +467,75 @@ class PerformanceSummary(SQLModel, table=True):
     ticker_obj: Ticker | None = Relationship(back_populates="performance_summaries")
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class Watchlist(SQLModel, table=True):
+    """Watchlist for tracking selected tickers.
+
+    Stores tickers that the user wants to monitor closely. Each ticker can only
+    appear once in the watchlist (enforced via unique constraint on ticker_id).
+    """
+
+    __tablename__ = "watchlist"
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
+    ticker_id: int = SQLField(
+        foreign_key="tickers.id", unique=True, index=True, description="Foreign key to ticker"
+    )
+    recommendation_id: int | None = SQLField(
+        foreign_key="recommendations.id",
+        default=None,
+        index=True,
+        description="Optional foreign key to recommendation that triggered watchlist addition",
+    )
+    created_at: datetime = SQLField(
+        default_factory=datetime.now, description="When ticker was added to watchlist"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WatchlistSignal(SQLModel, table=True):
+    """Technical analysis signals for watchlist tickers.
+
+    Stores periodic technical analysis results for tickers in the watchlist
+    to help identify optimal entry points for opening positions.
+    """
+
+    __tablename__ = "watchlist_signals"
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
+    ticker_id: int = SQLField(
+        foreign_key="tickers.id", index=True, description="Foreign key to ticker"
+    )
+    watchlist_id: int = SQLField(
+        foreign_key="watchlist.id", index=True, description="Foreign key to watchlist entry"
+    )
+    analysis_date: date = SQLField(
+        index=True, description="Date when technical analysis was performed"
+    )
+    score: float = SQLField(description="Technical analysis score (0-100)")
+    confidence: float = SQLField(description="Confidence level in the analysis (0-100)")
+    current_price: float = SQLField(description="Stock price at time of analysis")
+    currency: str = SQLField(default="USD", description="Price currency")
+    action: str | None = SQLField(default=None, description="Suggested action: Buy, Wait, Remove")
+    entry_price: float | None = SQLField(
+        default=None, description="Suggested entry price for Buy actions"
+    )
+    stop_loss: float | None = SQLField(
+        default=None, description="Suggested stop loss level for Buy actions"
+    )
+    take_profit: float | None = SQLField(
+        default=None, description="Suggested take profit target for Buy actions"
+    )
+    wait_for_price: float | None = SQLField(
+        default=None, description="Price level to wait for if action is Wait"
+    )
+    rationale: str | None = SQLField(
+        default=None, description="Explanation of the technical analysis and signal"
+    )
+    created_at: datetime = SQLField(
+        default_factory=datetime.now, description="When signal was created"
+    )
+
+    model_config = ConfigDict(from_attributes=True)

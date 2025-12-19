@@ -10,6 +10,9 @@ Complete guide to using the NordInvest command-line interface.
   - [analyze](#analyze)
   - [report](#report)
   - [publish](#publish)
+  - [watchlist](#watchlist)
+  - [watchlist-scan](#watchlist-scan)
+  - [watchlist-report](#watchlist-report)
   - [track-performance](#track-performance)
   - [performance-report](#performance-report)
   - [list-categories](#list-categories)
@@ -23,6 +26,7 @@ Complete guide to using the NordInvest command-line interface.
 
 The NordInvest CLI provides commands for:
 - **Analysis**: Generate investment signals using rule-based or LLM-powered methods
+- **Watchlist Management**: AI-powered technical analysis with tactical trading recommendations
 - **Reporting**: Generate reports from historical analysis sessions
 - **Performance Tracking**: Track and analyze recommendation performance
 - **Configuration**: Initialize and validate configuration files
@@ -367,6 +371,187 @@ uv run python -m src.main publish --session-id 123 --build-only
 
 ---
 
+### watchlist
+
+Manage your watchlist of tickers to monitor.
+
+**Syntax:**
+```bash
+uv run python -m src.main watchlist [OPTIONS]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--add-ticker`, `-a` | Add ticker to watchlist by symbol |
+| `--add-recommendation`, `-r` | Add ticker to watchlist by recommendation ID |
+| `--remove-ticker`, `-d` | Remove ticker from watchlist |
+| `--list`, `-l` | List all tickers in watchlist |
+| `--config`, `-c` | Path to configuration file |
+
+#### Examples
+
+```bash
+# Add ticker to watchlist
+uv run python -m src.main watchlist --add-ticker AAPL
+
+# Add ticker by recommendation ID
+uv run python -m src.main watchlist --add-recommendation 123
+
+# Remove ticker from watchlist
+uv run python -m src.main watchlist --remove-ticker AAPL
+
+# List all watchlist tickers
+uv run python -m src.main watchlist --list
+```
+
+**Features:**
+- Add tickers by symbol or from recommendation IDs
+- Each ticker can only appear once in watchlist
+- View watchlist with company names and metadata
+- Track when each ticker was added
+- Links to recommendation ID if added from analysis
+
+**Watchlist Display:**
+When using `--list`, shows:
+- Ticker symbol
+- Company name
+- Recommendation ID (if added from analysis)
+- Date added
+- Total ticker count
+
+**Notes:**
+- Database must be enabled in configuration
+- Tickers are validated and company info is stored
+- Use `watchlist-scan` to run AI analysis on watchlist tickers
+- Use `watchlist-report` to view historical signals
+
+---
+
+### watchlist-scan
+
+Run AI-powered technical analysis on watchlist tickers with tactical trading recommendations.
+
+**Syntax:**
+```bash
+uv run python -m src.main watchlist-scan [OPTIONS]
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--ticker`, `-t` | All watchlist tickers | Comma-separated list of specific tickers to scan |
+| `--config`, `-c` | `config/default.yaml` | Path to configuration file |
+
+#### Examples
+
+```bash
+# Scan all watchlist tickers
+uv run python -m src.main watchlist-scan
+
+# Scan specific tickers from watchlist
+uv run python -m src.main watchlist-scan --ticker AAPL,NVDA
+
+# Use custom config
+uv run python -m src.main watchlist-scan --ticker MSFT --config config/local.yaml
+```
+
+**What It Does:**
+- **Refreshes price data**: Downloads latest historical prices for all tickers (force refresh)
+- Uses AI-powered `AITechnicalAnalysisAgent` with tactical prompt mode
+- Analyzes technical indicators, price action, and volume patterns
+- Generates actionable recommendations: **Buy**, **Wait**, or **Remove**
+- Provides specific trading levels:
+  - Entry price (suggested buy price)
+  - Stop loss level (risk management)
+  - Take profit target (exit strategy)
+  - Wait for price (if action is "Wait")
+- Stores comprehensive analysis in `watchlist_signals` table
+
+**Analysis Output:**
+- Technical score (0-100)
+- Confidence level (0-100)
+- Recommended action with fact-based rationale
+- Specific price levels for trade execution
+- Complete analysis stored for historical tracking
+
+**Notes:**
+- Requires LLM API key (Anthropic or OpenAI)
+- Database must be enabled in configuration
+- Automatically downloads fresh price data before analysis (force refresh)
+- Tickers must exist in watchlist (use `watchlist --add-ticker` first)
+- Results can be viewed with `watchlist-report` command
+
+---
+
+### watchlist-report
+
+Display historical watchlist signals with full analysis details and trading levels.
+
+**Syntax:**
+```bash
+uv run python -m src.main watchlist-report [OPTIONS]
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--ticker`, `-t` | All tickers | Filter by specific ticker(s), comma-separated |
+| `--days`, `-d` | `30` | Number of days of history to show |
+| `--config`, `-c` | `config/default.yaml` | Path to configuration file |
+
+#### Examples
+
+```bash
+# Show all recent signals (last 30 days)
+uv run python -m src.main watchlist-report
+
+# Show signals for specific ticker
+uv run python -m src.main watchlist-report --ticker AAPL
+
+# Show signals for multiple tickers
+uv run python -m src.main watchlist-report --ticker AAPL,NVDA,MSFT
+
+# Show last 90 days of history
+uv run python -m src.main watchlist-report --days 90
+
+# Combine filters: specific tickers with extended history
+uv run python -m src.main watchlist-report --ticker ADBE,CFLT --days 60
+```
+
+**Report Contents:**
+
+For each signal, displays:
+- **Ticker Symbol**
+- **Analysis Date**
+- **Action**: Buy, Wait, or Remove
+- **Technical Score**: 0-100 rating
+- **Confidence**: Analysis confidence level (0-100)
+- **Full Rationale**: Complete fact-based reasoning (not truncated)
+- **Trading Levels**:
+  - Entry Price: Suggested buy price
+  - Stop Loss: Risk management level
+  - Take Profit: Exit target
+  - Wait For Price: Price to wait for (if action is "Wait")
+
+**Display Format:**
+- Rich Panel-based display with color coding
+- Signals grouped by ticker and sorted by date
+- Full rationale text (no truncation)
+- Clear presentation of all tactical trading levels
+
+**Notes:**
+- Database must be enabled in configuration
+- Displays signals from `watchlist_signals` table
+- Requires prior execution of `watchlist-scan`
+- Supports filtering by single or multiple tickers
+- All prices and levels displayed in local currency format
+
+---
+
 ### track-performance
 
 Track performance of active recommendations by fetching current prices.
@@ -668,6 +853,36 @@ uv run python -m src.main analyze --ticker NVDA,AMD --llm --debug-llm
 
 # 4. Review LLM debug outputs
 ls -la data/llm_debug/
+```
+
+### Watchlist Management Workflow
+
+```bash
+# 1. Add tickers to watchlist
+uv run python -m src.main watchlist --add-ticker AAPL
+uv run python -m src.main watchlist --add-ticker NVDA
+uv run python -m src.main watchlist --add-ticker MSFT
+
+# Or add from analysis recommendations
+uv run python -m src.main watchlist --add-recommendation 42
+
+# View current watchlist
+uv run python -m src.main watchlist --list
+
+# 2. Run AI technical analysis with tactical recommendations
+uv run python -m src.main watchlist-scan
+
+# 3. View detailed signals with trading levels
+uv run python -m src.main watchlist-report
+
+# 4. Check specific ticker's history
+uv run python -m src.main watchlist-report --ticker AAPL --days 90
+
+# 5. Re-scan specific tickers after market moves
+uv run python -m src.main watchlist-scan --ticker NVDA,AMD
+
+# 6. Compare multiple tickers
+uv run python -m src.main watchlist-report --ticker AAPL,NVDA,MSFT --days 60
 ```
 
 ---

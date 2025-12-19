@@ -23,6 +23,8 @@ from src.data.models import (
     Recommendation,
     RunSession,
     Ticker,
+    Watchlist,
+    WatchlistSignal,
 )
 
 
@@ -1097,6 +1099,48 @@ class RecommendationsRepository:
             logger.error(f"Error retrieving recommendations for ticker {ticker}: {e}")
             return []
 
+    def get_recommendation_by_id(self, recommendation_id: int) -> dict | None:
+        """Get a single recommendation by ID.
+
+        Args:
+            recommendation_id: Recommendation ID.
+
+        Returns:
+            Dictionary with recommendation details or None if not found.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                recommendation = session.exec(
+                    select(Recommendation, Ticker)
+                    .join(Ticker, Recommendation.ticker_id == Ticker.id)
+                    .where(Recommendation.id == recommendation_id)
+                ).first()
+
+                if not recommendation:
+                    return None
+
+                rec, ticker = recommendation
+
+                return {
+                    "id": rec.id,
+                    "ticker": ticker.symbol,
+                    "name": ticker.name,
+                    "recommendation": rec.signal_type,
+                    "confidence": rec.confidence,
+                    "current_price": rec.current_price,
+                    "analysis_date": rec.analysis_date.isoformat() if rec.analysis_date else None,
+                    "analysis_mode": rec.analysis_mode,
+                    "reasoning": rec.rationale,
+                }
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error retrieving recommendation {recommendation_id}: {e}")
+            return None
+
     def get_recent_analysis_dates(self, limit: int = 10) -> list[dict]:
         """Get recent analysis dates with signal counts.
 
@@ -1626,3 +1670,569 @@ class PerformanceRepository:
         except Exception as e:
             logger.error(f"Error generating performance report: {e}")
             return {}
+
+
+class WatchlistRepository:
+    """Repository for managing watchlist operations.
+
+    Handles adding, removing, and querying tickers in the watchlist.
+    """
+
+    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+        """Initialize repository with database manager.
+
+        Args:
+            db_path: Path to SQLite database file.
+        """
+        self.db_manager = DatabaseManager(db_path)
+        self.db_manager.initialize()
+
+    def add_to_watchlist(
+        self, ticker_symbol: str, recommendation_id: int | None = None
+    ) -> tuple[bool, str]:
+        """Add ticker to watchlist.
+
+        Args:
+            ticker_symbol: Ticker symbol to add.
+            recommendation_id: Optional recommendation ID to associate.
+                If not provided, will use the first recommendation for the ticker.
+
+        Returns:
+            Tuple of (success, message).
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                # Get or create ticker
+                ticker = get_or_create_ticker(session, ticker_symbol)
+
+                # Check if ticker already in watchlist
+                existing = session.exec(
+                    select(Watchlist).where(Watchlist.ticker_id == ticker.id)
+                ).first()
+
+                if existing:
+                    return False, f"{ticker_symbol} is already in watchlist"
+
+                # If no recommendation_id provided, fetch first recommendation for this ticker
+                if recommendation_id is None:
+                    first_rec = session.exec(
+                        select(Recommendation)
+                        .where(Recommendation.ticker_id == ticker.id)
+                        .order_by(Recommendation.analysis_date)
+                    ).first()
+                    if first_rec:
+                        recommendation_id = first_rec.id
+
+                # Create watchlist entry
+                watchlist_entry = Watchlist(
+                    ticker_id=ticker.id, recommendation_id=recommendation_id
+                )
+                session.add(watchlist_entry)
+                session.commit()
+
+                return True, f"Added {ticker_symbol} to watchlist"
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error adding {ticker_symbol} to watchlist: {e}")
+            return False, f"Error: {str(e)}"
+
+    def remove_from_watchlist(self, ticker_symbol: str) -> tuple[bool, str]:
+        """Remove ticker from watchlist.
+
+        Args:
+            ticker_symbol: Ticker symbol to remove.
+
+        Returns:
+            Tuple of (success, message).
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                # Find ticker
+                ticker = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+                if not ticker:
+                    return False, f"Ticker {ticker_symbol} not found"
+
+                # Find and delete watchlist entry
+                watchlist_entry = session.exec(
+                    select(Watchlist).where(Watchlist.ticker_id == ticker.id)
+                ).first()
+
+                if not watchlist_entry:
+                    return False, f"{ticker_symbol} is not in watchlist"
+
+                session.delete(watchlist_entry)
+                session.commit()
+
+                return True, f"Removed {ticker_symbol} from watchlist"
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error removing {ticker_symbol} from watchlist: {e}")
+            return False, f"Error: {str(e)}"
+
+    def get_watchlist(self) -> list[dict]:
+        """Get all tickers in watchlist.
+
+        Returns:
+            List of dictionaries with ticker info.
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                statement = select(Watchlist, Ticker).join(Ticker).order_by(Watchlist.created_at)
+                results = session.exec(statement).all()
+
+                watchlist = []
+                for watchlist_entry, ticker in results:
+                    watchlist.append(
+                        {
+                            "ticker": ticker.symbol,
+                            "name": ticker.name,
+                            "recommendation_id": watchlist_entry.recommendation_id,
+                            "created_at": watchlist_entry.created_at,
+                        }
+                    )
+
+                return watchlist
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting watchlist: {e}")
+            return []
+
+    def ticker_exists(self, ticker_symbol: str) -> bool:
+        """Check if ticker exists in watchlist.
+
+        Args:
+            ticker_symbol: Ticker symbol to check.
+
+        Returns:
+            True if ticker is in watchlist.
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                ticker = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+                if not ticker:
+                    return False
+
+                existing = session.exec(
+                    select(Watchlist).where(Watchlist.ticker_id == ticker.id)
+                ).first()
+
+                return existing is not None
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error checking watchlist for {ticker_symbol}: {e}")
+            return False
+
+
+class WatchlistSignalRepository:
+    """Repository for managing watchlist technical analysis signals.
+
+    Stores periodic technical analysis results for watchlist tickers to help
+    identify optimal entry points for opening positions.
+    """
+
+    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+        """Initialize repository with database manager.
+
+        Args:
+            db_path: Path to SQLite database file.
+        """
+        self.db_manager = DatabaseManager(db_path)
+        self.db_manager.initialize()
+
+    def store_signal(
+        self,
+        ticker_symbol: str,
+        analysis_date: date,
+        score: float,
+        confidence: float,
+        current_price: float,
+        rationale: str | None = None,
+        action: str | None = None,
+        currency: str = "USD",
+        entry_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        wait_for_price: float | None = None,
+    ) -> tuple[bool, str]:
+        """Store technical analysis signal for a watchlist ticker.
+
+        Args:
+            ticker_symbol: Ticker symbol (must be in watchlist).
+            analysis_date: Date when analysis was performed.
+            score: Technical analysis score (0-100).
+            confidence: Confidence level (0-100).
+            current_price: Stock price at time of analysis.
+            rationale: Explanation of the technical analysis.
+            action: Suggested action (Buy, Wait, Remove).
+            currency: Price currency (default: USD).
+            entry_price: Suggested entry price for Buy actions.
+            stop_loss: Suggested stop loss level for Buy actions.
+            take_profit: Suggested take profit target for Buy actions.
+            wait_for_price: Price level to wait for if action is Wait.
+
+        Returns:
+            Tuple of (success, message).
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                # Find ticker and verify it's in watchlist
+                ticker = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+                if not ticker:
+                    return False, f"Ticker {ticker_symbol} not found"
+
+                watchlist_entry = session.exec(
+                    select(Watchlist).where(Watchlist.ticker_id == ticker.id)
+                ).first()
+
+                if not watchlist_entry:
+                    return False, f"{ticker_symbol} is not in watchlist"
+
+                # Check if signal already exists for this ticker and date (upsert pattern)
+                existing = session.exec(
+                    select(WatchlistSignal).where(
+                        (WatchlistSignal.ticker_id == ticker.id)
+                        & (WatchlistSignal.analysis_date == analysis_date)
+                    )
+                ).first()
+
+                if existing:
+                    # Update existing signal
+                    existing.score = score
+                    existing.confidence = confidence
+                    existing.current_price = current_price
+                    existing.currency = currency
+                    existing.rationale = rationale
+                    existing.action = action
+                    existing.entry_price = entry_price
+                    existing.stop_loss = stop_loss
+                    existing.take_profit = take_profit
+                    existing.wait_for_price = wait_for_price
+                    existing.watchlist_id = watchlist_entry.id  # Update in case it changed
+                    session.add(existing)
+                    message = f"Updated signal for {ticker_symbol} on {analysis_date}"
+                else:
+                    # Create new signal
+                    signal = WatchlistSignal(
+                        ticker_id=ticker.id,
+                        watchlist_id=watchlist_entry.id,
+                        analysis_date=analysis_date,
+                        score=score,
+                        confidence=confidence,
+                        current_price=current_price,
+                        currency=currency,
+                        rationale=rationale,
+                        action=action,
+                        entry_price=entry_price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        wait_for_price=wait_for_price,
+                    )
+                    session.add(signal)
+                    message = f"Stored signal for {ticker_symbol} on {analysis_date}"
+
+                session.commit()
+                logger.debug(message)
+                return True, message
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error storing signal for {ticker_symbol}: {e}")
+            return False, f"Error: {str(e)}"
+
+    def get_latest_signal(self, ticker_symbol: str) -> dict | None:
+        """Get the most recent technical analysis signal for a ticker.
+
+        Args:
+            ticker_symbol: Ticker symbol.
+
+        Returns:
+            Dictionary with signal details or None if not found.
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                # Find ticker
+                ticker = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+                if not ticker:
+                    return None
+
+                # Get latest signal
+                signal = session.exec(
+                    select(WatchlistSignal)
+                    .where(WatchlistSignal.ticker_id == ticker.id)
+                    .order_by(WatchlistSignal.analysis_date.desc())
+                ).first()
+
+                if not signal:
+                    return None
+
+                return {
+                    "id": signal.id,
+                    "ticker": ticker_symbol,
+                    "analysis_date": signal.analysis_date,
+                    "score": signal.score,
+                    "confidence": signal.confidence,
+                    "current_price": signal.current_price,
+                    "currency": signal.currency,
+                    "rationale": signal.rationale,
+                    "action": signal.action,
+                    "entry_price": signal.entry_price,
+                    "stop_loss": signal.stop_loss,
+                    "take_profit": signal.take_profit,
+                    "wait_for_price": signal.wait_for_price,
+                    "created_at": signal.created_at,
+                }
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting latest signal for {ticker_symbol}: {e}")
+            return None
+
+    def get_signal_history(self, ticker_symbol: str, days_back: int = 30) -> list[dict]:
+        """Get historical technical analysis signals for a ticker.
+
+        Args:
+            ticker_symbol: Ticker symbol.
+            days_back: Number of days of history to retrieve (default: 30).
+
+        Returns:
+            List of signal dictionaries, ordered by date descending.
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                ticker_symbol = ticker_symbol.upper()
+
+                # Find ticker
+                ticker = session.exec(select(Ticker).where(Ticker.symbol == ticker_symbol)).first()
+
+                if not ticker:
+                    return []
+
+                # Calculate cutoff date
+                cutoff_date = date.today() - timedelta(days=days_back)
+
+                # Get signals
+                signals = session.exec(
+                    select(WatchlistSignal)
+                    .where(
+                        (WatchlistSignal.ticker_id == ticker.id)
+                        & (WatchlistSignal.analysis_date >= cutoff_date)
+                    )
+                    .order_by(WatchlistSignal.analysis_date.desc())
+                ).all()
+
+                return [
+                    {
+                        "id": signal.id,
+                        "ticker": ticker_symbol,
+                        "analysis_date": signal.analysis_date,
+                        "score": signal.score,
+                        "confidence": signal.confidence,
+                        "current_price": signal.current_price,
+                        "currency": signal.currency,
+                        "rationale": signal.rationale,
+                        "action": signal.action,
+                        "entry_price": signal.entry_price,
+                        "stop_loss": signal.stop_loss,
+                        "take_profit": signal.take_profit,
+                        "wait_for_price": signal.wait_for_price,
+                        "created_at": signal.created_at,
+                    }
+                    for signal in signals
+                ]
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting signal history for {ticker_symbol}: {e}")
+            return []
+
+    def get_signals_for_watchlist_id(self, watchlist_id: int) -> list[dict]:
+        """Get all signals associated with a specific watchlist entry.
+
+        Args:
+            watchlist_id: Watchlist entry ID.
+
+        Returns:
+            List of signal dictionaries, ordered by date descending.
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                signals = session.exec(
+                    select(WatchlistSignal, Ticker)
+                    .join(Ticker, WatchlistSignal.ticker_id == Ticker.id)
+                    .where(WatchlistSignal.watchlist_id == watchlist_id)
+                    .order_by(WatchlistSignal.analysis_date.desc())
+                ).all()
+
+                return [
+                    {
+                        "id": signal.id,
+                        "ticker": ticker.symbol,
+                        "name": ticker.name,
+                        "analysis_date": signal.analysis_date,
+                        "score": signal.score,
+                        "confidence": signal.confidence,
+                        "current_price": signal.current_price,
+                        "currency": signal.currency,
+                        "rationale": signal.rationale,
+                        "created_at": signal.created_at,
+                    }
+                    for signal, ticker in signals
+                ]
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting signals for watchlist {watchlist_id}: {e}")
+            return []
+
+    def delete_old_signals(self, days_old: int = 90) -> tuple[int, str]:
+        """Delete signals older than specified number of days.
+
+        Args:
+            days_old: Delete signals older than this many days (default: 90).
+
+        Returns:
+            Tuple of (count_deleted, message).
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                cutoff_date = date.today() - timedelta(days=days_old)
+
+                # Find old signals
+                old_signals = session.exec(
+                    select(WatchlistSignal).where(WatchlistSignal.analysis_date < cutoff_date)
+                ).all()
+
+                count = len(old_signals)
+
+                if count == 0:
+                    return 0, "No old signals to delete"
+
+                # Delete them
+                for signal in old_signals:
+                    session.delete(signal)
+
+                session.commit()
+                message = f"Deleted {count} signals older than {days_old} days"
+                logger.info(message)
+                return count, message
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error deleting old signals: {e}")
+            return 0, f"Error: {str(e)}"
+
+    def get_watchlist_with_latest_signals(self) -> list[dict]:
+        """Get all watchlist tickers with their most recent signal scores.
+
+        Useful for dashboard views showing current status of all watched tickers.
+
+        Returns:
+            List of dictionaries with ticker info and latest signal (if available).
+        """
+        try:
+            session = self.db_manager.get_session()
+
+            try:
+                # Get all watchlist entries with tickers
+                watchlist_entries = session.exec(
+                    select(Watchlist, Ticker)
+                    .join(Ticker, Watchlist.ticker_id == Ticker.id)
+                    .order_by(Ticker.symbol)
+                ).all()
+
+                result = []
+                for watchlist_entry, ticker in watchlist_entries:
+                    # Get latest signal for this ticker
+                    latest_signal = session.exec(
+                        select(WatchlistSignal)
+                        .where(WatchlistSignal.ticker_id == ticker.id)
+                        .order_by(WatchlistSignal.analysis_date.desc())
+                    ).first()
+
+                    entry_data = {
+                        "ticker": ticker.symbol,
+                        "name": ticker.name,
+                        "watchlist_id": watchlist_entry.id,
+                        "added_to_watchlist": watchlist_entry.created_at,
+                        "latest_signal": None,
+                    }
+
+                    if latest_signal:
+                        entry_data["latest_signal"] = {
+                            "analysis_date": latest_signal.analysis_date,
+                            "score": latest_signal.score,
+                            "confidence": latest_signal.confidence,
+                            "current_price": latest_signal.current_price,
+                            "currency": latest_signal.currency,
+                            "rationale": latest_signal.rationale,
+                            "action": latest_signal.action,
+                            "entry_price": latest_signal.entry_price,
+                            "stop_loss": latest_signal.stop_loss,
+                            "take_profit": latest_signal.take_profit,
+                            "wait_for_price": latest_signal.wait_for_price,
+                        }
+
+                    result.append(entry_data)
+
+                return result
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error getting watchlist with latest signals: {e}")
+            return []
