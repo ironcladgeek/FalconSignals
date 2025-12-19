@@ -227,7 +227,7 @@ class WebsiteGenerator:
             f'(https://finance.yahoo.com/quote/{signal.ticker}/){{:target="_blank"}}',
             "",
             f"**Recommendation:** {symbol} {recommendation}  ",
-            f"**Confidence:** {signal.confidence}%  ",
+            f"**Confidence:** {signal.confidence:.0f}%  ",
             f"**Current Price:** ${signal.current_price:.2f}",
             "",
         ]

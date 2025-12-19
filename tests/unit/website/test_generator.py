@@ -225,7 +225,9 @@ class TestWebsiteGenerator:
         # formatted is a list of strings, check if ticker appears in any line
         formatted_text = "\n".join(formatted)
         assert signal.ticker in formatted_text
-        assert str(signal.confidence) in formatted_text
+        assert (
+            f"{signal.confidence:.0f}%" in formatted_text
+        )  # confidence formatted as integer with %
         # Check for spaced version since .upper().replace('_', ' ') converts to space
         expected_rec = signal.recommendation.value.replace("_", " ")
         assert expected_rec in formatted_text.lower()
