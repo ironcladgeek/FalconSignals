@@ -409,7 +409,7 @@ class TestIndexPageGeneration:
         content = index_path.read_text()
 
         # Check basic structure
-        assert "NordInvest" in content
+        assert "FalconSignals" in content
         assert "Recent Analysis" in content
 
     def test_generate_index_with_recent_reports(self, generator):

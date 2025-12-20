@@ -537,7 +537,7 @@ class WebsiteGenerator:
             ]
 
         lines = [
-            "# Welcome to NordInvest Analysis",
+            "# Welcome to FalconSignals Analysis",
             "",
             "AI-powered financial analysis and investment recommendations.",
             "",

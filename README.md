@@ -1,4 +1,4 @@
-# NordInvest
+# FalconSignals
 
 AI-powered financial analysis and investment recommendation system using multi-agent AI orchestration (CrewAI). Analyzes global markets to generate daily investment signals with confidence scores.
 
@@ -6,7 +6,7 @@ AI-powered financial analysis and investment recommendation system using multi-a
 
 ## Overview
 
-NordInvest is designed to help investors make informed decisions by providing daily, data-driven investment analysis. The system combines fundamental analysis, technical indicators, and news sentiment to generate actionable investment signals with confidence scores.
+FalconSignals is designed to help investors make informed decisions by providing daily, data-driven investment analysis. The system combines fundamental analysis, technical indicators, and news sentiment to generate actionable investment signals with confidence scores.
 
 **Key Features:**
 - 🤖 Multi-agent AI system with 5 specialized analysis agents
@@ -33,7 +33,7 @@ NordInvest is designed to help investors make informed decisions by providing da
 ```bash
 # Clone and setup
 git clone <repository>
-cd nordinvest
+cd falconsignals
 
 # Install dependencies
 uv sync
@@ -215,7 +215,7 @@ llm:
 
 ## Architecture
 
-NordInvest uses a multi-agent CrewAI architecture:
+FalconSignals uses a multi-agent CrewAI architecture:
 
 ```
 Configuration Layer (YAML/CLI)
@@ -247,7 +247,7 @@ For detailed architecture diagrams, see:
 ## Project Structure
 
 ```
-nordinvest/
+falconsignals/
 ├── src/
 │   ├── main.py              # CLI entry point
 │   ├── config/              # Configuration system

@@ -12,8 +12,8 @@ class ErrorSeverity(str, Enum):
     CRITICAL = "critical"
 
 
-class NordInvestException(Exception):
-    """Base exception for NordInvest application."""
+class FalconSignalsException(Exception):
+    """Base exception for FalconSignals application."""
 
     def __init__(
         self,
@@ -41,7 +41,7 @@ class NordInvestException(Exception):
         return f"[{self.error_code}] {self.message}"
 
 
-class RetryableException(NordInvestException):
+class RetryableException(FalconSignalsException):
     """Exception that indicates operation should be retried."""
 
     def __init__(self, message: str, error_code: str = "RETRYABLE_ERROR", **kwargs):
@@ -83,7 +83,7 @@ def is_retryable_error(error: Exception) -> bool:
         "CONNECTION_ERROR",
     ]
 
-    if isinstance(error, NordInvestException):
+    if isinstance(error, FalconSignalsException):
         return error.error_code in retryable_codes
 
     # Check for rate limit errors in error message (yfinance RuntimeError)

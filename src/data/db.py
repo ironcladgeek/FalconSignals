@@ -1,4 +1,4 @@
-"""Database engine and session management for NordInvest.
+"""Database engine and session management for FalconSignals.
 
 Handles SQLite database initialization, schema creation, and session management
 for storing historical analyst ratings and performance tracking data.
@@ -18,7 +18,7 @@ _initialized_databases = set()
 class DatabaseManager:
     """Manages database connections and initialization."""
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize database manager.
 
         Args:
@@ -113,7 +113,7 @@ class DatabaseManager:
 _db_manager: DatabaseManager | None = None
 
 
-def get_db_manager(db_path: Path | str = "data/nordinvest.db") -> DatabaseManager:
+def get_db_manager(db_path: Path | str = "data/falconsignals.db") -> DatabaseManager:
     """Get or create global database manager instance.
 
     Args:
@@ -131,7 +131,7 @@ def get_db_manager(db_path: Path | str = "data/nordinvest.db") -> DatabaseManage
     return _db_manager
 
 
-def init_db(db_path: Path | str = "data/nordinvest.db") -> None:
+def init_db(db_path: Path | str = "data/falconsignals.db") -> None:
     """Initialize the database with default path.
 
     Args:

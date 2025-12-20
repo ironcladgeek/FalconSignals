@@ -962,7 +962,7 @@ Implement a local file-based SQLite database for storing historical data that ha
 **Objective**: Persist time-sensitive data that APIs don't retain historically.
 
 #### Tasks
-- [x] **Create SQLite database** (`data/nordinvest.db`):
+- [x] **Create SQLite database** (`data/falconsignals.db`):
   ```sql
   -- Analyst ratings historical storage
   -- APIs only provide current + ~3 months, we need to accumulate over time
@@ -991,7 +991,7 @@ Implement a local file-based SQLite database for storing historical data that ha
   class AnalystRatingsRepository:
       """Repository for storing and retrieving historical analyst ratings."""
 
-      def __init__(self, db_path: Path = Path("data/nordinvest.db")):
+      def __init__(self, db_path: Path = Path("data/falconsignals.db")):
           self.db_path = db_path
           self._init_db()
 
@@ -1296,7 +1296,7 @@ uv run python -m src.main performance-report --period 30
 ```yaml
 database:
   enabled: true
-  db_path: "data/nordinvest.db"
+  db_path: "data/falconsignals.db"
 
   performance_tracking:
     enabled: true
@@ -3758,9 +3758,9 @@ Currently, analysis reports are only available as local markdown/JSON files. Thi
 
 - [ ] **Configure mkdocs.yml**:
   ```yaml
-  site_name: NordInvest Analysis
-  site_url: https://nordinvest.yourdomain.com
-  repo_url: https://github.com/yourusername/NordInvest
+  site_name: FalconSignals Analysis
+  site_url: https://falconsignals.yourdomain.com
+  repo_url: https://github.com/yourusername/FalconSignals
 
   theme:
     name: material
@@ -4031,7 +4031,7 @@ Currently, analysis reports are only available as local markdown/JSON files. Thi
           with:
             github_token: ${{ secrets.GITHUB_TOKEN }}
             publish_dir: ./website/site
-            cname: nordinvest.yourdomain.com
+            cname: falconsignals.yourdomain.com
   ```
 
 #### Manual Deployment Script
@@ -4046,7 +4046,7 @@ Currently, analysis reports are only available as local markdown/JSON files. Thi
   # Push to gh-pages branch
   cd site
   git init
-  git remote add origin https://github.com/yourusername/NordInvest.git
+  git remote add origin https://github.com/yourusername/FalconSignals.git
   git checkout -b gh-pages
   git add .
   git commit -m "Deploy website"
@@ -4059,21 +4059,21 @@ Currently, analysis reports are only available as local markdown/JSON files. Thi
 - [ ] **Configure repository settings**:
   - Go to Settings → Pages
   - Source: Deploy from branch `gh-pages`
-  - Custom domain: `nordinvest.yourdomain.com`
+  - Custom domain: `falconsignals.yourdomain.com`
   - Enforce HTTPS: ✅
 
 #### GoDaddy DNS Configuration
 - [ ] **Add DNS records**:
   ```
   Type: CNAME
-  Name: nordinvest
+  Name: falconsignals
   Value: yourusername.github.io
   TTL: 600
   ```
 
 - [ ] **Create `website/docs/CNAME`**:
   ```
-  nordinvest.yourdomain.com
+  falconsignals.yourdomain.com
   ```
 
 ### 17.6 Filtering & Navigation Features
@@ -4141,8 +4141,8 @@ Currently, analysis reports are only available as local markdown/JSON files. Thi
   website:
     enabled: true
     output_dir: "website/docs"
-    domain: "nordinvest.yourdomain.com"
-    github_repo: "yourusername/NordInvest"
+    domain: "falconsignals.yourdomain.com"
+    github_repo: "yourusername/FalconSignals"
 
     # Privacy controls
     include_portfolio_data: false
@@ -4332,13 +4332,13 @@ What's missing is the scheduling/automation layer.
 - [ ] **Create systemd service** (for Linux deployment):
   ```ini
   [Unit]
-  Description=NordInvest Daily Analysis
+  Description=FalconSignals Daily Analysis
   After=network.target
 
   [Service]
   Type=oneshot
-  User=nordinvest
-  WorkingDirectory=/opt/nordinvest
+  User=falconsignals
+  WorkingDirectory=/opt/falconsignals
   ExecStart=/usr/local/bin/uv run python -m src.utils.scheduler
 
   [Install]
@@ -4348,7 +4348,7 @@ What's missing is the scheduling/automation layer.
 - [ ] **Create systemd timer** (for scheduling):
   ```ini
   [Unit]
-  Description=NordInvest Daily Analysis Timer
+  Description=FalconSignals Daily Analysis Timer
 
   [Timer]
   OnCalendar=Mon-Fri 16:00:00
@@ -4366,7 +4366,7 @@ What's missing is the scheduling/automation layer.
   <plist version="1.0">
   <dict>
       <key>Label</key>
-      <string>com.nordinvest.daily</string>
+      <string>com.falconsignals.daily</string>
       <key>ProgramArguments</key>
       <array>
           <string>/usr/local/bin/uv</string>
@@ -4385,7 +4385,7 @@ What's missing is the scheduling/automation layer.
           <integer>1</integer> <!-- Monday -->
       </dict>
       <key>WorkingDirectory</key>
-      <string>/Users/username/NordInvest</string>
+      <string>/Users/username/FalconSignals</string>
   </dict>
   </plist>
   ```
@@ -4451,7 +4451,7 @@ What's missing is the scheduling/automation layer.
 - [ ] **Create deployment script** (`scripts/deploy.sh`):
   ```bash
   #!/bin/bash
-  # Deploy NordInvest to production server
+  # Deploy FalconSignals to production server
 
   # Pull latest code
   # Install dependencies
@@ -4557,4 +4557,4 @@ def daily_workflow():
 
 ---
 
-*This roadmap serves as the canonical implementation guide for the NordInvest project. Update task checkboxes as development progresses.*
+*This roadmap serves as the canonical implementation guide for the FalconSignals project. Update task checkboxes as development progresses.*

@@ -219,7 +219,7 @@ logs/
 *.pdf
 *.parquet
 config/local.yaml
-data/nordinvest.db
+data/falconsignals.db
 
 # Generated website content
 website/docs/*.md

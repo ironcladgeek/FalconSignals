@@ -295,7 +295,7 @@ class LoggingConfig(BaseModel):
         description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
     )
     format: str = Field(default="json", description="Log format: json or text")
-    log_file: str = Field(default="logs/nordinvest.log", description="Log file path")
+    log_file: str = Field(default="logs/falconsignals.log", description="Log file path")
     max_log_size_mb: int = Field(default=10, ge=1, description="Maximum log file size in MB")
     backup_count: int = Field(default=5, ge=1, description="Number of backup log files to keep")
 
@@ -396,7 +396,9 @@ class DatabaseConfig(BaseModel):
     """Database configuration for historical data storage."""
 
     enabled: bool = Field(default=True, description="Enable database storage of historical data")
-    db_path: str = Field(default="data/nordinvest.db", description="Path to SQLite database file")
+    db_path: str = Field(
+        default="data/falconsignals.db", description="Path to SQLite database file"
+    )
     auto_persist_analyst_ratings: bool = Field(
         default=True, description="Automatically store analyst ratings when fetched from APIs"
     )

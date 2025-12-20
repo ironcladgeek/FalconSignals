@@ -31,7 +31,7 @@ See `docs/roadmap.md` and `docs/ARCHITECTURE_ANALYSIS.md` for detailed DRY viola
 
 ## Project Overview
 
-**NordInvest** is an AI-powered financial analysis and investment recommendation system that generates daily investment signals and portfolio allocation suggestions. It uses a multi-agent CrewAI architecture to analyze global financial markets across fundamental, technical, and sentiment dimensions.
+**FalconSignals** is an AI-powered financial analysis and investment recommendation system that generates daily investment signals and portfolio allocation suggestions. It uses a multi-agent CrewAI architecture to analyze global financial markets across fundamental, technical, and sentiment dimensions.
 
 **Key characteristics:**
 - Cost-conscious design: Target €50-90/month operational cost
@@ -214,7 +214,7 @@ Output (Files, Terminal, Cost Summary)
 - Minimizes API calls and costs
 
 **4. Database Layer (src/data/db.py, src/data/repository.py)**
-- SQLite database (`data/nordinvest.db`) for persistent storage
+- SQLite database (`data/falconsignals.db`) for persistent storage
 - **Auto-incrementing INTEGER primary keys** (migrated from UUID for performance)
 - Repository pattern for data access with session management
 - **Run Sessions**: Track each analysis run with metadata (mode, tickers, status, timestamps)
@@ -261,7 +261,7 @@ Output (Files, Terminal, Cost Summary)
 ## Code Organization
 
 ```
-NordInvest/
+FalconSignals/
 ├── src/
 │   ├── main.py              # CLI entry point
 │   ├── agents/              # CrewAI agent definitions

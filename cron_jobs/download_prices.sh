@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# NordInvest Price Download Script
+# FalconSignals Price Download Script
 # Usage: ./download_prices.sh <group_name>
 
 set -e  # Exit on error

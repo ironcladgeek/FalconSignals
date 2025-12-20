@@ -1,4 +1,4 @@
-# NordInvest Configuration Template
+# FalconSignals Configuration Template
 # Copy this file to config/local.yaml and customize for your preferences
 
 # Capital Settings
@@ -174,7 +174,7 @@ data:
 
 database:
   enabled: true
-  db_path: data/nordinvest.db
+  db_path: data/falconsignals.db
 
 api:
   # Set these via environment variables
@@ -191,7 +191,7 @@ api:
 logging:
   level: DEBUG # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
   format: json # Options: json, text
-  log_file: logs/nordinvest.log
+  log_file: logs/falconsignals.log
   max_log_size_mb: 10
   backup_count: 5
 

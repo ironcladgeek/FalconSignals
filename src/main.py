@@ -1,4 +1,4 @@
-"""NordInvest CLI interface."""
+"""FalconSignals CLI interface."""
 
 import json
 import subprocess
@@ -47,7 +47,7 @@ from src.utils.scheduler import RunLog
 from src.website.generator import WebsiteGenerator
 
 app = typer.Typer(
-    name="nordinvest",
+    name="falconsignals",
     help="AI-powered financial analysis and investment recommendation system",
     no_args_is_help=True,
 )
@@ -565,7 +565,7 @@ def analyze(
         data_dir = Path("data")
         run_log = RunLog(data_dir / "runs.jsonl")
 
-        logger.debug(f"Starting NordInvest analysis (dry_run={dry_run})")
+        logger.debug(f"Starting FalconSignals analysis (dry_run={dry_run})")
         logger.debug(f"Using config: {config}")
         logger.debug(f"Risk tolerance: {config_obj.risk.tolerance}")
         logger.debug(f"Capital: €{config_obj.capital.starting_capital_eur:,.2f}")
@@ -1491,7 +1491,7 @@ def publish(
 
                 typer.echo("✓ Deployed to GitHub Pages")
                 typer.echo("\n🌐 Your site should be available at:")
-                typer.echo("   https://ironcladgeek.github.io/NordInvest/")
+                typer.echo("   https://ironcladgeek.github.io/FalconSignals/")
             else:
                 typer.echo("\n✓ Build complete (deployment skipped)")
         else:
@@ -2047,7 +2047,7 @@ def track_performance(
         logger.info("Starting performance tracking")
 
         db_path = Path(
-            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
         )
 
         # Initialize repositories
@@ -2206,7 +2206,7 @@ def performance_report(
         logger.info("Generating performance report")
 
         db_path = Path(
-            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
         )
 
         # Initialize repository
@@ -2309,7 +2309,7 @@ def list_strategies() -> None:
     - Suitable use cases
 
     Example:
-        nordinvest list-strategies
+        falconsignals list-strategies
     """
 
     typer.echo("\n📊 Available Filtering Strategies\n")
@@ -2323,8 +2323,8 @@ def list_strategies() -> None:
 
     typer.echo(f"\n{'=' * 80}")
     typer.echo(f"\nTotal strategies: {len(strategies)}")
-    typer.echo("\nUsage: nordinvest analyze --strategy <strategy_name>")
-    typer.echo("Example: nordinvest analyze --group us_tech_software --strategy momentum\n")
+    typer.echo("\nUsage: falconsignals analyze --strategy <strategy_name>")
+    typer.echo("Example: falconsignals analyze --group us_tech_software --strategy momentum\n")
 
 
 @app.command()
@@ -2385,7 +2385,7 @@ def watchlist(
 
         # Initialize database
         db_path = (
-            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
         )
         init_db(db_path)
 
@@ -2667,7 +2667,7 @@ def watchlist_scan(
 
         # Initialize database
         db_path = (
-            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
         )
         init_db(db_path)
 
@@ -2789,7 +2789,7 @@ def watchlist_report(
 
         # Initialize database
         db_path = (
-            config_obj.database.db_path if config_obj.database.enabled else "data/nordinvest.db"
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
         )
         init_db(db_path)
 
@@ -2934,7 +2934,7 @@ def version_callback(
 ) -> None:
     """Show version information."""
     if version:
-        typer.echo("NordInvest v0.1.0")
+        typer.echo("FalconSignals v0.1.0")
         raise typer.Exit()
 
 

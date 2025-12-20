@@ -2833,7 +2833,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nordinvest"
+name = "falconsignals"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

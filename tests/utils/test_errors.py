@@ -2,7 +2,7 @@
 
 from src.utils.errors import (
     ErrorSeverity,
-    NordInvestException,
+    FalconSignalsException,
     RateLimitException,
     RetryableException,
     is_retryable_error,
@@ -20,12 +20,12 @@ class TestErrorSeverity:
         assert ErrorSeverity.CRITICAL.value == "critical"
 
 
-class TestNordInvestException:
-    """Test suite for NordInvestException."""
+class TestFalconSignalsException:
+    """Test suite for FalconSignalsException."""
 
     def test_basic_initialization(self):
         """Test basic exception initialization."""
-        exc = NordInvestException("Something went wrong")
+        exc = FalconSignalsException("Something went wrong")
 
         assert exc.message == "Something went wrong"
         assert exc.severity == ErrorSeverity.ERROR
@@ -34,26 +34,26 @@ class TestNordInvestException:
 
     def test_custom_severity(self):
         """Test exception with custom severity."""
-        exc = NordInvestException("Warning!", severity=ErrorSeverity.WARNING)
+        exc = FalconSignalsException("Warning!", severity=ErrorSeverity.WARNING)
 
         assert exc.severity == ErrorSeverity.WARNING
 
     def test_custom_error_code(self):
         """Test exception with custom error code."""
-        exc = NordInvestException("Error", error_code="CUSTOM_CODE")
+        exc = FalconSignalsException("Error", error_code="CUSTOM_CODE")
 
         assert exc.error_code == "CUSTOM_CODE"
 
     def test_with_context(self):
         """Test exception with context."""
         context = {"ticker": "AAPL", "operation": "fetch"}
-        exc = NordInvestException("Error", context=context)
+        exc = FalconSignalsException("Error", context=context)
 
         assert exc.context == context
 
     def test_str_representation(self):
         """Test string representation."""
-        exc = NordInvestException("Test error", error_code="TEST_CODE")
+        exc = FalconSignalsException("Test error", error_code="TEST_CODE")
 
         result = str(exc)
 
@@ -80,7 +80,7 @@ class TestRetryableException:
         """Test RetryableException inherits correctly."""
         exc = RetryableException("Error")
 
-        assert isinstance(exc, NordInvestException)
+        assert isinstance(exc, FalconSignalsException)
 
 
 class TestRateLimitException:
@@ -118,7 +118,7 @@ class TestRateLimitException:
         exc = RateLimitException("Error")
 
         assert isinstance(exc, RetryableException)
-        assert isinstance(exc, NordInvestException)
+        assert isinstance(exc, FalconSignalsException)
 
 
 class TestIsRetryableError:
@@ -137,14 +137,14 @@ class TestIsRetryableError:
         assert is_retryable_error(error) is True
 
     def test_nord_invest_with_retryable_code(self):
-        """Test NordInvestException with retryable error code."""
-        error = NordInvestException("Timeout", error_code="API_TIMEOUT")
+        """Test FalconSignalsException with retryable error code."""
+        error = FalconSignalsException("Timeout", error_code="API_TIMEOUT")
 
         assert is_retryable_error(error) is True
 
     def test_nord_invest_with_non_retryable_code(self):
-        """Test NordInvestException with non-retryable error code."""
-        error = NordInvestException("Invalid input", error_code="VALIDATION_ERROR")
+        """Test FalconSignalsException with non-retryable error code."""
+        error = FalconSignalsException("Invalid input", error_code="VALIDATION_ERROR")
 
         assert is_retryable_error(error) is False
 
@@ -183,5 +183,5 @@ class TestIsRetryableError:
         ]
 
         for code in retryable_codes:
-            error = NordInvestException("Test", error_code=code)
+            error = FalconSignalsException("Test", error_code=code)
             assert is_retryable_error(error) is True, f"{code} should be retryable"

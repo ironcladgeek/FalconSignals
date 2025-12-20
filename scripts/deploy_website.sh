@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Deploy NordInvest website to GitHub Pages
+# Deploy FalconSignals website to GitHub Pages
 #
 # Usage:
 #   ./scripts/deploy_website.sh [--force] [--no-build]
@@ -33,7 +33,7 @@ for arg in "$@"; do
         --help|-h)
             echo "Usage: $0 [--force] [--no-build]"
             echo ""
-            echo "Deploy NordInvest website to GitHub Pages"
+            echo "Deploy FalconSignals website to GitHub Pages"
             echo ""
             echo "Options:"
             echo "  --force     Force deployment even if there are uncommitted changes"
@@ -56,7 +56,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 NordInvest Website Deployment${NC}"
+echo -e "${BLUE}🚀 FalconSignals Website Deployment${NC}"
 echo ""
 
 # Check if we're in a git repository
@@ -120,6 +120,6 @@ echo ""
 echo -e "${GREEN}✅ Deployment successful!${NC}"
 echo ""
 echo -e "${BLUE}🌐 Your website will be available at:${NC}"
-echo "   https://ironcladgeek.github.io/NordInvest/"
+echo "   https://ironcladgeek.github.io/FalconSignals/"
 echo ""
 echo -e "${YELLOW}Note: It may take a few minutes for changes to appear${NC}"

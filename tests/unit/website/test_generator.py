@@ -196,7 +196,7 @@ class TestWebsiteGenerator:
 
         # Check content
         content = index_path.read_text()
-        assert "NordInvest" in content or "Analysis" in content
+        assert "FalconSignals" in content or "Analysis" in content
         assert "Recent Analysis" in content
 
     def test_update_navigation(self, generator, temp_output_dir):

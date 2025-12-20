@@ -80,7 +80,7 @@ class AnalystRatingsRepository:
     with additional methods for querying historical data.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:
@@ -441,7 +441,7 @@ class RunSessionRepository:
     Tracks each analysis run with metadata for grouping signals and monitoring progress.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:
@@ -632,7 +632,7 @@ class RecommendationsRepository:
     generation and historical analysis.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:
@@ -1191,7 +1191,7 @@ class PerformanceRepository:
     and generating performance reports.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:
@@ -1678,7 +1678,7 @@ class WatchlistRepository:
     Handles adding, removing, and querying tickers in the watchlist.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:
@@ -1858,7 +1858,7 @@ class WatchlistSignalRepository:
     identify optimal entry points for opening positions.
     """
 
-    def __init__(self, db_path: Path | str = "data/nordinvest.db"):
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
         """Initialize repository with database manager.
 
         Args:

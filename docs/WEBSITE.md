@@ -1,6 +1,6 @@
 ># Website Publishing Guide
 
-This document explains how to publish NordInvest analysis results to a static website using MkDocs, Material theme, and GitHub Pages.
+This document explains how to publish FalconSignals analysis results to a static website using MkDocs, Material theme, and GitHub Pages.
 
 ## Overview
 
@@ -50,27 +50,27 @@ uv pip install mkdocs mkdocs-material mkdocs-awesome-pages-plugin
 
 ```bash
 # Publish and deploy
-nordinvest publish --session-id 123
+falconsignals publish --session-id 123
 
 # Generate content only (no build)
-nordinvest publish --session-id 123 --no-build
+falconsignals publish --session-id 123 --no-build
 
 # Build but don't deploy
-nordinvest publish --session-id 123 --build-only
+falconsignals publish --session-id 123 --build-only
 ```
 
 #### Publish from a Date
 
 ```bash
 # Publish all signals from a specific date
-nordinvest publish --date 2025-12-10
+falconsignals publish --date 2025-12-10
 ```
 
 #### Publish Specific Ticker
 
 ```bash
 # Generate page for one ticker
-nordinvest publish --ticker NVDA --date 2025-12-10
+falconsignals publish --ticker NVDA --date 2025-12-10
 ```
 
 ## Content Structure
@@ -213,10 +213,10 @@ All content passes through `sanitize_report_for_web()` which:
 Edit `website/mkdocs.yml`:
 
 ```yaml
-site_name: NordInvest Analysis
+site_name: FalconSignals Analysis
 site_description: AI-powered financial analysis
 site_url: https://yourdomain.com
-repo_url: https://github.com/ironcladgeek/NordInvest
+repo_url: https://github.com/ironcladgeek/FalconSignals
 ```
 
 ### Customize Theme
@@ -261,7 +261,7 @@ Visit `http://127.0.0.1:8000` to preview changes.
 
 ```bash
 # Generate content from latest session without building
-nordinvest publish --session-id 123 --no-build
+falconsignals publish --session-id 123 --no-build
 
 # Preview
 cd website && mkdocs serve
@@ -294,7 +294,7 @@ cd website && mkdocs serve
 **Issue:** Generated pages don't appear on site
 
 **Solutions:**
-1. Run `nordinvest publish` to regenerate content
+1. Run `falconsignals publish` to regenerate content
 2. Check database has signals: `SELECT COUNT(*) FROM recommendations;`
 3. Verify navigation files (`.pages`) exist
 4. Rebuild site: `cd website && mkdocs build --clean`
@@ -317,7 +317,7 @@ from src.website.generator import WebsiteGenerator
 
 generator = WebsiteGenerator(
     config=config,
-    db_path="data/nordinvest.db",
+    db_path="data/falconsignals.db",
     output_dir="website/docs/"
 )
 
@@ -388,6 +388,6 @@ Potential improvements:
 ## Support
 
 For issues or questions:
-- Check logs: `logs/nordinvest.log`
+- Check logs: `logs/falconsignals.log`
 - Review test suite: `tests/unit/website/`
-- GitHub Issues: https://github.com/ironcladgeek/NordInvest/issues
+- GitHub Issues: https://github.com/ironcladgeek/FalconSignals/issues

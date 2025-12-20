@@ -1,8 +1,8 @@
-site_name: NordInvest Analysis
+site_name: FalconSignals Analysis
 site_description: AI-powered financial analysis and investment recommendations
-site_url: https://ironcladgeek.github.io/NordInvest/
-repo_url: https://github.com/ironcladgeek/NordInvest
-repo_name: ironcladgeek/NordInvest
+site_url: https://ironcladgeek.github.io/FalconSignals/
+repo_url: https://github.com/ironcladgeek/FalconSignals
+repo_name: ironcladgeek/FalconSignals
 
 theme:
   name: material
@@ -70,8 +70,8 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/ironcladgeek/NordInvest
+      link: https://github.com/ironcladgeek/FalconSignals
 
 copyright: >
-  Copyright &copy; 2025 NordInvest -
+  Copyright &copy; 2025 FalconSignals -
   <a href="#__consent">Change cookie settings</a>

@@ -1,6 +1,6 @@
-# NordInvest CLI Guide
+# FalconSignals CLI Guide
 
-Complete guide to using the NordInvest command-line interface.
+Complete guide to using the FalconSignals command-line interface.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ Complete guide to using the NordInvest command-line interface.
 
 ## Overview
 
-The NordInvest CLI provides commands for:
+The FalconSignals CLI provides commands for:
 - **Analysis**: Generate investment signals using rule-based or LLM-powered methods
 - **Watchlist Management**: AI-powered technical analysis with tactical trading recommendations
 - **Reporting**: Generate reports from historical analysis sessions
@@ -906,7 +906,7 @@ export FINNHUB_API_KEY=your_key          # Optional
 
 ### Configuration Hierarchy
 
-NordInvest loads configuration in this order (later overrides earlier):
+FalconSignals loads configuration in this order (later overrides earlier):
 
 1. `config/default.yaml` (base template)
 2. `config/local.yaml` (if exists)
@@ -914,13 +914,13 @@ NordInvest loads configuration in this order (later overrides earlier):
 
 ### Database Location
 
-Default: `data/nordinvest.db`
+Default: `data/falconsignals.db`
 
 Configure in `config/local.yaml`:
 ```yaml
 database:
   enabled: true
-  db_path: "data/nordinvest.db"
+  db_path: "data/falconsignals.db"
 ```
 
 ### Output Locations
@@ -931,7 +931,7 @@ database:
 | LLM Debug | `data/llm_debug/` |
 | Cache | `data/cache/` |
 | Token Tracking | `data/tracking/` |
-| Database | `data/nordinvest.db` |
+| Database | `data/falconsignals.db` |
 | Run Log | `data/runs.jsonl` |
 
 ### Error Handling
@@ -1003,7 +1003,7 @@ uv run python -m src.main analyze --help
 
 **Check logs:**
 ```bash
-tail -f logs/nordinvest.log
+tail -f logs/falconsignals.log
 ```
 
 ---

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# NordInvest Analysis Script
+# FalconSignals Analysis Script
 # Usage: ./run_analysis.sh <group_name> [strategy] [flags]
 # Example: ./run_analysis.sh us_biotech_genomics momentum --llm
 

@@ -1,1 +1,1 @@
-"""Integration tests for NordInvest CLI commands."""
+"""Integration tests for FalconSignals CLI commands."""
