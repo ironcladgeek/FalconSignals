@@ -3410,10 +3410,10 @@ def journal(
             for trade in open_trades:
                 ticker = trade["ticker_symbol"]
                 try:
-                    # Fetch current price
-                    price_data = provider_manager.get_current_price(ticker)
-                    if price_data and "price" in price_data:
-                        current_price = price_data["price"]
+                    # Fetch latest price using get_latest_price method
+                    price_obj = provider_manager.get_latest_price(ticker)
+                    if price_obj and price_obj.close:
+                        current_price = price_obj.close
 
                         # Calculate unrealized P&L
                         entry_amount = trade["total_entry_amount"]
