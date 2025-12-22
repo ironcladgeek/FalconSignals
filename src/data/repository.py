@@ -23,6 +23,7 @@ from src.data.models import (
     Recommendation,
     RunSession,
     Ticker,
+    TradingJournal,
     Watchlist,
     WatchlistSignal,
 )
@@ -2236,3 +2237,499 @@ class WatchlistSignalRepository:
         except Exception as e:
             logger.error(f"Error getting watchlist with latest signals: {e}")
             return []
+
+
+"""TradingJournalRepository implementation to append to repository.py"""
+
+
+class TradingJournalRepository:
+    """Repository for managing trading journal operations.
+
+    Handles creating, updating, and querying trade records for both open and closed positions.
+    Automatically calculates P&L metrics and maintains trade history.
+    """
+
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
+        """Initialize repository with database manager.
+
+        Args:
+            db_path: Path to SQLite database file.
+        """
+        self.db_manager = DatabaseManager(db_path)
+        self.db_manager.initialize()
+
+    def create_trade(
+        self,
+        ticker_symbol: str,
+        entry_date: date,
+        entry_price: float,
+        position_size: float,
+        position_type: str = "long",
+        fees_entry: float = 0.0,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        recommendation_id: int | None = None,
+        currency: str = "USD",
+        description: str | None = None,
+    ) -> tuple[bool, str, int | None]:
+        """Create a new trade entry.
+
+        Args:
+            ticker_symbol: Ticker symbol (e.g., 'AAPL').
+            entry_date: Date when position was opened.
+            entry_price: Price per share/unit at entry.
+            position_size: Number of shares/units.
+            position_type: Position type ('long' or 'short').
+            fees_entry: Fees paid at entry (default: 0.0).
+            stop_loss: Stop loss price level (optional).
+            take_profit: Take profit price level (optional).
+            recommendation_id: Optional link to recommendation that triggered trade.
+            currency: Trading currency (default: 'USD').
+            description: Notes about the trade (optional).
+
+        Returns:
+            Tuple of (success: bool, message: str, trade_id: int | None).
+        """
+        try:
+            # Validate position type
+            if position_type not in ["long", "short"]:
+                return (
+                    False,
+                    f"Invalid position type: {position_type}. Must be 'long' or 'short'",
+                    None,
+                )
+
+            # Validate numeric values
+            if entry_price <= 0:
+                return False, "Entry price must be positive", None
+            if position_size <= 0:
+                return False, "Position size must be positive", None
+            if fees_entry < 0:
+                return False, "Entry fees cannot be negative", None
+
+            session = self.db_manager.get_session()
+            try:
+                # Get or create ticker
+                ticker = get_or_create_ticker(session, ticker_symbol)
+
+                # Calculate total entry amount
+                total_entry_amount = (entry_price * position_size) + fees_entry
+
+                # Create trade record
+                trade = TradingJournal(
+                    ticker_id=ticker.id,
+                    recommendation_id=recommendation_id,
+                    entry_date=entry_date,
+                    entry_price=entry_price,
+                    position_size=position_size,
+                    position_type=position_type,
+                    fees_entry=fees_entry,
+                    total_entry_amount=total_entry_amount,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    status="open",
+                    currency=currency,
+                    description=description,
+                )
+
+                session.add(trade)
+                session.commit()
+                session.refresh(trade)
+
+                trade_id = trade.id
+                logger.info(
+                    f"Created trade: {ticker_symbol} {position_type} {position_size} @ {entry_price} (ID: {trade_id})"
+                )
+                return True, f"Trade created successfully for {ticker_symbol}", trade_id
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to create trade: {e}")
+            return False, f"Error creating trade: {e}", None
+
+    def update_trade(
+        self,
+        trade_id: int,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        description: str | None = None,
+    ) -> tuple[bool, str]:
+        """Update trade details (for open trades only).
+
+        Args:
+            trade_id: Trade ID to update.
+            stop_loss: New stop loss level (optional).
+            take_profit: New take profit level (optional).
+            description: New/updated description (optional).
+
+        Returns:
+            Tuple of (success: bool, message: str).
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get trade
+                trade = session.get(TradingJournal, trade_id)
+                if not trade:
+                    return False, f"Trade {trade_id} not found"
+
+                if trade.status != "open":
+                    return False, f"Cannot update closed trade {trade_id}"
+
+                # Update fields
+                updated = False
+                if stop_loss is not None:
+                    trade.stop_loss = stop_loss
+                    updated = True
+                if take_profit is not None:
+                    trade.take_profit = take_profit
+                    updated = True
+                if description is not None:
+                    trade.description = description
+                    updated = True
+
+                if updated:
+                    trade.updated_at = datetime.now()
+                    session.commit()
+                    logger.info(f"Updated trade {trade_id}")
+                    return True, f"Trade {trade_id} updated successfully"
+                else:
+                    return True, "No changes made"
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to update trade {trade_id}: {e}")
+            return False, f"Error updating trade: {e}"
+
+    def close_trade(
+        self,
+        trade_id: int,
+        exit_date: date,
+        exit_price: float,
+        fees_exit: float = 0.0,
+    ) -> tuple[bool, str, float | None]:
+        """Close an open trade and calculate P&L.
+
+        Args:
+            trade_id: Trade ID to close.
+            exit_date: Date when position was closed.
+            exit_price: Price per share/unit at exit.
+            fees_exit: Fees paid at exit (default: 0.0).
+
+        Returns:
+            Tuple of (success: bool, message: str, profit_loss: float | None).
+        """
+        try:
+            # Validate inputs
+            if exit_price <= 0:
+                return False, "Exit price must be positive", None
+            if fees_exit < 0:
+                return False, "Exit fees cannot be negative", None
+
+            session = self.db_manager.get_session()
+            try:
+                # Get trade
+                trade = session.get(TradingJournal, trade_id)
+                if not trade:
+                    return False, f"Trade {trade_id} not found", None
+
+                if trade.status == "closed":
+                    return False, f"Trade {trade_id} is already closed", None
+
+                # Calculate total exit amount
+                total_exit_amount = (exit_price * trade.position_size) - fees_exit
+
+                # Calculate P&L based on position type
+                if trade.position_type == "long":
+                    profit_loss = total_exit_amount - trade.total_entry_amount
+                else:  # short
+                    profit_loss = trade.total_entry_amount - total_exit_amount
+
+                profit_loss_pct = (profit_loss / trade.total_entry_amount) * 100
+
+                # Update trade
+                trade.exit_date = exit_date
+                trade.exit_price = exit_price
+                trade.fees_exit = fees_exit
+                trade.total_exit_amount = total_exit_amount
+                trade.profit_loss = profit_loss
+                trade.profit_loss_pct = profit_loss_pct
+                trade.status = "closed"
+                trade.updated_at = datetime.now()
+
+                session.commit()
+
+                ticker_symbol = trade.ticker_obj.symbol
+                logger.info(
+                    f"Closed trade {trade_id}: {ticker_symbol} P&L: {profit_loss:.2f} ({profit_loss_pct:.2f}%)"
+                )
+                return (
+                    True,
+                    f"Trade closed: P&L = {profit_loss:.2f} ({profit_loss_pct:.2f}%)",
+                    profit_loss,
+                )
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to close trade {trade_id}: {e}")
+            return False, f"Error closing trade: {e}", None
+
+    def get_open_trades(self, ticker_symbol: str | None = None) -> list[dict]:
+        """Get all open trades.
+
+        Args:
+            ticker_symbol: Optional filter by ticker symbol.
+
+        Returns:
+            List of trade dictionaries.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                query = (
+                    select(TradingJournal, Ticker)
+                    .join(Ticker, TradingJournal.ticker_id == Ticker.id)
+                    .where(TradingJournal.status == "open")
+                )
+
+                if ticker_symbol:
+                    ticker_symbol = ticker_symbol.upper()
+                    query = query.where(Ticker.symbol == ticker_symbol)
+
+                query = query.order_by(TradingJournal.entry_date.desc())
+                results = session.exec(query).all()
+
+                trades = []
+                for trade, ticker in results:
+                    trades.append(self._trade_to_dict(trade, ticker))
+
+                return trades
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get open trades: {e}")
+            return []
+
+    def get_closed_trades(
+        self,
+        ticker_symbol: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict]:
+        """Get closed trades with optional filters.
+
+        Args:
+            ticker_symbol: Optional filter by ticker symbol.
+            start_date: Optional filter by exit date (inclusive).
+            end_date: Optional filter by exit date (inclusive).
+
+        Returns:
+            List of trade dictionaries.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                query = (
+                    select(TradingJournal, Ticker)
+                    .join(Ticker, TradingJournal.ticker_id == Ticker.id)
+                    .where(TradingJournal.status == "closed")
+                )
+
+                if ticker_symbol:
+                    ticker_symbol = ticker_symbol.upper()
+                    query = query.where(Ticker.symbol == ticker_symbol)
+
+                if start_date:
+                    query = query.where(TradingJournal.exit_date >= start_date)
+
+                if end_date:
+                    query = query.where(TradingJournal.exit_date <= end_date)
+
+                query = query.order_by(TradingJournal.exit_date.desc())
+                results = session.exec(query).all()
+
+                trades = []
+                for trade, ticker in results:
+                    trades.append(self._trade_to_dict(trade, ticker))
+
+                return trades
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get closed trades: {e}")
+            return []
+
+    def get_trade_by_id(self, trade_id: int) -> dict | None:
+        """Get trade by ID.
+
+        Args:
+            trade_id: Trade ID.
+
+        Returns:
+            Trade dictionary or None if not found.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                query = (
+                    select(TradingJournal, Ticker)
+                    .join(Ticker, TradingJournal.ticker_id == Ticker.id)
+                    .where(TradingJournal.id == trade_id)
+                )
+                result = session.exec(query).first()
+
+                if result:
+                    trade, ticker = result
+                    return self._trade_to_dict(trade, ticker)
+                return None
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get trade {trade_id}: {e}")
+            return None
+
+    def get_trade_history(self, ticker_symbol: str, limit: int = 50) -> list[dict]:
+        """Get complete trade history for a ticker.
+
+        Args:
+            ticker_symbol: Ticker symbol.
+            limit: Maximum number of trades to return (default: 50).
+
+        Returns:
+            List of trade dictionaries, sorted by entry date descending.
+        """
+        try:
+            ticker_symbol = ticker_symbol.upper()
+            session = self.db_manager.get_session()
+            try:
+                query = (
+                    select(TradingJournal, Ticker)
+                    .join(Ticker, TradingJournal.ticker_id == Ticker.id)
+                    .where(Ticker.symbol == ticker_symbol)
+                    .order_by(TradingJournal.entry_date.desc())
+                    .limit(limit)
+                )
+                results = session.exec(query).all()
+
+                trades = []
+                for trade, ticker in results:
+                    trades.append(self._trade_to_dict(trade, ticker))
+
+                return trades
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get trade history for {ticker_symbol}: {e}")
+            return []
+
+    def get_performance_summary(self, ticker_symbol: str | None = None) -> dict:
+        """Get performance summary for closed trades.
+
+        Args:
+            ticker_symbol: Optional filter by ticker symbol.
+
+        Returns:
+            Dictionary with performance metrics.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                query = select(TradingJournal).where(TradingJournal.status == "closed")
+
+                if ticker_symbol:
+                    ticker_symbol = ticker_symbol.upper()
+                    query = query.join(Ticker, TradingJournal.ticker_id == Ticker.id).where(
+                        Ticker.symbol == ticker_symbol
+                    )
+
+                trades = session.exec(query).all()
+
+                if not trades:
+                    return {
+                        "total_trades": 0,
+                        "total_profit_loss": 0.0,
+                        "win_rate": 0.0,
+                        "avg_profit_loss": 0.0,
+                        "avg_profit_loss_pct": 0.0,
+                        "total_fees": 0.0,
+                    }
+
+                profit_losses = [t.profit_loss for t in trades if t.profit_loss is not None]
+                winning_trades = [p for p in profit_losses if p > 0]
+                total_fees = sum((t.fees_entry or 0) + (t.fees_exit or 0) for t in trades)
+
+                return {
+                    "total_trades": len(trades),
+                    "winning_trades": len(winning_trades),
+                    "losing_trades": len(profit_losses) - len(winning_trades),
+                    "win_rate": (len(winning_trades) / len(profit_losses) * 100)
+                    if profit_losses
+                    else 0.0,
+                    "total_profit_loss": sum(profit_losses),
+                    "avg_profit_loss": statistics.mean(profit_losses) if profit_losses else 0.0,
+                    "avg_profit_loss_pct": statistics.mean(
+                        [t.profit_loss_pct for t in trades if t.profit_loss_pct is not None]
+                    )
+                    if trades
+                    else 0.0,
+                    "best_trade": max(profit_losses) if profit_losses else 0.0,
+                    "worst_trade": min(profit_losses) if profit_losses else 0.0,
+                    "total_fees": total_fees,
+                }
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get performance summary: {e}")
+            return {}
+
+    def _trade_to_dict(self, trade: TradingJournal, ticker: Ticker) -> dict:
+        """Convert TradingJournal model to dictionary.
+
+        Args:
+            trade: TradingJournal object.
+            ticker: Ticker object.
+
+        Returns:
+            Dictionary representation of trade.
+        """
+        return {
+            "id": trade.id,
+            "ticker_symbol": ticker.symbol,
+            "ticker_name": ticker.name,
+            "recommendation_id": trade.recommendation_id,
+            "entry_date": trade.entry_date,
+            "entry_price": trade.entry_price,
+            "position_size": trade.position_size,
+            "position_type": trade.position_type,
+            "fees_entry": trade.fees_entry,
+            "total_entry_amount": trade.total_entry_amount,
+            "stop_loss": trade.stop_loss,
+            "take_profit": trade.take_profit,
+            "exit_date": trade.exit_date,
+            "exit_price": trade.exit_price,
+            "fees_exit": trade.fees_exit,
+            "total_exit_amount": trade.total_exit_amount,
+            "profit_loss": trade.profit_loss,
+            "profit_loss_pct": trade.profit_loss_pct,
+            "status": trade.status,
+            "currency": trade.currency,
+            "description": trade.description,
+            "created_at": trade.created_at,
+            "updated_at": trade.updated_at,
+        }
