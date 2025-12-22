@@ -27,6 +27,7 @@ from src.data.repository import (
     PerformanceRepository,
     RecommendationsRepository,
     RunSessionRepository,
+    TradingJournalRepository,
     WatchlistRepository,
     WatchlistSignalRepository,
 )
@@ -2924,6 +2925,395 @@ def watchlist_report(
 
     except Exception as e:
         logger.error(f"Watchlist report error: {e}", exc_info=True)
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1) from e
+
+
+@app.command()
+def journal(
+    action: str = typer.Option(
+        None,
+        "--action",
+        "-a",
+        help="Action to perform: add, update, close, list, view",
+    ),
+    config: Path = typer.Option(  # noqa: B008
+        None,
+        "--config",
+        "-c",
+        help="Path to configuration file",
+        exists=True,
+    ),
+) -> None:
+    """Manage trading journal entries interactively.
+
+    Add, update, close, list, or view trades with interactive prompts.
+
+    Examples:
+        # Add a new trade (interactive)
+        journal --action add
+
+        # Update an open trade
+        journal --action update
+
+        # Close a trade
+        journal --action close
+
+        # List open trades
+        journal --action list
+
+        # View trade details
+        journal --action view
+    """
+    try:
+        # Load config
+        config_obj = load_config(config)
+        setup_logging(config_obj.logging)
+
+        # Initialize database
+        db_path = (
+            config_obj.database.db_path if config_obj.database.enabled else "data/falconsignals.db"
+        )
+        init_db(db_path)
+
+        # Create repository
+        journal_repo = TradingJournalRepository(db_path)
+
+        # If no action specified, prompt for it
+        if not action:
+            typer.echo("\n📒 Trading Journal\n")
+            typer.echo("Available actions:")
+            typer.echo("  add    - Add a new trade")
+            typer.echo("  update - Update an open trade")
+            typer.echo("  close  - Close an open trade")
+            typer.echo("  list   - List trades")
+            typer.echo("  view   - View trade details")
+            typer.echo()
+            action = typer.prompt("Select action")
+
+        action = action.lower()
+
+        if action == "add":
+            typer.echo("\n➕ Add New Trade\n")
+
+            # Get ticker
+            ticker = typer.prompt("Ticker symbol").strip().upper()
+
+            # Get entry date
+            entry_date_str = typer.prompt(
+                "Entry date (YYYY-MM-DD, or press Enter for today)",
+                default=date.today().strftime("%Y-%m-%d"),
+            )
+            try:
+                entry_date = datetime.strptime(entry_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                typer.echo("❌ Invalid date format", err=True)
+                raise typer.Exit(code=1) from None
+
+            # Get position type
+            position_type = typer.prompt(
+                "Position type", type=typer.Choice(["long", "short"], case_sensitive=False)
+            ).lower()
+
+            # Get entry price
+            entry_price = typer.prompt("Entry price", type=float)
+
+            # Get position size
+            position_size = typer.prompt("Position size (number of shares)", type=float)
+
+            # Get fees (optional)
+            fees_entry = typer.prompt("Entry fees", type=float, default=0.0)
+
+            # Get stop loss (optional)
+            stop_loss_str = typer.prompt("Stop loss (optional, press Enter to skip)", default="")
+            stop_loss = float(stop_loss_str) if stop_loss_str else None
+
+            # Get take profit (optional)
+            take_profit_str = typer.prompt(
+                "Take profit (optional, press Enter to skip)", default=""
+            )
+            take_profit = float(take_profit_str) if take_profit_str else None
+
+            # Get description (optional)
+            description = typer.prompt("Description (optional, press Enter to skip)", default="")
+            description = description if description else None
+
+            # Create trade
+            success, message, trade_id = journal_repo.create_trade(
+                ticker_symbol=ticker,
+                entry_date=entry_date,
+                entry_price=entry_price,
+                position_size=position_size,
+                position_type=position_type,
+                fees_entry=fees_entry,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                description=description,
+            )
+
+            if success:
+                typer.echo(f"\n✅ {message}")
+                typer.echo(f"   Trade ID: {trade_id}")
+                total_amount = (entry_price * position_size) + fees_entry
+                typer.echo(f"   Total amount: ${total_amount:,.2f}")
+            else:
+                typer.echo(f"\n❌ Error: {message}", err=True)
+                raise typer.Exit(code=1)
+
+        elif action == "update":
+            typer.echo("\n✏️  Update Trade\n")
+
+            # Get trade ID
+            trade_id = typer.prompt("Trade ID to update", type=int)
+
+            # Get current trade details
+            trade = journal_repo.get_trade_by_id(trade_id)
+            if not trade:
+                typer.echo(f"❌ Trade {trade_id} not found", err=True)
+                raise typer.Exit(code=1)
+
+            if trade["status"] != "open":
+                typer.echo(f"❌ Trade {trade_id} is closed and cannot be updated", err=True)
+                raise typer.Exit(code=1)
+
+            typer.echo(f"\nCurrent values for {trade['ticker_symbol']}:")
+            typer.echo(f"  Stop loss: {trade['stop_loss']}")
+            typer.echo(f"  Take profit: {trade['take_profit']}")
+            typer.echo(f"  Description: {trade['description']}")
+            typer.echo()
+
+            # Get new values (optional)
+            stop_loss_str = typer.prompt("New stop loss (press Enter to keep current)", default="")
+            stop_loss = float(stop_loss_str) if stop_loss_str else None
+
+            take_profit_str = typer.prompt(
+                "New take profit (press Enter to keep current)", default=""
+            )
+            take_profit = float(take_profit_str) if take_profit_str else None
+
+            description = typer.prompt("New description (press Enter to keep current)", default="")
+            description = description if description else None
+
+            # Update trade
+            success, message = journal_repo.update_trade(
+                trade_id=trade_id,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                description=description,
+            )
+
+            if success:
+                typer.echo(f"\n✅ {message}")
+            else:
+                typer.echo(f"\n❌ Error: {message}", err=True)
+                raise typer.Exit(code=1)
+
+        elif action == "close":
+            typer.echo("\n🔒 Close Trade\n")
+
+            # Get trade ID
+            trade_id = typer.prompt("Trade ID to close", type=int)
+
+            # Get current trade details
+            trade = journal_repo.get_trade_by_id(trade_id)
+            if not trade:
+                typer.echo(f"❌ Trade {trade_id} not found", err=True)
+                raise typer.Exit(code=1)
+
+            if trade["status"] == "closed":
+                typer.echo(f"❌ Trade {trade_id} is already closed", err=True)
+                raise typer.Exit(code=1)
+
+            typer.echo(f"\nClosing {trade['position_type']} position for {trade['ticker_symbol']}")
+            typer.echo(f"  Entry price: ${trade['entry_price']:.2f}")
+            typer.echo(f"  Position size: {trade['position_size']}")
+            typer.echo(f"  Entry amount: ${trade['total_entry_amount']:,.2f}")
+            typer.echo()
+
+            # Get exit date
+            exit_date_str = typer.prompt(
+                "Exit date (YYYY-MM-DD, or press Enter for today)",
+                default=date.today().strftime("%Y-%m-%d"),
+            )
+            try:
+                exit_date = datetime.strptime(exit_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                typer.echo("❌ Invalid date format", err=True)
+                raise typer.Exit(code=1) from None
+
+            # Get exit price
+            exit_price = typer.prompt("Exit price", type=float)
+
+            # Get exit fees
+            fees_exit = typer.prompt("Exit fees", type=float, default=0.0)
+
+            # Close trade
+            success, message, profit_loss = journal_repo.close_trade(
+                trade_id=trade_id,
+                exit_date=exit_date,
+                exit_price=exit_price,
+                fees_exit=fees_exit,
+            )
+
+            if success:
+                typer.echo(f"\n✅ {message}")
+                if profit_loss is not None:
+                    if profit_loss > 0:
+                        typer.echo(f"   💰 Profit: ${profit_loss:,.2f}", nl=False)
+                        typer.secho(" 📈", fg="green")
+                    else:
+                        typer.echo(f"   📉 Loss: ${profit_loss:,.2f}", nl=False)
+                        typer.secho(" 📉", fg="red")
+            else:
+                typer.echo(f"\n❌ Error: {message}", err=True)
+                raise typer.Exit(code=1)
+
+        elif action == "list":
+            typer.echo("\n📋 List Trades\n")
+
+            # Prompt for filter type
+            list_type = typer.prompt(
+                "List type",
+                type=typer.Choice(["open", "closed", "ticker", "all"], case_sensitive=False),
+            ).lower()
+
+            if list_type == "open":
+                trades = journal_repo.get_open_trades()
+                typer.echo(f"\n📂 Open Trades ({len(trades)}):")
+            elif list_type == "closed":
+                trades = journal_repo.get_closed_trades()
+                typer.echo(f"\n📂 Closed Trades ({len(trades)}):")
+            elif list_type == "ticker":
+                ticker = typer.prompt("Ticker symbol").strip().upper()
+                trades = journal_repo.get_trade_history(ticker)
+                typer.echo(f"\n📂 Trades for {ticker} ({len(trades)}):")
+            else:  # all
+                open_trades = journal_repo.get_open_trades()
+                closed_trades = journal_repo.get_closed_trades()
+                trades = open_trades + closed_trades
+                typer.echo(f"\n📂 All Trades ({len(trades)}):")
+
+            if not trades:
+                typer.echo("  No trades found")
+            else:
+                # Display trades in a table
+                from rich.console import Console
+                from rich.table import Table
+
+                table = Table(show_header=True, header_style="bold cyan")
+                table.add_column("ID", style="dim", width=6)
+                table.add_column("Ticker", style="green", width=8)
+                table.add_column("Type", width=6)
+                table.add_column("Entry", justify="right", width=10)
+                table.add_column("Size", justify="right", width=8)
+                table.add_column("Status", width=8)
+                table.add_column("P&L", justify="right", width=12)
+                table.add_column("P&L %", justify="right", width=8)
+
+                for trade in trades:
+                    pl_str = (
+                        f"${trade['profit_loss']:,.2f}" if trade["profit_loss"] is not None else "-"
+                    )
+                    pl_pct_str = (
+                        f"{trade['profit_loss_pct']:.2f}%"
+                        if trade["profit_loss_pct"] is not None
+                        else "-"
+                    )
+
+                    pl_style = "green" if (trade["profit_loss"] or 0) > 0 else "red"
+
+                    table.add_row(
+                        str(trade["id"]),
+                        trade["ticker_symbol"],
+                        trade["position_type"],
+                        f"${trade['entry_price']:.2f}",
+                        f"{trade['position_size']:.2f}",
+                        trade["status"],
+                        f"[{pl_style}]{pl_str}[/{pl_style}]",
+                        f"[{pl_style}]{pl_pct_str}[/{pl_style}]",
+                    )
+
+                console = Console()
+                console.print(table)
+
+        elif action == "view":
+            typer.echo("\n🔍 View Trade Details\n")
+
+            # Get trade ID
+            trade_id = typer.prompt("Trade ID", type=int)
+
+            # Get trade
+            trade = journal_repo.get_trade_by_id(trade_id)
+            if not trade:
+                typer.echo(f"❌ Trade {trade_id} not found", err=True)
+                raise typer.Exit(code=1)
+
+            # Display trade details
+            typer.echo(f"\n{'=' * 60}")
+            typer.echo(f"Trade #{trade['id']} - {trade['ticker_symbol']} ({trade['ticker_name']})")
+            typer.echo(f"{'=' * 60}\n")
+
+            typer.echo("📊 Position Details:")
+            typer.echo(f"  Type: {trade['position_type'].upper()}")
+            typer.echo(f"  Status: {trade['status'].upper()}")
+            typer.echo()
+
+            typer.echo("📥 Entry:")
+            typer.echo(f"  Date: {trade['entry_date']}")
+            typer.echo(f"  Price: ${trade['entry_price']:.2f}")
+            typer.echo(f"  Size: {trade['position_size']}")
+            typer.echo(f"  Fees: ${trade['fees_entry']:.2f}")
+            typer.echo(f"  Total: ${trade['total_entry_amount']:,.2f}")
+            typer.echo()
+
+            typer.echo("🎯 Risk Management:")
+            typer.echo(
+                f"  Stop Loss: ${trade['stop_loss']:.2f}"
+                if trade["stop_loss"]
+                else "  Stop Loss: Not set"
+            )
+            typer.echo(
+                f"  Take Profit: ${trade['take_profit']:.2f}"
+                if trade["take_profit"]
+                else "  Take Profit: Not set"
+            )
+            typer.echo()
+
+            if trade["status"] == "closed":
+                typer.echo("📤 Exit:")
+                typer.echo(f"  Date: {trade['exit_date']}")
+                typer.echo(f"  Price: ${trade['exit_price']:.2f}")
+                typer.echo(f"  Fees: ${trade['fees_exit']:.2f}")
+                typer.echo(f"  Total: ${trade['total_exit_amount']:,.2f}")
+                typer.echo()
+
+                typer.echo("💰 Performance:")
+                pl_color = "green" if trade["profit_loss"] > 0 else "red"
+                typer.echo("  P&L: ", nl=False)
+                typer.secho(f"${trade['profit_loss']:,.2f}", fg=pl_color)
+                typer.echo("  P&L %: ", nl=False)
+                typer.secho(f"{trade['profit_loss_pct']:.2f}%", fg=pl_color)
+                typer.echo()
+
+            if trade["description"]:
+                typer.echo("📝 Notes:")
+                typer.echo(f"  {trade['description']}")
+                typer.echo()
+
+            typer.echo("⏱️  Timestamps:")
+            typer.echo(f"  Created: {trade['created_at']}")
+            typer.echo(f"  Updated: {trade['updated_at']}")
+            typer.echo(f"\n{'=' * 60}\n")
+
+        else:
+            typer.echo(f"❌ Unknown action: {action}", err=True)
+            typer.echo("Valid actions: add, update, close, list, view")
+            raise typer.Exit(code=1)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Trading journal error: {e}", exc_info=True)
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1) from e
 
