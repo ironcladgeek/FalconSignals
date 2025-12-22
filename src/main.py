@@ -3215,12 +3215,12 @@ def journal(
                 table.add_column("ID", style="dim", width=6)
                 table.add_column("Ticker", style="green", width=8)
                 table.add_column("Type", width=6)
-                table.add_column("Currency", width=8)
                 table.add_column("Entry Date", width=12)
                 table.add_column("Entry", justify="right", width=10)
+                table.add_column("Currency", width=8)
+                table.add_column("Size", justify="right", width=8)
                 table.add_column("Exit Date", width=12)
                 table.add_column("Exit", justify="right", width=10)
-                table.add_column("Size", justify="right", width=8)
                 table.add_column("Status", width=8)
                 table.add_column("P&L", justify="right", width=12)
                 table.add_column("P&L %", justify="right", width=8)
@@ -3257,12 +3257,12 @@ def journal(
                         str(trade["id"]),
                         trade["ticker_symbol"],
                         trade["position_type"],
-                        currency,
                         str(trade["entry_date"]),
                         entry_str,
+                        currency,
+                        f"{trade['position_size']:.2f}",
                         exit_date_str,
                         exit_str,
-                        f"{trade['position_size']:.2f}",
                         trade["status"],
                         f"[{pl_style}]{pl_str}[/{pl_style}]",
                         f"[{pl_style}]{pl_pct_str}[/{pl_style}]",
