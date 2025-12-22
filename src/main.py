@@ -3412,8 +3412,8 @@ def journal(
                 try:
                     # Fetch latest price using get_latest_price method
                     price_obj = provider_manager.get_latest_price(ticker)
-                    if price_obj and price_obj.close:
-                        current_price = price_obj.close
+                    if price_obj and price_obj.close_price:
+                        current_price = price_obj.close_price
 
                         # Calculate unrealized P&L
                         entry_amount = trade["total_entry_amount"]
