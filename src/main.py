@@ -3215,15 +3215,36 @@ def journal(
                 table.add_column("ID", style="dim", width=6)
                 table.add_column("Ticker", style="green", width=8)
                 table.add_column("Type", width=6)
-                table.add_column("Entry", justify="right", width=10)
+                table.add_column("Entry Date", width=12)
+                table.add_column("Entry", justify="right", width=12)
+                table.add_column("Exit Date", width=12)
+                table.add_column("Exit", justify="right", width=12)
                 table.add_column("Size", justify="right", width=8)
                 table.add_column("Status", width=8)
                 table.add_column("P&L", justify="right", width=12)
                 table.add_column("P&L %", justify="right", width=8)
 
                 for trade in trades:
+                    currency = trade.get("currency", "USD")
+
+                    # Format entry price with currency
+                    entry_str = f"{currency} {trade['entry_price']:.2f}"
+
+                    # Format exit price with currency (if closed)
+                    exit_str = (
+                        f"{currency} {trade['exit_price']:.2f}"
+                        if trade["exit_price"] is not None
+                        else "-"
+                    )
+
+                    # Format exit date (if closed)
+                    exit_date_str = str(trade["exit_date"]) if trade["exit_date"] else "-"
+
+                    # Format P&L with currency
                     pl_str = (
-                        f"${trade['profit_loss']:,.2f}" if trade["profit_loss"] is not None else "-"
+                        f"{currency} {trade['profit_loss']:,.2f}"
+                        if trade["profit_loss"] is not None
+                        else "-"
                     )
                     pl_pct_str = (
                         f"{trade['profit_loss_pct']:.2f}%"
@@ -3237,7 +3258,10 @@ def journal(
                         str(trade["id"]),
                         trade["ticker_symbol"],
                         trade["position_type"],
-                        f"${trade['entry_price']:.2f}",
+                        str(trade["entry_date"]),
+                        entry_str,
+                        exit_date_str,
+                        exit_str,
                         f"{trade['position_size']:.2f}",
                         trade["status"],
                         f"[{pl_style}]{pl_str}[/{pl_style}]",
