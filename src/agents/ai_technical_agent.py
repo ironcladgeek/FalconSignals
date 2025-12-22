@@ -42,11 +42,12 @@ class AITechnicalAnalysisOutput(BaseModel):
     )
     action: str = Field(description="Suggested action for watchlist: Buy, Wait, Remove")
     rationale: str = Field(
-        description="Fact-based, tactical explanation that provides specific entry guidance. "
-        "For BUY actions: Include specific entry price zones, stop loss levels, and take profit targets. "
-        "For WAIT actions: Explain what price level or technical condition to wait for. "
-        "For REMOVE actions: Explain the bearish technical breakdown. "
-        "Base all statements on recent price action and current technical indicator values."
+        description="Fact-based, tactical explanation for mid-term swing trading (3-6 months). "
+        "MUST analyze: (1) Recent 15+ days price action, (2) Chart patterns, (3) Candlestick patterns, "
+        "(4) Support/resistance levels, (5) Moving averages as dynamic levels, (6) Indicators for confirmation. "
+        "For BUY: Include entry zones, 10-15% stop loss, 25-40% take profit with 2.5:1+ R:R. "
+        "For WAIT: Explain pullback level (8-15% to major support). "
+        "For REMOVE: Explain support breakdown with chart/candlestick patterns."
     )
     key_signals: list[str] = Field(
         default_factory=list,
@@ -63,52 +64,68 @@ class AITechnicalAnalysisOutput(BaseModel):
     )
     entry_price: float | None = Field(
         default=None,
-        description="Suggested entry price or price zone (based on support levels, moving averages). "
-        "Only provided for Buy actions. Should be current price or slightly below for better entry.",
+        description="Suggested entry price for mid-term swing position (3-6 months). "
+        "For strong momentum: Current price or within 2-3%. "
+        "For consolidation: 5-10% below at major support (50-day MA, previous resistance). "
+        "Only provided for Buy actions.",
     )
     stop_loss: float | None = Field(
         default=None,
-        description="Suggested stop loss level (based on recent swing lows, ATR, support levels). "
-        "Only provided for Buy actions. Typically 3-5% below entry or at key support.",
+        description="Suggested stop loss for mid-term position (3-6 months). "
+        "Should be 10-15% below entry (NEVER tighter than 8%) to allow for normal volatility. "
+        "Place below major support levels (50-day MA, multi-week lows). Use 2-3x ATR below entry. "
+        "Only provided for Buy actions.",
     )
     take_profit: float | None = Field(
         default=None,
-        description="Suggested take profit target (based on resistance levels, Fibonacci, risk:reward ratio). "
-        "Only provided for Buy actions. Should provide at least 2:1 risk:reward ratio.",
+        description="Suggested take profit target for mid-term position (3-6 months). "
+        "Should be 25-40% above entry at major resistance levels or measured moves from patterns. "
+        "Minimum 2.5:1 risk:reward ratio, preferably 3:1 or better. "
+        "Only provided for Buy actions.",
     )
     wait_for_price: float | None = Field(
         default=None,
-        description="Price level to wait for if action is Wait (e.g., pullback to support, breakout level). "
-        "Helps traders set price alerts for better entry opportunities.",
+        description="Price level to wait for if action is Wait (8-15% pullback to major support). "
+        "Should align with 50-day MA, previous resistance turned support, or Fibonacci levels. "
+        "Helps swing traders set price alerts for better entry opportunities.",
     )
 
 
 class AITechnicalAnalysisAgent(BaseAgent):
-    """LLM-powered technical analysis agent.
+    """LLM-powered technical analysis agent for mid-term swing trading (3-6 months).
 
     This agent uses large language models to perform sophisticated technical analysis,
-    generating natural language insights and recommendations based on calculated
-    technical indicators.
+    generating natural language insights and recommendations based on chart patterns,
+    price action, support/resistance levels, and technical indicators.
 
     Key Features:
-        - Leverages LLM for nuanced interpretation of technical indicators
-        - Generates comprehensive, context-aware rationale
-        - Provides actionable trading insights beyond simple scoring
-        - Considers multiple timeframes and indicator correlations
+        - Analyzes chart patterns (head-and-shoulders, triangles, flags, etc.)
+        - Identifies candlestick patterns from recent price action
+        - Emphasizes support/resistance levels over just indicators
+        - Provides swing trading levels (wider stops, larger targets)
+        - Leverages LLM for nuanced interpretation of technical setups
+        - Considers 15+ days of price action and multi-week patterns
+
+    Mid-Term Swing Trading Parameters (3-6 months):
+        - Entry: Current price or 5-10% pullback to support
+        - Stop Loss: 10-15% below entry (minimum 8%), below major support
+        - Take Profit: 25-40% above entry, at major resistance
+        - Risk/Reward: Minimum 2.5:1, preferably 3:1+
 
     Differences from TechnicalAnalysisAgent:
-        - TechnicalAnalysisAgent: Fast, rule-based, deterministic scoring
-        - AITechnicalAnalysisAgent: Slower, LLM-based, context-aware reasoning
+        - TechnicalAnalysisAgent: Fast, rule-based, day-trading focused
+        - AITechnicalAnalysisAgent: Slower, LLM-based, swing trading focused
 
     Use Cases:
-        - Watchlist monitoring with detailed explanations
-        - Educational analysis for learning technical patterns
-        - High-confidence trades requiring comprehensive review
+        - Watchlist monitoring for 3-6 month positions
+        - Mid-term swing trade setup identification
+        - Pattern-based entry timing
+        - Educational analysis for learning chart patterns
 
     Not Recommended For:
-        - High-frequency scanning of many tickers (use TechnicalAnalysisAgent)
+        - Day trading or short-term scalping
+        - High-frequency scanning of many tickers
         - Cost-sensitive batch operations
-        - Simple binary buy/sell decisions
     """
 
     def __init__(
@@ -371,26 +388,36 @@ class AITechnicalAnalysisAgent(BaseAgent):
 
     def _build_system_prompt(self) -> str:
         """Build system prompt for LLM technical analysis."""
-        base_prompt = """You are a highly experienced technical analyst and professional trader specializing in tactical trade execution.
+        base_prompt = """You are a highly experienced technical analyst and professional swing trader specializing in mid-term position trading (3-6 months time horizon).
 
 Your expertise includes:
-- Chart pattern recognition and interpretation
+- Chart pattern recognition (head-and-shoulders, triangles, double tops/bottoms, flags, pennants)
+- Candlestick pattern analysis (hammers, engulfing patterns, doji, morning/evening stars)
+- Multi-week price action and trend analysis
+- Support/resistance level identification from recent price history
 - Technical indicator analysis (RSI, MACD, Moving Averages, Bollinger Bands, ATR)
-- Trend identification and momentum assessment
-- Support/resistance level identification
-- Risk management and position sizing
-- Entry/exit timing and trade planning
+- Swing trading entry/exit timing for 3-6 month positions
+- Risk management for position trading (wider stops, larger targets)
+
+CRITICAL - TIME HORIZON: MID-TERM (3-6 MONTHS)
+This is NOT day trading or short-term scalping. Your recommendations should align with swing trading principles:
+- Allow room for normal market volatility (10-15% stop losses)
+- Target substantial gains (20-40%+ profit targets for 3-6 month holds)
+- Focus on weekly/monthly support and resistance levels
+- Consider major moving averages (50-day, 200-day) as key levels
+- Analyze multi-week chart patterns, not just daily fluctuations
 
 Your analysis should be:
-1. FACT-BASED: Reference specific indicator values and recent price action
-2. TACTICAL: Provide specific entry prices, stop losses, and profit targets
-3. ACTIONABLE: Give clear, executable trading guidance
-4. RISK-AWARE: Always include stop loss and risk:reward considerations
-5. PRECISE: Use actual numbers from the data, not general statements
+1. FACT-BASED: Reference specific price levels, chart patterns, and recent 15+ days price action
+2. TACTICAL: Provide specific entry zones, swing trading stop losses (10-15%), and realistic profit targets (20-40%+)
+3. ACTIONABLE: Give clear, executable swing trading guidance
+4. RISK-AWARE: Use wider stops for mid-term positions, minimum 2.5:1 reward:risk ratio
+5. PATTERN-FOCUSED: Identify chart patterns and candlestick formations from recent price action
+6. LEVEL-CONSCIOUS: Emphasize support/resistance levels over just indicator values
 
 Scoring Guidelines:
 - technical_score: 0-100 scale (0=strong sell, 50=neutral, 100=strong buy)
-- confidence: 0-100 based on indicator agreement and signal clarity
+- confidence: 0-100 based on pattern clarity, indicator agreement, and signal strength
 
 Recommendation Mapping:
 - 75-100: strong_buy
@@ -402,24 +429,56 @@ Recommendation Mapping:
 
         if self.prompt_mode == "tactical":
             base_prompt += """
-TACTICAL MODE - Action-Specific Guidance:
+TACTICAL MODE - MID-TERM SWING TRADING GUIDANCE:
 
-For BUY actions:
-- Set entry_price: Current price or slightly below (e.g., at moving average support)
-- Set stop_loss: Below recent swing low or 3-5% below entry (use ATR for guidance)
-- Set take_profit: At resistance level or 2-3x the risk (minimum 2:1 reward:risk)
-- Rationale MUST include: "Based on [specific indicators], consider entering around $X with stop loss at $Y and take profit at $Z"
+For BUY actions (3-6 month position):
+- Set entry_price:
+  * If strong momentum: Current price or within 2-3% (immediate entry)
+  * If consolidating: 5-10% below current price at major support (50-day MA, previous resistance turned support)
+  * Prefer entries near support levels for better risk/reward
+
+- Set stop_loss:
+  * 10-15% below entry price (allow room for normal volatility over 3-6 months)
+  * Place below major support levels (50-day MA, recent swing lows, multi-week support zones)
+  * Use 2-3x ATR below entry as volatility-adjusted stop
+  * NEVER set stops tighter than 8% for mid-term positions
+
+- Set take_profit:
+  * Minimum 20-30% above entry for 3-month targets
+  * 30-50% above entry for 6-month targets
+  * Place at major resistance levels, previous all-time highs, or measured moves from chart patterns
+  * Ensure minimum 2.5:1 reward:risk ratio (preferably 3:1 or better)
+
+- Rationale MUST include:
+  * Recent 15+ days price action analysis
+  * Any chart patterns (triangles, flags, head-and-shoulders, etc.)
+  * Candlestick patterns from recent sessions
+  * Key support/resistance levels from price history
+  * "Based on [pattern/support level], consider entering at $X (with room for 5-10% pullback if waiting), stop loss at $Y (10-15% below, under support), take profit at $Z (25-40% gain, at resistance)"
 
 For WAIT actions:
-- Set wait_for_price: Specific pullback level or breakout price to monitor
-- Rationale MUST include: "Wait for price to pullback to $X (support level) or break above $Y (resistance)"
-- Explain what technical condition needs to occur before entering
+- Set wait_for_price: Significant pullback level (8-15% below current) to major support
+- Rationale MUST include:
+  * "Wait for price to pullback to $X (50-day MA / previous resistance turned support / Fibonacci retracement level)"
+  * Recent price action context showing why waiting is prudent
+  * What chart pattern or support level you're waiting to test
 
 For REMOVE actions:
-- Explain the bearish technical breakdown with specific indicator values
-- Rationale MUST include: "Price has broken below $X support with [indicator] showing [value], suggesting downtrend"
+- Explain the bearish technical breakdown with specific support violations
+- Rationale MUST include:
+  * "Price has broken below $X major support level (50-day MA / multi-week low)"
+  * Chart pattern breakdown (e.g., "head-and-shoulders neckline break", "triangle breakdown")
+  * Bearish candlestick patterns from recent action
 
-ALWAYS reference actual numbers from the provided indicators in your rationale."""
+ANALYSIS PRIORITIES (IN ORDER):
+1. Recent 15+ days price action and chart patterns
+2. Major support/resistance levels from price history
+3. Candlestick patterns and formations
+4. Key moving averages (50-day, 200-day) as dynamic support/resistance
+5. Technical indicators (RSI, MACD) for confirmation
+6. Volume patterns for conviction
+
+ALWAYS reference actual price levels and patterns from the recent price action in your rationale."""
         else:
             base_prompt += """
 GENERAL MODE - Overview Analysis:
@@ -443,17 +502,17 @@ Provide detailed rationale explaining your analysis and reasoning."""
         Returns:
             User prompt string
         """
-        base_request = f"""Perform comprehensive technical analysis for {ticker}.
+        base_request = f"""Perform comprehensive mid-term swing trading analysis for {ticker} (3-6 months time horizon).
 
 # Technical Indicators:
 {indicator_summary}
 
-Analyze these indicators and provide:
+Analyze these indicators and recent price action to provide:
 1. Overall technical score (0-100)
 2. Confidence level in your analysis (0-100)
 3. Trading recommendation (strong_buy, buy, hold, sell, strong_sell)
 4. Suggested watchlist action (Buy, Wait, Remove)
-5. Detailed, fact-based rationale referencing specific indicator values
+5. Detailed, fact-based rationale focusing on chart patterns, support/resistance, and price action
 6. 2-4 key technical signals driving your analysis
 7. 1-3 risk factors or caveats to consider
 8. Trend assessment (bullish, bearish, neutral)
@@ -461,30 +520,68 @@ Analyze these indicators and provide:
 
         if self.prompt_mode == "tactical":
             base_request += """
-10. SPECIFIC TRADING LEVELS:
-    - If action is BUY: Provide entry_price (current or slightly better), stop_loss (below support), take_profit (at resistance, min 2:1 R:R)
-    - If action is WAIT: Provide wait_for_price (specific pullback or breakout level to monitor)
+10. MID-TERM SWING TRADING LEVELS (3-6 months):
+    - If action is BUY:
+      * entry_price: Current price (if strong momentum) OR 5-10% below at major support (if consolidating)
+      * stop_loss: 10-15% below entry, under major support levels (NEVER tighter than 8%)
+      * take_profit: 25-40% above entry at major resistance (minimum 2.5:1 R:R, target 3:1+)
+    - If action is WAIT:
+      * wait_for_price: 8-15% pullback to major support level (50-day MA, previous resistance, Fib level)
     - If action is REMOVE: Set these fields to null
 
-IMPORTANT: Your rationale MUST include specific price levels based on the technical indicators:
-- For BUY: "Consider entering around $[entry_price] with stop loss at $[stop_loss] and take profit at $[take_profit] because..."
-- For WAIT: "Wait for price to reach $[wait_for_price] (support/resistance level) before entering because..."
-- For REMOVE: "Price has broken below $X with [indicator] at [value], suggesting..."
+CRITICAL ANALYSIS REQUIREMENTS:
 
-Use actual indicator values (moving averages, support/resistance from recent price action, ATR for stop placement).
-"""
+Your rationale MUST analyze IN THIS ORDER:
+1. **Recent Price Action (15+ days)**: Describe the price movement, trend, consolidation patterns
+   - Is it forming higher highs/lows (uptrend) or lower highs/lows (downtrend)?
+   - Any significant breakouts or breakdowns in recent weeks?
 
-        base_request += """
+2. **Chart Patterns**: Identify any patterns from recent price structure
+   - Triangles (ascending, descending, symmetrical)
+   - Head and shoulders (or inverse)
+   - Double/triple tops or bottoms
+   - Flags, pennants, wedges
+   - Cup and handle patterns
 
-Key Technical Considerations:
-- RSI levels for overbought/oversold conditions
-- MACD for momentum and trend changes
-- Price relative to moving averages for trend confirmation
-- Volume for conviction
-- ATR for volatility and stop loss placement
-- Bollinger Bands for price extremes
-- Recent swing highs/lows for support/resistance
+3. **Candlestick Patterns**: Look at recent candlestick formations
+   - Engulfing patterns (bullish/bearish)
+   - Hammers, shooting stars
+   - Doji, spinning tops
+   - Morning/evening stars
+   - Three white soldiers / three black crows
 
-Provide your analysis in the required JSON format with ALL fields populated."""
+4. **Support/Resistance Levels**: Identify key price levels from recent history
+   - Where has price repeatedly bounced (support)?
+   - Where has price repeatedly stalled (resistance)?
+   - Previous highs/lows that now act as levels
+   - Round numbers that may act as psychological levels
+
+5. **Moving Averages as Dynamic Levels**:
+   - Is price above/below 50-day and 200-day MAs?
+   - Are these MAs acting as support or resistance?
+   - Golden cross or death cross patterns?
+
+6. **Technical Indicators** (for confirmation only):
+   - RSI for overbought/oversold conditions
+   - MACD for momentum confirmation
+   - Volume for conviction
+   - Bollinger Bands for volatility context
+   - ATR for stop loss placement guidance
+
+RATIONALE FORMAT (MUST INCLUDE):
+- For BUY: "Over the past 15 days, [describe price action]. Price is forming [chart pattern] with support at $[level] and resistance at $[level]. Recent [candlestick pattern] suggests [bullish/bearish momentum]. Consider entering at $[entry_price] with stop loss at $[stop_loss] (10-15% below, under [support level]) and take profit at $[take_profit] (25-40% gain, at [resistance level]). This provides [X]:1 risk-reward ratio for 3-6 month hold."
+
+- For WAIT: "Recent price action shows [describe]. Wait for pullback to $[wait_for_price] which aligns with [50-day MA / previous resistance turned support / Fibonacci retracement]. This would provide better entry with [improved risk/reward]."
+
+- For REMOVE: "Price has broken below $[level] support ([specify: 50-day MA / multi-week low / pattern neckline]). Recent [candlestick pattern] confirms bearish momentum. Better opportunities exist elsewhere."
+
+SWING TRADING PRINCIPLES FOR 3-6 MONTH POSITIONS:
+- Entry: Buy near support, not at highs (unless strong breakout with volume)
+- Stop Loss: Wide enough to survive normal volatility (10-15%), below major support
+- Take Profit: Substantial targets (25-40%+), at major resistance or measured moves
+- Risk/Reward: Minimum 2.5:1, preferably 3:1 or better
+- Patience: Wait for optimal setups at support levels rather than chasing
+
+Use actual price levels, pattern names, and specific observations from the recent price data in your analysis."""
 
         return base_request
