@@ -3020,6 +3020,9 @@ def journal(
             # Get entry price
             entry_price = typer.prompt("Entry price", type=float)
 
+            # Get currency (optional)
+            currency = typer.prompt("Currency (optional)", default="USD").strip().upper()
+
             # Get position size
             position_size = typer.prompt("Position size (number of shares)", type=float)
 
@@ -3045,9 +3048,6 @@ def journal(
                 "Recommendation ID (optional, press Enter to skip)", default=""
             )
             recommendation_id = int(recommendation_id_str) if recommendation_id_str else None
-
-            # Get currency (optional)
-            currency = typer.prompt("Currency", default="USD").strip().upper()
 
             # Create trade
             success, message, trade_id = journal_repo.create_trade(
@@ -3213,9 +3213,6 @@ def journal(
                 typer.echo("  No trades found")
             else:
                 # Display trades in a table
-                from rich.console import Console
-                from rich.table import Table
-
                 table = Table(show_header=True, header_style="bold cyan")
                 table.add_column("ID", style="dim", width=6)
                 table.add_column("Ticker", style="green", width=8)
