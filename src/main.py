@@ -2935,7 +2935,7 @@ def journal(
         None,
         "--action",
         "-a",
-        help="Action to perform: add, update, close, list, view",
+        help="Action to perform: add, update, close, list, view, performance",
     ),
     config: Path = typer.Option(  # noqa: B008
         None,
@@ -2964,6 +2964,9 @@ def journal(
 
         # View trade details
         journal --action view
+
+        # View performance statistics
+        journal --action performance
     """
     try:
         # Load config
@@ -2983,11 +2986,12 @@ def journal(
         if not action:
             typer.echo("\n📒 Trading Journal\n")
             typer.echo("Available actions:")
-            typer.echo("  add    - Add a new trade")
-            typer.echo("  update - Update an open trade")
-            typer.echo("  close  - Close an open trade")
-            typer.echo("  list   - List trades")
-            typer.echo("  view   - View trade details")
+            typer.echo("  add         - Add a new trade")
+            typer.echo("  update      - Update an open trade")
+            typer.echo("  close       - Close an open trade")
+            typer.echo("  list        - List trades")
+            typer.echo("  view        - View trade details")
+            typer.echo("  performance - View performance statistics")
             typer.echo()
             action = typer.prompt("Select action")
 
@@ -3340,9 +3344,229 @@ def journal(
             typer.echo(f"  Updated: {trade['updated_at']}")
             typer.echo(f"\n{'=' * 60}\n")
 
+        elif action == "performance":
+            typer.echo("\n📊 Performance Statistics\n")
+
+            # Prompt for date range (optional)
+            start_date_str = typer.prompt(
+                "Start date (YYYY-MM-DD, press Enter for all)", default=""
+            )
+            end_date_str = typer.prompt("End date (YYYY-MM-DD, press Enter for all)", default="")
+
+            start_date = None
+            end_date = None
+
+            if start_date_str:
+                try:
+                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    typer.echo("❌ Invalid start date format", err=True)
+                    raise typer.Exit(code=1) from None
+
+            if end_date_str:
+                try:
+                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    typer.echo("❌ Invalid end date format", err=True)
+                    raise typer.Exit(code=1) from None
+
+            # Get closed trades for realized P&L
+            closed_trades = journal_repo.get_closed_trades(start_date=start_date, end_date=end_date)
+
+            # Get open trades for unrealized P&L
+            open_trades = journal_repo.get_open_trades()
+
+            # Filter open trades by entry date if date range specified
+            if start_date or end_date:
+                filtered_open = []
+                for trade in open_trades:
+                    entry_date = trade["entry_date"]
+                    if isinstance(entry_date, str):
+                        entry_date = datetime.strptime(entry_date, "%Y-%m-%d").date()
+                    if start_date and entry_date < start_date:
+                        continue
+                    if end_date and entry_date > end_date:
+                        continue
+                    filtered_open.append(trade)
+                open_trades = filtered_open
+
+            # Initialize provider manager for fetching current prices
+            from src.data.provider_manager import ProviderManager
+
+            provider_manager = ProviderManager(
+                primary_provider=config_obj.data.primary_provider,
+                backup_providers=config_obj.data.backup_providers,
+                db_path=config_obj.database.db_path if config_obj.database.enabled else None,
+                historical_data_lookback_days=config_obj.analysis.historical_data_lookback_days,
+            )
+
+            typer.echo("\n⏳ Fetching current prices for open positions...")
+
+            # Calculate unrealized P&L for open trades
+            unrealized_pl = 0.0
+            unrealized_pl_pct_list = []
+            open_positions_with_prices = []
+
+            for trade in open_trades:
+                ticker = trade["ticker_symbol"]
+                try:
+                    # Fetch current price
+                    price_data = provider_manager.get_current_price(ticker)
+                    if price_data and "price" in price_data:
+                        current_price = price_data["price"]
+
+                        # Calculate unrealized P&L
+                        entry_amount = trade["total_entry_amount"]
+                        position_size = trade["position_size"]
+                        position_type = trade["position_type"]
+
+                        if position_type == "long":
+                            current_value = (current_price * position_size) - (
+                                trade["fees_entry"] or 0
+                            )
+                            trade_pl = current_value - entry_amount
+                        else:  # short
+                            current_value = (
+                                (trade["entry_price"] * position_size * 2)
+                                - (current_price * position_size)
+                                - (trade["fees_entry"] or 0)
+                            )
+                            trade_pl = current_value - entry_amount
+
+                        trade_pl_pct = (trade_pl / entry_amount) * 100 if entry_amount > 0 else 0
+
+                        unrealized_pl += trade_pl
+                        unrealized_pl_pct_list.append(trade_pl_pct)
+                        open_positions_with_prices.append(
+                            {
+                                **trade,
+                                "current_price": current_price,
+                                "unrealized_pl": trade_pl,
+                                "unrealized_pl_pct": trade_pl_pct,
+                            }
+                        )
+                    else:
+                        typer.echo(f"  ⚠️  Could not fetch price for {ticker}")
+                except Exception as e:
+                    typer.echo(f"  ❌ Error fetching price for {ticker}: {e}")
+
+            # Calculate realized P&L from closed trades
+            realized_pl = sum(trade["profit_loss"] or 0 for trade in closed_trades)
+            realized_pl_pct_list = [
+                trade["profit_loss_pct"] for trade in closed_trades if trade["profit_loss_pct"]
+            ]
+
+            # Calculate statistics
+            total_trades = len(closed_trades)
+            winning_trades = sum(1 for trade in closed_trades if (trade["profit_loss"] or 0) > 0)
+            losing_trades = sum(1 for trade in closed_trades if (trade["profit_loss"] or 0) < 0)
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+            avg_win = (
+                sum(
+                    trade["profit_loss"]
+                    for trade in closed_trades
+                    if (trade["profit_loss"] or 0) > 0
+                )
+                / winning_trades
+                if winning_trades > 0
+                else 0
+            )
+            avg_loss = (
+                sum(
+                    trade["profit_loss"]
+                    for trade in closed_trades
+                    if (trade["profit_loss"] or 0) < 0
+                )
+                / losing_trades
+                if losing_trades > 0
+                else 0
+            )
+
+            avg_realized_pl_pct = (
+                sum(realized_pl_pct_list) / len(realized_pl_pct_list) if realized_pl_pct_list else 0
+            )
+            avg_unrealized_pl_pct = (
+                sum(unrealized_pl_pct_list) / len(unrealized_pl_pct_list)
+                if unrealized_pl_pct_list
+                else 0
+            )
+
+            # Display results
+            typer.echo("\n" + "=" * 60)
+            typer.echo("📈 TRADING PERFORMANCE SUMMARY")
+            typer.echo("=" * 60)
+
+            if start_date or end_date:
+                date_range = f"{start_date or 'Beginning'} to {end_date or 'Present'}"
+                typer.echo(f"\n📅 Date Range: {date_range}")
+
+            # Realized Performance (Closed Trades)
+            typer.echo("\n💰 Realized Performance (Closed Trades):")
+            typer.echo(f"  Total closed trades: {total_trades}")
+            if total_trades > 0:
+                typer.echo(f"  Winning trades: {winning_trades} ({win_rate:.1f}%)")
+                typer.echo(f"  Losing trades: {losing_trades}")
+                pl_color = "green" if realized_pl > 0 else "red"
+                typer.echo("  Total realized P&L: ", nl=False)
+                typer.secho(f"${realized_pl:,.2f}", fg=pl_color)
+                typer.echo(f"  Average P&L per trade: ${realized_pl / total_trades:,.2f}")
+                typer.echo(f"  Average return: {avg_realized_pl_pct:.2f}%")
+                if winning_trades > 0:
+                    typer.echo(f"  Average win: ${avg_win:,.2f}")
+                if losing_trades > 0:
+                    typer.echo(f"  Average loss: ${avg_loss:,.2f}")
+                if winning_trades > 0 and losing_trades > 0:
+                    profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+                    typer.echo(f"  Profit factor: {profit_factor:.2f}")
+
+            # Unrealized Performance (Open Trades)
+            typer.echo("\n📊 Unrealized Performance (Open Trades):")
+            typer.echo(f"  Total open positions: {len(open_positions_with_prices)}")
+            if open_positions_with_prices:
+                unrealized_color = "green" if unrealized_pl > 0 else "red"
+                typer.echo("  Total unrealized P&L: ", nl=False)
+                typer.secho(f"${unrealized_pl:,.2f}", fg=unrealized_color)
+                avg_unrealized = unrealized_pl / len(open_positions_with_prices)
+                typer.echo(f"  Average unrealized P&L per position: ${avg_unrealized:,.2f}")
+                typer.echo(f"  Average unrealized return: {avg_unrealized_pl_pct:.2f}%")
+
+                # Show top 3 best and worst performing open positions
+                sorted_open = sorted(
+                    open_positions_with_prices, key=lambda x: x["unrealized_pl"], reverse=True
+                )
+
+                typer.echo("\n  📈 Top performing open positions:")
+                for i, pos in enumerate(sorted_open[:3], 1):
+                    pl_color = "green" if pos["unrealized_pl"] > 0 else "red"
+                    typer.echo(f"    {i}. {pos['ticker_symbol']}: ", nl=False)
+                    typer.secho(
+                        f"${pos['unrealized_pl']:,.2f} ({pos['unrealized_pl_pct']:.2f}%)",
+                        fg=pl_color,
+                    )
+
+                if len(sorted_open) > 3:
+                    typer.echo("\n  📉 Worst performing open positions:")
+                    for i, pos in enumerate(sorted_open[-3:][::-1], 1):
+                        pl_color = "green" if pos["unrealized_pl"] > 0 else "red"
+                        typer.echo(f"    {i}. {pos['ticker_symbol']}: ", nl=False)
+                        typer.secho(
+                            f"${pos['unrealized_pl']:,.2f} ({pos['unrealized_pl_pct']:.2f}%)",
+                            fg=pl_color,
+                        )
+
+            # Overall Performance
+            total_pl = realized_pl + unrealized_pl
+            typer.echo("\n🎯 Overall Performance:")
+            overall_color = "green" if total_pl > 0 else "red"
+            typer.echo("  Total P&L (realized + unrealized): ", nl=False)
+            typer.secho(f"${total_pl:,.2f}", fg=overall_color)
+
+            typer.echo("\n" + "=" * 60 + "\n")
+
         else:
             typer.echo(f"❌ Unknown action: {action}", err=True)
-            typer.echo("Valid actions: add, update, close, list, view")
+            typer.echo("Valid actions: add, update, close, list, view, performance")
             raise typer.Exit(code=1)
 
     except typer.Exit:
