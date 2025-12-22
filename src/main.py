@@ -3204,9 +3204,7 @@ def journal(
                 trades = journal_repo.get_trade_history(ticker)
                 typer.echo(f"\n📂 Trades for {ticker} ({len(trades)}):")
             else:  # all
-                open_trades = journal_repo.get_open_trades()
-                closed_trades = journal_repo.get_closed_trades()
-                trades = open_trades + closed_trades
+                trades = journal_repo.get_all_trades()
                 typer.echo(f"\n📂 All Trades ({len(trades)}):")
 
             if not trades:
