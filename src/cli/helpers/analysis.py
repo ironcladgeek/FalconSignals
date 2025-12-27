@@ -109,8 +109,8 @@ def run_llm_analysis(
                             task_tracker[0] = current
                             # Show which agent is working
                             agent_name = task_name.replace("_", " ").title()
-                            typer_instance.echo(f"  → {agent_name} ({current}/{total})", nl=False)
-                            typer_instance.echo("\r", nl=False)  # Carriage return to overwrite
+                            # Use regular newline instead of carriage return to avoid stdout pollution
+                            typer_instance.echo(f"  → {agent_name} ({current}/{total})")
 
                     # Analyze instrument - returns UnifiedAnalysisResult or None
                     unified_result = orchestrator.analyze_instrument(

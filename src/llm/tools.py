@@ -35,6 +35,20 @@ def tool_with_timeout(timeout_seconds=30):
                     logger.warning(
                         f"Tool {func.__name__} took {elapsed:.1f}s (exceeded {timeout_seconds}s timeout)"
                     )
+
+                # CRITICAL: Validate that result is not empty or whitespace-only
+                # This prevents Anthropic API error: "text content blocks must contain non-whitespace text"
+                if result is None or (isinstance(result, str) and not result.strip()):
+                    error_msg = f"Tool {func.__name__} returned empty or whitespace-only result"
+                    logger.error(error_msg)
+                    return json.dumps(
+                        {
+                            "error": error_msg,
+                            "tool": func.__name__,
+                            "note": "Tool execution completed but produced no output",
+                        }
+                    )
+
                 return result
             except TimeoutError as e:
                 logger.error(f"Tool {func.__name__} timed out after {timeout_seconds}s: {e}")
@@ -363,7 +377,7 @@ class CrewAIToolAdapter:
                         ),
                     )
 
-                    summary = (
+                    summary_text = (
                         f"Sentiment analysis for {ticker}: {total} articles analyzed with pre-calculated sentiment scores.\n"
                         f"Distribution: {positive} positive ({100 * positive / total:.1f}%), "
                         f"{negative} negative ({100 * negative / total:.1f}%), "
@@ -373,10 +387,24 @@ class CrewAIToolAdapter:
                         f"based on article recency and importance."
                     )
 
+                    # Return as JSON for consistency with other tools
+                    result = {
+                        "ticker": ticker,
+                        "total_articles": total,
+                        "distribution": {
+                            "positive": positive,
+                            "negative": negative,
+                            "neutral": neutral,
+                        },
+                        "average_sentiment_score": avg_score,
+                        "has_precalculated_scores": True,
+                        "summary": summary_text,
+                    }
+
                     logger.debug(
                         f"Sentiment analysis for {ticker}: {total} articles with pre-calculated scores"
                     )
-                    return summary
+                    return json.dumps(result, default=json_serial)
 
                 result = {
                     "ticker": ticker,

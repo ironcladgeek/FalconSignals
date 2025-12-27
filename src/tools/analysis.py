@@ -169,8 +169,9 @@ class TechnicalIndicatorTool(BaseTool):
             if "ratio" in vol:
                 output["volume_ratio"] = vol["ratio"]
 
-            # Include full results for advanced usage
-            output["full_analysis"] = results
+            # REMOVED: full_analysis duplicates all data, causing large tool outputs
+            # that break Pydantic conversion in CrewAI (Issue #107)
+            # All necessary data is already extracted to top-level output fields
 
             return output
 

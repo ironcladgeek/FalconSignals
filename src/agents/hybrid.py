@@ -65,9 +65,14 @@ class HybridAnalysisAgent:
             crew = Crew(
                 agents=[self.crewai_agent],
                 tasks=[task],
-                verbose=False,
+                verbose=True,  # Enable verbose for debugging Pydantic conversion
                 manager_llm=agent_llm,  # Ensure crew uses the same LLM
             )
+
+            # Execute crew and capture detailed error info
+            logger.debug(f"Starting CrewAI execution for task: {task.description[:100]}...")
+            logger.debug(f"Context provided: {list(context.keys()) if context else 'None'}")
+
             result = crew.kickoff(inputs=context)
 
             # Track token usage (approximate)
