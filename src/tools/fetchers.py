@@ -1058,7 +1058,7 @@ class NewsFetcherTool(BaseTool):
             as_of_date = None
             if self.historical_date:
                 as_of_date = datetime.combine(self.historical_date, datetime.max.time())
-                logger.info(f"Fetching news as of {self.historical_date} for {ticker}")
+                logger.debug(f"Fetching news as of {self.historical_date} for {ticker}")
 
             # Try to find existing cache with matching date range
             # Check for news cache files matching this ticker and date
@@ -1105,13 +1105,13 @@ class NewsFetcherTool(BaseTool):
             scoring_method = "api_provider"
             if self.use_local_sentiment and self.sentiment_analyzer:
                 try:
-                    logger.info(f"Applying FinBERT sentiment to {len(articles)} articles")
+                    logger.debug(f"Applying FinBERT sentiment to {len(articles)} articles")
                     sentiment_result = self.sentiment_analyzer.analyze_sentiment(
                         articles, method="local"
                     )
                     scoring_method = sentiment_result.get("method", "local_finbert")
                     # Articles are updated in-place by the analyzer
-                    logger.info(f"Sentiment scoring complete using {scoring_method}")
+                    logger.debug(f"Sentiment scoring complete using {scoring_method}")
                 except Exception as e:
                     logger.warning(f"Local sentiment scoring failed, using API scores: {e}")
                     scoring_method = "api_provider_fallback"

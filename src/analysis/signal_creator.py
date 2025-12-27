@@ -155,6 +155,8 @@ class SignalCreator:
         is_historical = analysis_date and analysis_date < date.today()
 
         if is_historical:
+            # Type assertion: if is_historical is True, analysis_date cannot be None
+            assert analysis_date is not None  # for type checker
             return self._fetch_historical_price(ticker, analysis_date)
         else:
             return self._fetch_current_price(ticker)
@@ -177,42 +179,88 @@ class SignalCreator:
             f"Fetching historical price for {ticker} on {target_date} (analysis is in the past)"
         )
 
-        # Try provider for historical data
-        if not self.provider_manager:
-            logger.warning(f"No provider_manager available for historical price fetch of {ticker}")
-            return None
-
+        # Try unified CSV storage first
         try:
-            # Fetch recent prices using period parameter (get 5 days to ensure we have target date)
-            prices = self.provider_manager.get_stock_prices(ticker, period="5d")
-            if not prices:
-                logger.warning(f"No historical prices found for {ticker} around {target_date}")
-                return None
+            price_data = self.price_manager.get_price_at_date(
+                ticker=ticker,
+                target_date=target_date,
+                tolerance_days=5,  # Allow up to 5 days back for weekends/holidays
+            )
+            if price_data:
+                price = float(price_data["close"])
+                currency = price_data.get("currency", "USD")
+                price_date = price_data["date"]
 
-            # Find exact date match
-            for price in prices:
-                price_date = price.date.date() if isinstance(price.date, datetime) else price.date
+                # Convert pandas Timestamp to date for comparison
+                if hasattr(price_date, "date"):
+                    price_date = price_date.date()
+
                 if price_date == target_date:
                     logger.debug(
-                        f"Found historical price for {ticker} on {target_date}: "
-                        f"${price.close_price}"
+                        f"Found exact historical price for {ticker} on {target_date}: ${price}"
                     )
-                    return (float(price.close_price), price.currency)
-
-            # If exact date not found, use most recent in range
-            if prices:
-                most_recent = prices[-1]
-                logger.warning(
-                    f"Exact price for {ticker} on {target_date} not found, "
-                    f"using most recent in range: ${most_recent.close_price} "
-                    f"from {most_recent.date}"
-                )
-                return (float(most_recent.close_price), most_recent.currency)
-
+                else:
+                    logger.info(
+                        f"Using closest available price for {ticker}: ${price} "
+                        f"from {price_date} (target: {target_date})"
+                    )
+                return (price, currency)
         except Exception as e:
-            logger.error(f"Failed to fetch historical price for {ticker} on {target_date}: {e}")
-            return None
+            logger.debug(f"Unified storage lookup failed for {ticker} on {target_date}: {e}")
 
+        # Fallback: Try provider for historical data if unified storage doesn't have it
+        if self.provider_manager:
+            try:
+                # Fetch a range around target date (±5 days) to handle weekends
+                from datetime import timedelta
+
+                start_date = target_date - timedelta(days=5)
+                end_date = target_date + timedelta(days=1)
+
+                prices = self.provider_manager.get_stock_prices(
+                    ticker, start_date=start_date, end_date=end_date
+                )
+                if not prices:
+                    logger.warning(f"No historical prices found for {ticker} around {target_date}")
+                    return None
+
+                # Find exact date match
+                for price in prices:
+                    price_date = (
+                        price.date.date() if isinstance(price.date, datetime) else price.date
+                    )
+                    if price_date == target_date:
+                        logger.debug(
+                            f"Found historical price for {ticker} on {target_date}: "
+                            f"${price.close_price} (from provider)"
+                        )
+                        return (float(price.close_price), price.currency)
+
+                # If exact date not found, use closest before target date
+                closest_before = None
+                for price in prices:
+                    price_date = (
+                        price.date.date() if isinstance(price.date, datetime) else price.date
+                    )
+                    if price_date <= target_date:
+                        if closest_before is None or price_date > closest_before[1]:
+                            closest_before = (price, price_date)
+
+                if closest_before:
+                    price_obj, price_date = closest_before
+                    logger.info(
+                        f"Using closest available price for {ticker}: ${price_obj.close_price} "
+                        f"from {price_date} (target: {target_date})"
+                    )
+                    return (float(price_obj.close_price), price_obj.currency)
+
+            except Exception as e:
+                logger.error(f"Failed to fetch historical price for {ticker} on {target_date}: {e}")
+                return None
+
+        logger.error(
+            f"Could not fetch historical price for {ticker} on {target_date} from any source"
+        )
         return None
 
     def _fetch_current_price(self, ticker: str) -> tuple[float, str] | None:

@@ -513,6 +513,11 @@ def analyze(
             typer.echo("\n🤖 Stage 2: Deep LLM-powered analysis")
             typer.echo(f"   LLM Provider: {config_obj.llm.provider}")
             typer.echo(f"   Model: {config_obj.llm.model}")
+            typer.echo(
+                f"   Analysis weights: Fundamental {config_obj.analysis.weight_fundamental:.0%}, "
+                f"Technical {config_obj.analysis.weight_technical:.0%}, "
+                f"Sentiment {config_obj.analysis.weight_sentiment:.0%}"
+            )
 
             signals, portfolio_manager = run_llm_analysis(
                 filtered_ticker_list,
@@ -530,6 +535,11 @@ def analyze(
         else:
             typer.echo("\n📊 Stage 2: Rule-based analysis")
             typer.echo("   Using technical indicators & fundamental metrics")
+            typer.echo(
+                f"   Analysis weights: Fundamental {config_obj.analysis.weight_fundamental:.0%}, "
+                f"Technical {config_obj.analysis.weight_technical:.0%}, "
+                f"Sentiment {config_obj.analysis.weight_sentiment:.0%}"
+            )
             # Pass historical context if available
             analysis_context = {}
             if historical_context_data:

@@ -158,7 +158,9 @@ class UnifiedNewsAggregator:
 
                     all_articles.extend(filtered)
                     sources_used.append(source.name)
-                    logger.info(f"Fetched {len(filtered)} articles from {source.name} for {ticker}")
+                    logger.debug(
+                        f"Fetched {len(filtered)} articles from {source.name} for {ticker}"
+                    )
 
             except Exception as e:
                 logger.warning(f"Error fetching news from {source.name} for {ticker}: {e}")
@@ -179,7 +181,7 @@ class UnifiedNewsAggregator:
         if self.cache_manager and result:
             self._cache_articles(ticker, result, sources_used, as_of_date)
 
-        logger.info(
+        logger.debug(
             f"Aggregated {len(result)} unique articles for {ticker} from sources: {sources_used}"
         )
 

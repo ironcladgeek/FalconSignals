@@ -67,7 +67,7 @@ class FinBERTSentimentScorer:
         self.max_length = max_length
         self.device = device  # None = auto-detect, or specific device
 
-        logger.info(
+        logger.debug(
             f"Initializing FinBERT scorer with model={self.model_name}, device={device or 'auto'}"
         )
 
@@ -80,7 +80,7 @@ class FinBERTSentimentScorer:
         if self._loaded:
             return
 
-        logger.info(f"Loading FinBERT model: {self.model_name}")
+        logger.debug(f"Loading FinBERT model: {self.model_name}")
 
         # Create pipeline with device auto-detection
         device_arg = self.device if self.device is not None else -1  # -1 = CPU, >=0 = GPU
@@ -93,7 +93,7 @@ class FinBERTSentimentScorer:
         )
 
         self._loaded = True
-        logger.info("FinBERT pipeline loaded successfully")
+        logger.debug("FinBERT pipeline loaded successfully")
 
     def score_text(self, text: str) -> SentimentScore:
         """Score sentiment for a single text.
@@ -209,7 +209,7 @@ class FinBERTSentimentScorer:
             article.sentiment = score.sentiment
             article.sentiment_score = score.score
 
-        logger.info(f"Updated {len(articles)} articles with FinBERT sentiment scores")
+        logger.debug(f"Updated {len(articles)} articles with FinBERT sentiment scores")
         return articles
 
     def get_aggregate_sentiment(

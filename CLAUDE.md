@@ -558,6 +558,45 @@ uv run python scripts/fix_historical_prices.py --apply
 - ✅ Backtesting accuracy improved
 - ✅ Performance tracking baseline prices are accurate
 
+### Bug Fix #3: SignalCreator Historical Price Fetching (December 2025)
+
+**Problem**: Even with Bug Fix #2, `SignalCreator._fetch_historical_price()` was still using incorrect historical prices. It called `provider_manager.get_stock_prices(ticker, period="5d")` which fetches the LAST 5 days from TODAY, not from the historical target date.
+
+**Example**: Analyzing NVDA on 2025-09-10 (price was $177.33) showed warning:
+```
+WARNING - Exact price for NVDA on 2025-09-10 not found, using most recent in range:
+$190.53 from 2025-12-26 00:00:00
+```
+
+This leaked future information into historical analysis, breaking backtesting validity.
+
+**Root Cause**: The method fetched recent prices using `period="5d"` without specifying a date range, so the provider returned the last 5 days from the current date, not the historical target date.
+
+**Solution**:
+1. Use `PriceDataManager.get_price_at_date()` as primary method (reads from unified CSV storage)
+2. Falls back to provider with correct date range: `target_date ± 5 days`
+3. Improved logging to distinguish exact vs approximate date matches
+4. Added type assertion for pyright compliance
+
+**Files Modified**:
+- [src/analysis/signal_creator.py](src/analysis/signal_creator.py): Lines 162-266 (complete rewrite of `_fetch_historical_price`)
+
+**Verification**:
+```bash
+# Test with historical date
+uv run python -m src.main analyze --ticker NVDA --llm --date 2025-09-10
+
+# Should now log:
+# INFO - Found exact historical price for NVDA on 2025-09-10: $177.33
+# (instead of WARNING about using price from 2025-12-26)
+```
+
+**Impact**:
+- ✅ Historical analysis now uses correct prices from unified CSV storage
+- ✅ No more future information leakage in backtesting
+- ✅ Backtesting framework can rely on accurate historical signals
+- ✅ Reports generated with `--date` flag show correct historical prices
+
 ## Common Troubleshooting
 
 ### API Rate Limiting
