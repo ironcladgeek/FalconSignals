@@ -1,5 +1,6 @@
 """Integration tests for journal CLI command."""
 
+import re
 import tempfile
 from pathlib import Path
 
@@ -7,6 +8,12 @@ import pytest
 from typer.testing import CliRunner
 
 from src.main import app
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 @pytest.fixture
@@ -332,13 +339,16 @@ class TestJournalCLIHelp:
 
     def test_journal_help(self, runner):
         """Test journal --help command."""
-        result = runner.invoke(app, ["journal", "--help"], color=False)
+        result = runner.invoke(app, ["journal", "--help"])
+
+        # Strip ANSI codes for reliable string matching
+        clean_output = strip_ansi_codes(result.stdout)
 
         assert result.exit_code == 0
-        assert "Manage trading journal entries interactively" in result.stdout
-        assert "--action" in result.stdout
-        assert "add" in result.stdout
-        assert "update" in result.stdout
-        assert "close" in result.stdout
-        assert "list" in result.stdout
-        assert "view" in result.stdout
+        assert "Manage trading journal entries interactively" in clean_output
+        assert "--action" in clean_output
+        assert "add" in clean_output
+        assert "update" in clean_output
+        assert "close" in clean_output
+        assert "list" in clean_output
+        assert "view" in clean_output
