@@ -566,10 +566,22 @@ class FinancialDataFetcherTool(BaseTool):
 
             logger.debug(f"Fetching enriched fundamental data for {ticker}")
 
-            # Fetch company overview (Alpha Vantage Premium)
+            # Fetch company overview
+            # For historical analysis, use yfinance quarterly data
+            # For current analysis, use Alpha Vantage (primary) or yfinance (fallback)
             company_info = None
             try:
-                company_info = self.provider_manager.get_company_info(ticker)
+                if self.historical_date and as_of_date:
+                    # Historical mode: Use yfinance quarterly data
+                    logger.debug(
+                        f"Historical analysis mode: fetching company info from yfinance quarterly data for {ticker}"
+                    )
+                    company_info = self._get_historical_company_info_from_yfinance(
+                        ticker, as_of_date
+                    )
+                else:
+                    # Current mode: Use Alpha Vantage
+                    company_info = self.provider_manager.get_company_info(ticker)
             except Exception as e:
                 logger.warning(f"Could not fetch company info for {ticker}: {e}")
 
@@ -643,7 +655,9 @@ class FinancialDataFetcherTool(BaseTool):
             # Add data_source attribution to each section
             company_info_with_source = company_info or {}
             if company_info_with_source:
-                company_info_with_source["data_source"] = "Alpha Vantage"
+                # Preserve existing data_source if already set (e.g., from historical yfinance data)
+                if "data_source" not in company_info_with_source:
+                    company_info_with_source["data_source"] = "Alpha Vantage"
 
             earnings_estimates_with_source = earnings_estimates or {}
             if earnings_estimates_with_source:
@@ -942,6 +956,263 @@ class FinancialDataFetcherTool(BaseTool):
             merged["data_source"] = "Yahoo Finance"
 
         return merged
+
+    def _get_historical_company_info_from_yfinance(
+        self, ticker: str, as_of_date: datetime
+    ) -> Optional[dict]:
+        """Get historical company info from yfinance quarterly data.
+
+        Uses yfinance quarterly financial statements to reconstruct company_info
+        as it would have appeared at the specified historical date.
+
+        Args:
+            ticker: Stock ticker symbol
+            as_of_date: Historical date for analysis
+
+        Returns:
+            Dictionary with company info reconstructed from historical quarterly data,
+            or None if data unavailable
+        """
+        try:
+            import yfinance as yf
+
+            logger.debug(f"Fetching historical company info for {ticker} as of {as_of_date.date()}")
+
+            # Fetch ticker data
+            tick = yf.Ticker(ticker)
+
+            # Get current info for static fields (name, sector, industry, etc.)
+            # These don't change historically
+            info = tick.info
+            if not info:
+                logger.warning(f"No yfinance info available for {ticker}")
+                return None
+
+            # Get quarterly financials and balance sheet
+            quarterly_financials = tick.quarterly_financials
+            quarterly_balance_sheet = tick.quarterly_balance_sheet
+
+            # Find the most recent quarter before or at as_of_date
+            target_date = as_of_date.date()
+            selected_quarter = None
+            selected_quarter_date = None
+
+            # Check quarterly_financials columns (these are dates)
+            if not quarterly_financials.empty:
+                for col in quarterly_financials.columns:
+                    quarter_date = col.date()
+                    if quarter_date <= target_date:
+                        if selected_quarter_date is None or quarter_date > selected_quarter_date:
+                            selected_quarter_date = quarter_date
+                            selected_quarter = col
+
+            if selected_quarter is None:
+                logger.warning(f"No quarterly data available for {ticker} before {target_date}")
+                # Fall back to current yfinance info
+                return self._build_company_info_from_yfinance_info(ticker, info)
+
+            logger.info(
+                f"Using quarterly data from {selected_quarter_date} for {ticker} (analysis date: {target_date})"
+            )
+
+            # Extract metrics from the selected quarter
+            company_info = {
+                # Static fields (from current info)
+                "ticker": ticker.upper(),
+                "name": info.get("longName", ticker.upper()),
+                "description": info.get("longBusinessSummary", ""),
+                "sector": info.get("sector", "").upper(),
+                "industry": info.get("industry", "").upper(),
+                "currency": info.get("currency", "USD"),
+                "exchange": info.get("exchange", ""),
+                # Dynamic fields will be populated from quarterly data below
+            }
+
+            # Extract financial metrics from quarterly statements
+            # Balance sheet metrics
+            if (
+                not quarterly_balance_sheet.empty
+                and selected_quarter in quarterly_balance_sheet.columns
+            ):
+                bs = quarterly_balance_sheet[selected_quarter]
+
+                # Total equity
+                total_equity = bs.get("Total Equity Gross Minority Interest", None)
+                if total_equity is None:
+                    total_equity = bs.get("Stockholders Equity", None)
+                if total_equity is None:
+                    total_equity = bs.get("Common Stock Equity", None)
+
+                # Shares outstanding
+                shares_outstanding = bs.get("Ordinary Shares Number", None)
+                if shares_outstanding is None:
+                    shares_outstanding = bs.get("Share Issued", None)
+
+                # Book value per share
+                if total_equity and shares_outstanding:
+                    book_value_per_share = float(total_equity) / float(shares_outstanding)
+                    company_info["book_value"] = round(book_value_per_share, 2)
+                    company_info["shares_outstanding"] = float(shares_outstanding)
+
+            # Income statement metrics (TTM from quarterly)
+            if not quarterly_financials.empty and selected_quarter in quarterly_financials.columns:
+                inc = quarterly_financials[selected_quarter]
+
+                # Revenue
+                total_revenue = inc.get("Total Revenue", None)
+                if total_revenue:
+                    company_info["revenue_ttm"] = float(total_revenue)
+
+                # Net income
+                net_income = inc.get("Net Income", None)
+                if net_income is None:
+                    net_income = inc.get(
+                        "Net Income From Continuing Operation Net Minority Interest", None
+                    )
+
+                # EPS calculation
+                if net_income and "shares_outstanding" in company_info:
+                    eps = float(net_income) / company_info["shares_outstanding"]
+                    company_info["eps"] = round(eps, 2)
+                    company_info["diluted_eps_ttm"] = round(eps, 2)
+
+                # Profit margins
+                gross_profit = inc.get("Gross Profit", None)
+                if gross_profit and total_revenue:
+                    company_info["profit_margin"] = (
+                        round(float(net_income or 0) / float(total_revenue), 3)
+                        if net_income
+                        else None
+                    )
+                    company_info["gross_profit_ttm"] = float(gross_profit)
+
+                operating_income = inc.get("Operating Income", None)
+                if operating_income and total_revenue:
+                    company_info["operating_margin"] = round(
+                        float(operating_income) / float(total_revenue), 3
+                    )
+
+                # EBITDA
+                ebitda = inc.get("EBITDA", None)
+                if ebitda:
+                    company_info["ebitda"] = float(ebitda)
+
+            # Return metrics (need both balance sheet and income statement)
+            if (
+                "eps" in company_info
+                and "book_value" in company_info
+                and company_info["book_value"]
+            ):
+                # ROE approximation
+                if total_equity:
+                    roe = float(net_income or 0) / float(total_equity)
+                    company_info["return_on_equity"] = round(roe, 3)
+
+            # Get price data for the selected quarter to calculate valuation ratios
+            try:
+                # Fetch price data around the analysis date (±5 days to handle weekends/holidays)
+                from src.data.price_manager import PriceDataManager
+
+                pm = PriceDataManager()
+                price_at_date = pm.get_price_at_date(ticker, as_of_date.date())
+
+                if price_at_date:
+                    historical_price = price_at_date["close"]
+                    logger.debug(
+                        f"Found historical price for {ticker} on {as_of_date.date()}: ${historical_price}"
+                    )
+
+                    # Calculate valuation metrics using historical price
+                    if "eps" in company_info and company_info["eps"]:
+                        company_info["pe_ratio"] = round(historical_price / company_info["eps"], 2)
+                        company_info["trailing_pe"] = company_info["pe_ratio"]
+
+                    if "book_value" in company_info and company_info["book_value"]:
+                        company_info["price_to_book"] = round(
+                            historical_price / company_info["book_value"], 2
+                        )
+
+                    if (
+                        "revenue_ttm" in company_info
+                        and company_info["revenue_ttm"]
+                        and "shares_outstanding" in company_info
+                    ):
+                        revenue_per_share = (
+                            company_info["revenue_ttm"] / company_info["shares_outstanding"]
+                        )
+                        company_info["price_to_sales"] = round(
+                            historical_price / revenue_per_share, 2
+                        )
+                        company_info["revenue_per_share_ttm"] = round(revenue_per_share, 2)
+
+                    # Market cap at historical price
+                    if "shares_outstanding" in company_info:
+                        company_info["market_cap"] = (
+                            historical_price * company_info["shares_outstanding"]
+                        )
+                else:
+                    logger.warning(f"No historical price found for {ticker} on {as_of_date.date()}")
+            except Exception as e:
+                logger.warning(f"Could not fetch historical price for {ticker}: {e}")
+
+            # Add metadata
+            company_info["data_source"] = f"Yahoo Finance (Quarterly) - Q{selected_quarter_date}"
+            company_info["historical_quarter_date"] = str(selected_quarter_date)
+
+            logger.debug(
+                f"Built historical company info for {ticker} from quarter {selected_quarter_date}"
+            )
+            return company_info
+
+        except ImportError:
+            logger.error("yfinance not installed, cannot fetch historical company info")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching historical company info for {ticker}: {e}")
+            return None
+
+    def _build_company_info_from_yfinance_info(self, ticker: str, info: dict) -> Optional[dict]:
+        """Build company_info dict from yfinance .info property (fallback).
+
+        Args:
+            ticker: Stock ticker symbol
+            info: yfinance Ticker.info dictionary
+
+        Returns:
+            Dictionary with company info in Alpha Vantage format
+        """
+        if not info:
+            return None
+
+        return {
+            "ticker": ticker.upper(),
+            "name": info.get("longName", ticker.upper()),
+            "description": info.get("longBusinessSummary", ""),
+            "sector": info.get("sector", "").upper(),
+            "industry": info.get("industry", "").upper(),
+            "currency": info.get("currency", "USD"),
+            "exchange": info.get("exchange", ""),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "trailing_pe": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "peg_ratio": info.get("pegRatio"),
+            "price_to_book": info.get("priceToBook"),
+            "price_to_sales": info.get("priceToSalesTrailing12Months"),
+            "book_value": info.get("bookValue"),
+            "eps": info.get("trailingEps"),
+            "diluted_eps_ttm": info.get("trailingEps"),
+            "revenue_per_share_ttm": info.get("revenuePerShare"),
+            "profit_margin": info.get("profitMargins"),
+            "operating_margin": info.get("operatingMargins"),
+            "return_on_assets": info.get("returnOnAssets"),
+            "return_on_equity": info.get("returnOnEquity"),
+            "revenue_ttm": info.get("totalRevenue"),
+            "ebitda": info.get("ebitda"),
+            "beta": info.get("beta"),
+            "shares_outstanding": info.get("sharesOutstanding"),
+            "data_source": "Yahoo Finance (Current)",
+        }
 
 
 class NewsFetcherTool(BaseTool):
