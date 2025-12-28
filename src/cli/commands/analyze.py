@@ -122,6 +122,11 @@ def analyze(
             "'gap' (price gaps), 'all' (no filtering). Use 'list-strategies' command for details."
         ),
     ),
+    force_reanalysis: bool = typer.Option(
+        False,
+        "--force-reanalysis",
+        help="Force re-analysis even if recommendations already exist for this date and mode",
+    ),
 ) -> None:
     """Analyze markets and generate investment signals.
 
@@ -473,7 +478,7 @@ def analyze(
             sys.exit(1)
 
         # Remove tickers that already have recommendations for this date and analysis mode
-        if recommendations_repo and not test:
+        if recommendations_repo and not test and not force_reanalysis:
             analysis_mode = "llm" if use_llm else "rule_based"
             check_date = historical_date if historical_date else datetime.now().date()
 

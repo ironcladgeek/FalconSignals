@@ -73,6 +73,7 @@ filterwarnings = [
 [tool.poe.tasks]
 lint = "sh -c 'ruff check --select I --select F --select B --select W --fix && ruff format'"
 pre-commit = "pre-commit run --all-files"
+test = "pytest tests/ --cov=src --tb=short -q"
 rmpycache = "find . -type d -name '__pycache__' -exec rm -rf {} +"
 rmdatacache = "find data/cache \\( -name '*.json' -o -name '*.csv' \\) -exec rm -f {} +"
 rmreports = "find data/reports -name '*.md' -exec rm -f {} +"

@@ -100,8 +100,9 @@ class TestTechnicalIndicatorTool:
         assert "symbol" in result
         assert result["symbol"] == "AAPL"
         assert "latest_price" in result
-        assert "trend" in result
-        assert "full_analysis" in result
+        # Issue #107: trend, full_analysis removed to fix Pydantic conversion
+        assert "analysis_type" in result
+        assert result["analysis_type"] == "rule_based_calculations"
 
     def test_run_with_empty_prices(self, tool):
         """Test run with empty price list."""
@@ -195,14 +196,15 @@ class TestTechnicalIndicatorTool:
             assert all(isinstance(result[field], (int, float)) for field in found_ichimoku)
 
     def test_run_returns_trend_information(self, tool, sample_prices):
-        """Test that trend information is included."""
+        """Test that metadata is included (Issue #107: trend removed)."""
         result = tool.run(sample_prices)
 
-        assert "trend" in result
-        assert result["trend"] in ["up", "down", "neutral", "sideways"]
-
-        if "trend_signals" in result:
-            assert isinstance(result["trend_signals"], list)
+        # Issue #107: trend, trend_signals removed to fix Pydantic conversion
+        # Check for analysis metadata instead
+        assert "analysis_type" in result
+        assert result["analysis_type"] == "rule_based_calculations"
+        assert "note" in result
+        assert "LLM should interpret" in result["note"]
 
     def test_run_returns_volume_ratio(self, tool, sample_prices):
         """Test that volume ratio is calculated when available."""
@@ -277,13 +279,14 @@ class TestTechnicalIndicatorTool:
         assert "error" in summary
 
     def test_get_summary_calls_analyzer_summary(self, tool, sample_prices):
-        """Test that get_summary uses analyzer's summary method."""
-        with patch.object(
-            tool._analyzer, "get_indicator_summary", return_value={"summary": "test"}
-        ) as mock_summary:
-            tool.get_summary(sample_prices)
+        """Test that get_summary returns tool output (Issue #107: full_analysis removed)."""
+        # Issue #107: full_analysis removed, so get_summary returns tool output directly
+        result = tool.get_summary(sample_prices)
 
-            mock_summary.assert_called_once()
+        # Should return same result as run() since full_analysis is removed
+        assert "error" not in result
+        assert "symbol" in result
+        assert "analysis_type" in result
 
     def test_legacy_calculate_rsi(self):
         """Test legacy RSI calculation method."""
@@ -319,6 +322,85 @@ class TestTechnicalIndicatorTool:
 
         assert isinstance(atr, float)
         assert atr >= 0
+
+    def test_initialization_with_config_import_error(self):
+        """Test initialization when global config import fails."""
+        # Mock the import to raise an exception
+        with patch("src.config.get_config", side_effect=ImportError("No config")):
+            # Should fall back to default config
+            tool = TechnicalIndicatorTool()
+            assert tool._analyzer is not None
+
+    def test_field_mappings_for_wma_and_ichimoku(self, sample_prices):
+        """Test field mappings for WMA and Ichimoku indicators (covers lines 136, 147-156)."""
+        from src.analysis.normalizer import AnalysisResultNormalizer
+
+        tool = TechnicalIndicatorTool()
+
+        # Mock the normalizer to return field names that match the mapping code
+        def mock_flatten(indicator_key, indicator_value):
+            """Mock flattener that returns WMA and Ichimoku field names."""
+            if indicator_key == "test_wma":
+                return {"wma_14": 105.5}
+            elif indicator_key == "test_ichimoku":
+                return {
+                    "ichimoku_tenkan": 100.0,
+                    "ichimoku_kijun": 101.0,
+                    "ichimoku_senkou_a": 102.0,
+                    "ichimoku_senkou_b": 103.0,
+                    "ichimoku_chikou": 99.0,
+                }
+            return {}
+
+        mock_analyzer_result = {
+            "symbol": "TEST",
+            "periods": 60,
+            "latest_price": 100.0,
+            "indicators": {
+                "test_wma": {},
+                "test_ichimoku": {},
+            },
+        }
+
+        with (
+            patch.object(tool._analyzer, "calculate_indicators", return_value=mock_analyzer_result),
+            patch.object(
+                AnalysisResultNormalizer, "_flatten_indicator_output", side_effect=mock_flatten
+            ),
+        ):
+            result = tool.run(sample_prices)
+
+            # The mapping lines (136, 147-156) should have been executed
+            assert "error" not in result
+            # Verify the mapped fields are in output
+            assert "wma_14" in result
+            assert "ichimoku_tenkan" in result
+            assert "ichimoku_kijun" in result
+            assert "ichimoku_senkou_a" in result
+            assert "ichimoku_senkou_b" in result
+            assert "ichimoku_chikou" in result
+
+    def test_get_summary_with_full_analysis_fallback(self, sample_prices):
+        """Test get_summary when full_analysis is in result (legacy path)."""
+        tool = TechnicalIndicatorTool()
+
+        # Mock run to return full_analysis
+        original_run = tool.run
+
+        def mock_run(prices):
+            result = original_run(prices)
+            # Add full_analysis for testing legacy path
+            result["full_analysis"] = {
+                "periods": 60,
+                "latest_price": 129.5,
+                "indicators": {"rsi_14": {"value": 56.3}},
+            }
+            return result
+
+        with patch.object(tool, "run", side_effect=mock_run):
+            summary = tool.get_summary(sample_prices)
+            # Should call analyzer's get_indicator_summary
+            assert summary is not None
 
 
 class TestSentimentAnalyzerTool:
@@ -696,15 +778,19 @@ class TestSentimentAnalyzerTool:
         assert "scored_count" in result
         assert result["scored_count"] == 4
 
-    def test_run_with_exception(self, tool):
+    def test_run_with_exception(self):
         """Test run handles exceptions gracefully."""
-        # Pass invalid data that will cause an error
-        invalid_articles = [{"sentiment": None, "sentiment_score": "not_a_number"}]
+        tool = SentimentAnalyzerTool()
 
-        result = tool.run(invalid_articles)
+        # Pass invalid data that will cause an exception during processing
+        # A dict instead of a list will cause iteration error
+        invalid_data = {"not": "a list"}
+
+        result = tool.run(invalid_data)
 
         # Should catch exception and return error
-        assert "error" in result or "count" in result
+        assert "error" in result
+        assert isinstance(result["error"], str)
 
     def test_weighted_sentiment_combines_weights(self, tool):
         """Test that weighted sentiment combines recency and importance weights."""

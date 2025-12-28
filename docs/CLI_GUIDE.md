@@ -76,6 +76,7 @@ uv run python -m src.main analyze [OPTIONS]
 | `--format`, `-f` | `markdown` | Output format: `markdown` or `json` |
 | `--save-report` / `--no-save-report` | `True` | Save report to disk |
 | `--dry-run` | `False` | Run without trades/alerts |
+| `--force-reanalysis` | `False` | Force re-analysis even if recommendations exist for date/mode |
 
 #### Analysis Mode Options
 
@@ -185,6 +186,10 @@ uv run python -m src.main analyze --ticker AAPL --date 2024-06-01 --llm
 
 # Historical market analysis
 uv run python -m src.main analyze --market us --date 2024-06-01 --limit 20
+
+# Force re-analysis (ignore existing recommendations)
+uv run python -m src.main analyze --ticker AAPL --date 2024-06-01 --force-reanalysis
+uv run python -m src.main analyze --ticker AAPL --date 2024-06-01 --llm --force-reanalysis
 ```
 
 **Output Formats:**
