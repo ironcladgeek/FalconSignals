@@ -323,6 +323,85 @@ class TestTechnicalIndicatorTool:
         assert isinstance(atr, float)
         assert atr >= 0
 
+    def test_initialization_with_config_import_error(self):
+        """Test initialization when global config import fails."""
+        # Mock the import to raise an exception
+        with patch("src.config.get_config", side_effect=ImportError("No config")):
+            # Should fall back to default config
+            tool = TechnicalIndicatorTool()
+            assert tool._analyzer is not None
+
+    def test_field_mappings_for_wma_and_ichimoku(self, sample_prices):
+        """Test field mappings for WMA and Ichimoku indicators (covers lines 136, 147-156)."""
+        from src.analysis.normalizer import AnalysisResultNormalizer
+
+        tool = TechnicalIndicatorTool()
+
+        # Mock the normalizer to return field names that match the mapping code
+        def mock_flatten(indicator_key, indicator_value):
+            """Mock flattener that returns WMA and Ichimoku field names."""
+            if indicator_key == "test_wma":
+                return {"wma_14": 105.5}
+            elif indicator_key == "test_ichimoku":
+                return {
+                    "ichimoku_tenkan": 100.0,
+                    "ichimoku_kijun": 101.0,
+                    "ichimoku_senkou_a": 102.0,
+                    "ichimoku_senkou_b": 103.0,
+                    "ichimoku_chikou": 99.0,
+                }
+            return {}
+
+        mock_analyzer_result = {
+            "symbol": "TEST",
+            "periods": 60,
+            "latest_price": 100.0,
+            "indicators": {
+                "test_wma": {},
+                "test_ichimoku": {},
+            },
+        }
+
+        with (
+            patch.object(tool._analyzer, "calculate_indicators", return_value=mock_analyzer_result),
+            patch.object(
+                AnalysisResultNormalizer, "_flatten_indicator_output", side_effect=mock_flatten
+            ),
+        ):
+            result = tool.run(sample_prices)
+
+            # The mapping lines (136, 147-156) should have been executed
+            assert "error" not in result
+            # Verify the mapped fields are in output
+            assert "wma_14" in result
+            assert "ichimoku_tenkan" in result
+            assert "ichimoku_kijun" in result
+            assert "ichimoku_senkou_a" in result
+            assert "ichimoku_senkou_b" in result
+            assert "ichimoku_chikou" in result
+
+    def test_get_summary_with_full_analysis_fallback(self, sample_prices):
+        """Test get_summary when full_analysis is in result (legacy path)."""
+        tool = TechnicalIndicatorTool()
+
+        # Mock run to return full_analysis
+        original_run = tool.run
+
+        def mock_run(prices):
+            result = original_run(prices)
+            # Add full_analysis for testing legacy path
+            result["full_analysis"] = {
+                "periods": 60,
+                "latest_price": 129.5,
+                "indicators": {"rsi_14": {"value": 56.3}},
+            }
+            return result
+
+        with patch.object(tool, "run", side_effect=mock_run):
+            summary = tool.get_summary(sample_prices)
+            # Should call analyzer's get_indicator_summary
+            assert summary is not None
+
 
 class TestSentimentAnalyzerTool:
     """Test suite for SentimentAnalyzerTool class."""
@@ -699,15 +778,19 @@ class TestSentimentAnalyzerTool:
         assert "scored_count" in result
         assert result["scored_count"] == 4
 
-    def test_run_with_exception(self, tool):
+    def test_run_with_exception(self):
         """Test run handles exceptions gracefully."""
-        # Pass invalid data that will cause an error
-        invalid_articles = [{"sentiment": None, "sentiment_score": "not_a_number"}]
+        tool = SentimentAnalyzerTool()
 
-        result = tool.run(invalid_articles)
+        # Pass invalid data that will cause an exception during processing
+        # A dict instead of a list will cause iteration error
+        invalid_data = {"not": "a list"}
+
+        result = tool.run(invalid_data)
 
         # Should catch exception and return error
-        assert "error" in result or "count" in result
+        assert "error" in result
+        assert isinstance(result["error"], str)
 
     def test_weighted_sentiment_combines_weights(self, tool):
         """Test that weighted sentiment combines recency and importance weights."""
