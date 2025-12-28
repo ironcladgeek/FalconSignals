@@ -60,7 +60,7 @@ def log_llm_status(provider: Optional[str] = None) -> bool:
     is_configured, provider_name = check_llm_configuration(provider)
 
     if is_configured:
-        logger.debug(f"LLM configured: Using {provider_name} for AI-powered analysis")
+        logger.info(f"LLM configured: Using {provider_name} for AI-powered analysis")
         return True
     else:
         if provider and provider.lower() == "local":
