@@ -8,7 +8,6 @@ import pytest
 from src.utils.llm_check import (
     check_llm_configuration,
     get_fallback_warning_message,
-    log_llm_status,
 )
 
 
@@ -86,40 +85,6 @@ class TestCheckLLMConfiguration:
         is_configured, provider = check_llm_configuration("anthropic")
         assert not is_configured
         assert provider is None
-
-
-@pytest.mark.unit
-class TestLogLLMStatus:
-    """Test LLM status logging."""
-
-    @patch("src.utils.llm_check.logger")
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test_key"}, clear=True)
-    def test_log_llm_status_configured(self, mock_logger):
-        """Test logging when LLM is configured."""
-        result = log_llm_status()
-        assert result is True
-        mock_logger.info.assert_called_once_with(
-            "LLM configured: Using Anthropic for AI-powered analysis"
-        )
-
-    @patch("src.utils.llm_check.logger")
-    @patch.dict(os.environ, {}, clear=True)
-    def test_log_llm_status_not_configured(self, mock_logger):
-        """Test logging when LLM is not configured."""
-        result = log_llm_status()
-        assert result is False
-        mock_logger.warning.assert_called_once()
-
-    @patch("src.utils.llm_check.logger")
-    @patch.dict(os.environ, {}, clear=True)
-    def test_log_llm_status_local_provider_not_available(self, mock_logger):
-        """Test logging for local provider when not available."""
-        result = log_llm_status("local")
-        assert result is True  # Local provider is always considered "configured"
-        # Note: Currently local provider logs info when "configured", not warning
-        mock_logger.info.assert_called_once_with(
-            "LLM configured: Using Local for AI-powered analysis"
-        )
 
 
 @pytest.mark.unit
