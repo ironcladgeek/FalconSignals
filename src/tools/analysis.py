@@ -159,19 +159,19 @@ class TechnicalIndicatorTool(BaseTool):
                 f"TechnicalIndicatorTool: mapped {indicator_count} indicator values to {len([k for k in output.keys() if k not in ['symbol', 'periods', 'latest_price']])} Pydantic model fields"
             )
 
-            # Trend
-            trend = results.get("trend", {})
-            output["trend"] = trend.get("direction", "neutral")
-            output["trend_signals"] = trend.get("signals", [])
+            # REMOVED: trend, trend_signals, volume_ratio fields (Issue #107)
+            # These don't exist in TechnicalAnalysisOutput Pydantic model and cause
+            # CrewAI's structured output conversion to produce empty responses.
+            # The LLM agent interprets the indicators and generates the required fields:
+            # - trend_direction, trend_strength, momentum_status
+            # - technical_score, key_findings, reasoning
 
-            # Volume ratio
-            vol = results.get("volume_analysis", {})
-            if "ratio" in vol:
-                output["volume_ratio"] = vol["ratio"]
-
-            # REMOVED: full_analysis duplicates all data, causing large tool outputs
-            # that break Pydantic conversion in CrewAI (Issue #107)
-            # All necessary data is already extracted to top-level output fields
+            # Include analysis metadata as a note for the LLM
+            output["analysis_type"] = "rule_based_calculations"
+            output["note"] = (
+                "Technical indicators calculated using mathematical formulas. "
+                "LLM should interpret these signals."
+            )
 
             return output
 

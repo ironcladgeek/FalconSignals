@@ -100,8 +100,9 @@ class TestTechnicalIndicatorTool:
         assert "symbol" in result
         assert result["symbol"] == "AAPL"
         assert "latest_price" in result
-        assert "trend" in result
-        assert "full_analysis" in result
+        # Issue #107: trend, full_analysis removed to fix Pydantic conversion
+        assert "analysis_type" in result
+        assert result["analysis_type"] == "rule_based_calculations"
 
     def test_run_with_empty_prices(self, tool):
         """Test run with empty price list."""
@@ -195,14 +196,15 @@ class TestTechnicalIndicatorTool:
             assert all(isinstance(result[field], (int, float)) for field in found_ichimoku)
 
     def test_run_returns_trend_information(self, tool, sample_prices):
-        """Test that trend information is included."""
+        """Test that metadata is included (Issue #107: trend removed)."""
         result = tool.run(sample_prices)
 
-        assert "trend" in result
-        assert result["trend"] in ["up", "down", "neutral", "sideways"]
-
-        if "trend_signals" in result:
-            assert isinstance(result["trend_signals"], list)
+        # Issue #107: trend, trend_signals removed to fix Pydantic conversion
+        # Check for analysis metadata instead
+        assert "analysis_type" in result
+        assert result["analysis_type"] == "rule_based_calculations"
+        assert "note" in result
+        assert "LLM should interpret" in result["note"]
 
     def test_run_returns_volume_ratio(self, tool, sample_prices):
         """Test that volume ratio is calculated when available."""
@@ -277,13 +279,14 @@ class TestTechnicalIndicatorTool:
         assert "error" in summary
 
     def test_get_summary_calls_analyzer_summary(self, tool, sample_prices):
-        """Test that get_summary uses analyzer's summary method."""
-        with patch.object(
-            tool._analyzer, "get_indicator_summary", return_value={"summary": "test"}
-        ) as mock_summary:
-            tool.get_summary(sample_prices)
+        """Test that get_summary returns tool output (Issue #107: full_analysis removed)."""
+        # Issue #107: full_analysis removed, so get_summary returns tool output directly
+        result = tool.get_summary(sample_prices)
 
-            mock_summary.assert_called_once()
+        # Should return same result as run() since full_analysis is removed
+        assert "error" not in result
+        assert "symbol" in result
+        assert "analysis_type" in result
 
     def test_legacy_calculate_rsi(self):
         """Test legacy RSI calculation method."""
