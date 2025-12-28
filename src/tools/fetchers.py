@@ -1054,72 +1054,103 @@ class FinancialDataFetcherTool(BaseTool):
                     company_info["book_value"] = round(book_value_per_share, 2)
                     company_info["shares_outstanding"] = float(shares_outstanding)
 
-            # Income statement metrics (TTM from quarterly)
+            # Income statement metrics (TTM from last 4 quarters)
+            # CRITICAL: Calculate TTM (Trailing Twelve Months) by summing last 4 quarters
+            # This matches how Yahoo Finance calculates historical fundamentals
             if not quarterly_financials.empty and selected_quarter in quarterly_financials.columns:
-                inc = quarterly_financials[selected_quarter]
+                # Get the last 4 quarters ending on or before selected_quarter
+                quarters_for_ttm = []
+                for col in quarterly_financials.columns:
+                    if col.date() <= selected_quarter.date():
+                        quarters_for_ttm.append(col)
+                        if len(quarters_for_ttm) == 4:
+                            break
 
-                # Revenue
-                total_revenue = inc.get("Total Revenue", None)
-                if total_revenue:
-                    company_info["revenue_ttm"] = float(total_revenue)
+                if len(quarters_for_ttm) >= 4:
+                    # Calculate TTM metrics by summing 4 quarters
+                    ttm_revenue = 0
+                    ttm_net_income = 0
+                    ttm_gross_profit = 0
+                    ttm_operating_income = 0
+                    ttm_ebitda = 0
 
-                # Net income
-                net_income = inc.get("Net Income", None)
-                if net_income is None:
-                    net_income = inc.get(
-                        "Net Income From Continuing Operation Net Minority Interest", None
+                    for qtr in quarters_for_ttm:
+                        inc = quarterly_financials[qtr]
+                        ttm_revenue += float(inc.get("Total Revenue", 0) or 0)
+
+                        ni = inc.get("Net Income", None)
+                        if ni is None:
+                            ni = inc.get(
+                                "Net Income From Continuing Operation Net Minority Interest", None
+                            )
+                        ttm_net_income += float(ni or 0)
+
+                        ttm_gross_profit += float(inc.get("Gross Profit", 0) or 0)
+                        ttm_operating_income += float(inc.get("Operating Income", 0) or 0)
+                        ttm_ebitda += float(inc.get("EBITDA", 0) or 0)
+
+                    # Store TTM values
+                    company_info["revenue_ttm"] = ttm_revenue
+                    company_info["gross_profit_ttm"] = ttm_gross_profit
+                    company_info["ebitda"] = ttm_ebitda
+
+                    # TTM EPS calculation
+                    if "shares_outstanding" in company_info and company_info["shares_outstanding"]:
+                        ttm_eps = ttm_net_income / company_info["shares_outstanding"]
+                        company_info["eps"] = round(ttm_eps, 2)
+                        company_info["diluted_eps_ttm"] = round(ttm_eps, 2)
+
+                    # TTM Profit margins
+                    if ttm_revenue > 0:
+                        company_info["profit_margin"] = round(ttm_net_income / ttm_revenue, 3)
+                        company_info["operating_margin"] = round(
+                            ttm_operating_income / ttm_revenue, 3
+                        )
+
+                    # TTM ROE
+                    if total_equity and total_equity > 0:
+                        company_info["return_on_equity"] = round(
+                            ttm_net_income / float(total_equity), 3
+                        )
+
+                    net_income = ttm_net_income  # For later use
+                    total_revenue = ttm_revenue
+                else:
+                    logger.warning(
+                        f"Not enough quarters for TTM calculation (need 4, have {len(quarters_for_ttm)})"
                     )
+                    # Fall back to single quarter if less than 4 quarters available
+                    inc = quarterly_financials[selected_quarter]
+                    total_revenue = inc.get("Total Revenue", None)
+                    if total_revenue:
+                        company_info["revenue_ttm"] = float(total_revenue)
 
-                # EPS calculation
-                if net_income and "shares_outstanding" in company_info:
-                    eps = float(net_income) / company_info["shares_outstanding"]
-                    company_info["eps"] = round(eps, 2)
-                    company_info["diluted_eps_ttm"] = round(eps, 2)
+                    net_income = inc.get("Net Income", None)
+                    if net_income is None:
+                        net_income = inc.get(
+                            "Net Income From Continuing Operation Net Minority Interest", None
+                        )
 
-                # Profit margins
-                gross_profit = inc.get("Gross Profit", None)
-                if gross_profit and total_revenue:
-                    company_info["profit_margin"] = (
-                        round(float(net_income or 0) / float(total_revenue), 3)
-                        if net_income
-                        else None
-                    )
-                    company_info["gross_profit_ttm"] = float(gross_profit)
-
-                operating_income = inc.get("Operating Income", None)
-                if operating_income and total_revenue:
-                    company_info["operating_margin"] = round(
-                        float(operating_income) / float(total_revenue), 3
-                    )
-
-                # EBITDA
-                ebitda = inc.get("EBITDA", None)
-                if ebitda:
-                    company_info["ebitda"] = float(ebitda)
-
-            # Return metrics (need both balance sheet and income statement)
-            if (
-                "eps" in company_info
-                and "book_value" in company_info
-                and company_info["book_value"]
-            ):
-                # ROE approximation
-                if total_equity:
-                    roe = float(net_income or 0) / float(total_equity)
-                    company_info["return_on_equity"] = round(roe, 3)
+                    if net_income and "shares_outstanding" in company_info:
+                        eps = float(net_income) / company_info["shares_outstanding"]
+                        company_info["eps"] = round(eps, 2)
+                        company_info["diluted_eps_ttm"] = round(eps, 2)
 
             # Get price data for the selected quarter to calculate valuation ratios
+            # CRITICAL: Use quarter-end price, not analysis date price
+            # This matches how Yahoo Finance calculates historical P/E, P/B, etc.
             try:
-                # Fetch price data around the analysis date (±5 days to handle weekends/holidays)
                 from src.data.price_manager import PriceDataManager
 
                 pm = PriceDataManager()
-                price_at_date = pm.get_price_at_date(ticker, as_of_date.date())
+                # Use quarter-end date for price lookup, not analysis date
+                quarter_end_date = selected_quarter_date
+                price_at_date = pm.get_price_at_date(ticker, quarter_end_date)
 
                 if price_at_date:
                     historical_price = price_at_date["close"]
                     logger.debug(
-                        f"Found historical price for {ticker} on {as_of_date.date()}: ${historical_price}"
+                        f"Found quarter-end price for {ticker} on {quarter_end_date}: ${historical_price}"
                     )
 
                     # Calculate valuation metrics using historical price
@@ -1151,9 +1182,9 @@ class FinancialDataFetcherTool(BaseTool):
                             historical_price * company_info["shares_outstanding"]
                         )
                 else:
-                    logger.warning(f"No historical price found for {ticker} on {as_of_date.date()}")
+                    logger.warning(f"No quarter-end price found for {ticker} on {quarter_end_date}")
             except Exception as e:
-                logger.warning(f"Could not fetch historical price for {ticker}: {e}")
+                logger.warning(f"Could not fetch quarter-end price for {ticker}: {e}")
 
             # Add metadata
             company_info["data_source"] = f"Yahoo Finance (Quarterly) - Q{selected_quarter_date}"
