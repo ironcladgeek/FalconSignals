@@ -876,6 +876,158 @@ uv run python -m src.main track-performance --max-age 90 --signals buy,strong_bu
 
 ---
 
+### backtest
+
+Run historical analysis across date ranges to validate recommendation quality.
+
+**Syntax:**
+```bash
+uv run python -m src.main backtest [OPTIONS]
+```
+
+#### Required Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--start-date`, `-s` | Start date of backtest period (YYYY-MM-DD) | `--start-date 2024-01-01` |
+| `--end-date`, `-e` | End date of backtest period (YYYY-MM-DD) | `--end-date 2024-12-31` |
+| `--ticker`, `-t` | Comma-separated list of tickers | `--ticker AAPL,MSFT` |
+
+#### Optional Settings
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--frequency`, `-f` | `weekly` | Analysis frequency: daily, weekly, or monthly |
+| `--mode`, `-m` | `rule_based` | Analysis mode: rule_based or llm |
+| `--dry-run` | `False` | Show plan and cost estimate without executing |
+| `--yes`, `-y` | `False` | Skip confirmation prompt for expensive backtests |
+| `--config`, `-c` | `config/default.yaml` | Path to configuration file |
+
+#### Examples
+
+**Rule-based backtest (free):**
+```bash
+# Weekly backtest for full year
+uv run python -m src.main backtest \
+  --start-date 2024-01-01 \
+  --end-date 2024-12-31 \
+  --ticker AAPL,MSFT \
+  --frequency weekly \
+  --mode rule_based
+
+# Monthly backtest (faster)
+uv run python -m src.main backtest \
+  --start-date 2024-01-01 \
+  --end-date 2024-12-31 \
+  --ticker NVDA \
+  --frequency monthly \
+  --mode rule_based
+```
+
+**LLM backtest with cost estimation:**
+```bash
+# Dry-run to see cost estimate
+uv run python -m src.main backtest \
+  --start-date 2024-06-01 \
+  --end-date 2024-09-01 \
+  --ticker NVDA \
+  --frequency weekly \
+  --mode llm \
+  --dry-run
+
+# Execute with automatic confirmation
+uv run python -m src.main backtest \
+  --start-date 2024-06-01 \
+  --end-date 2024-09-01 \
+  --ticker NVDA \
+  --frequency weekly \
+  --mode llm \
+  --yes
+```
+
+**Daily backtest for single month:**
+```bash
+uv run python -m src.main backtest \
+  --start-date 2024-11-01 \
+  --end-date 2024-11-30 \
+  --ticker AAPL \
+  --frequency daily \
+  --mode rule_based
+```
+
+#### How It Works
+
+1. **Date Generation**: Creates analysis dates based on frequency
+   - Daily: Every day in range
+   - Weekly: Every 7 days
+   - Monthly: Same day each month
+
+2. **Cost Estimation** (LLM mode only):
+   - Calculates estimated cost: analyses × €0.65 per ticker
+   - Shows confirmation prompt if cost exceeds threshold (default: €20)
+   - Checks against cost limit (default: €100)
+
+3. **Execution**:
+   - Runs analysis for each date using existing pipeline
+   - Stores recommendations in database
+   - Tracks successes, failures, and errors
+
+4. **Results**:
+   - Shows execution summary with counts and duration
+   - Displays run session IDs for report generation
+   - Lists errors if any occurred
+
+#### Cost Management
+
+**Configuration** (in `config/default.yaml`):
+```yaml
+backtesting:
+  llm_cost_limit_per_backtest: 100.0  # Maximum cost per backtest (EUR)
+  require_confirmation: true           # Require confirmation before expensive runs
+  cost_confirmation_threshold: 20.0    # Threshold requiring confirmation (EUR)
+```
+
+**Estimated Costs** (LLM mode):
+- Per ticker: ~€0.65
+- Weekly for 1 year, 3 tickers: ~€100
+- Monthly for 1 year, 3 tickers: ~€23
+
+**Tips to reduce costs:**
+1. Use monthly frequency instead of weekly/daily
+2. Reduce date range (e.g., 3 months instead of full year)
+3. Analyze fewer tickers at a time
+4. Use rule-based mode for initial validation
+
+#### Database Integration
+
+- Automatically creates run sessions for each analysis date
+- Stores all recommendations with historical prices
+- Enables historical report generation
+- Allows tracking performance over time
+
+**Access backtest results:**
+```bash
+# Generate report from specific session
+uv run python -m src.main report --session-id 123
+
+# Generate report for date range
+uv run python -m src.main report --date 2024-01-01
+
+# Track performance
+uv run python -m src.main track-performance
+uv run python -m src.main performance-report --period 90
+```
+
+#### Notes
+
+- Database must be enabled in configuration
+- LLM mode requires ANTHROPIC_API_KEY or OPENAI_API_KEY
+- Historical prices are fetched for accurate analysis
+- Prevents look-ahead bias (uses only data available at that date)
+- Existing recommendations are not re-analyzed unless `--force-reanalysis` is used in future
+
+---
+
 ### performance-report
 
 Generate performance analytics report for tracked recommendations.
