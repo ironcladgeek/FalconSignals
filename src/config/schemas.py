@@ -1,5 +1,7 @@
 """Pydantic schemas for configuration validation."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -497,4 +499,8 @@ class Config(BaseModel):
     filtering: FilteringConfig = Field(
         default_factory=FilteringConfig,
         description="Filtering configuration for ticker pre-selection",
+    )
+    backtesting: dict[str, Any] | None = Field(
+        default=None,
+        description="Backtesting configuration for historical validation",
     )

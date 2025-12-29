@@ -258,3 +258,32 @@ filtering:
     gap:
       min_gap_percent: 3.0 # Minimum 3% gap size
       lookback_days: 5 # Check last 5 days for gaps
+
+# Backtesting Configuration
+backtesting:
+  # Execution parameters
+  default_frequency: weekly # Options: daily, weekly, monthly
+  default_period_days: 90 # Default tracking period for measuring outcomes (1-365)
+  max_concurrent_analyses: 5 # Maximum concurrent analyses for parallel execution (1-20)
+
+  # Cost controls (for LLM mode)
+  llm_cost_limit_per_backtest: 100.0 # Maximum cost per backtest in EUR (0 = no limit)
+  require_confirmation: true # Require user confirmation before expensive backtests
+  cost_confirmation_threshold: 20.0 # Cost threshold (EUR) requiring confirmation
+
+  # Benchmarks
+  default_benchmark: SPY # Default benchmark ticker (S&P 500)
+  alternative_benchmarks:
+    - QQQ # Nasdaq-100 (tech-heavy)
+    - IWM # Russell 2000 (small-cap)
+
+  # Reporting
+  report_formats:
+    - markdown
+    - json
+    - csv
+  include_visualizations: false # Generate charts (requires additional dependencies)
+
+  # Resume functionality
+  allow_resume: true # Allow resuming failed backtests
+  skip_existing_data: true # Skip analysis for dates with existing recommendations

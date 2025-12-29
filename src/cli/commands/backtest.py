@@ -158,9 +158,11 @@ def backtest(
             cache_dir=Path("data/cache"),
         )
 
-        # Load backtesting config (use defaults for now)
-        # TODO: Add backtesting section to config schema
+        # Load backtesting config
         backtest_config = BacktestConfig()
+        if config_obj.backtesting:
+            # Convert dict to BacktestConfig
+            backtest_config = BacktestConfig(**config_obj.backtesting)
 
         # Initialize engine
         engine = BacktestEngine(
