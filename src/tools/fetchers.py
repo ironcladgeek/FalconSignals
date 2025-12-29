@@ -566,10 +566,21 @@ class FinancialDataFetcherTool(BaseTool):
 
             logger.debug(f"Fetching enriched fundamental data for {ticker}")
 
-            # Fetch company overview (Alpha Vantage Premium)
+            # Fetch company overview
+            # For historical analysis, use yfinance quarterly data
+            # For current analysis, use Alpha Vantage (primary) or yfinance (fallback)
             company_info = None
             try:
-                company_info = self.provider_manager.get_company_info(ticker)
+                if self.historical_date and as_of_date:
+                    # Historical mode: Use yfinance quarterly data from provider
+                    logger.debug(
+                        f"Historical analysis mode: fetching company info from yfinance quarterly data for {ticker}"
+                    )
+                    yahoo_provider = DataProviderFactory.create("yahoo_finance")
+                    company_info = yahoo_provider.get_historical_company_info(ticker, as_of_date)
+                else:
+                    # Current mode: Use Alpha Vantage
+                    company_info = self.provider_manager.get_company_info(ticker)
             except Exception as e:
                 logger.warning(f"Could not fetch company info for {ticker}: {e}")
 
@@ -643,7 +654,9 @@ class FinancialDataFetcherTool(BaseTool):
             # Add data_source attribution to each section
             company_info_with_source = company_info or {}
             if company_info_with_source:
-                company_info_with_source["data_source"] = "Alpha Vantage"
+                # Preserve existing data_source if already set (e.g., from historical yfinance data)
+                if "data_source" not in company_info_with_source:
+                    company_info_with_source["data_source"] = "Alpha Vantage"
 
             earnings_estimates_with_source = earnings_estimates or {}
             if earnings_estimates_with_source:
