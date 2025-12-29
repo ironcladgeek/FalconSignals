@@ -498,6 +498,10 @@ class AlphaVantageProvider(DataProvider):
                         and not next_quarter
                     ):
                         next_quarter = estimate
+                        # Adjust horizon label to "next" in historical analysis context
+                        # to simulate what would have been the next quarter at that time
+                        if next_quarter["horizon"] == "historical fiscal quarter":
+                            next_quarter["horizon"] = "next fiscal quarter"
                     elif (
                         "historical" in horizon
                         and "year" in horizon
@@ -505,6 +509,10 @@ class AlphaVantageProvider(DataProvider):
                         and not next_year
                     ):
                         next_year = estimate
+                        # Adjust horizon label to "next" in historical analysis context
+                        # to simulate what would have been the next year at that time
+                        if next_year["horizon"] == "historical fiscal year":
+                            next_year["horizon"] = "next fiscal year"
 
             result = {
                 "ticker": data.get("symbol", ticker),
