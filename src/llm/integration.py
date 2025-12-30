@@ -16,11 +16,6 @@ from src.agents.rule_based import (
     SentimentAnalysisModule,
     TechnicalAnalysisModule,
 )
-
-# Backward compatibility aliases
-FundamentalAnalysisAgent = FundamentalAnalysisModule
-TechnicalAnalysisAgent = TechnicalAnalysisModule
-SentimentAgent = SentimentAnalysisModule
 from src.analysis.models import UnifiedAnalysisResult
 from src.analysis.normalizer import AnalysisResultNormalizer
 from src.config.schemas import LLMConfig
@@ -94,10 +89,10 @@ class LLMAnalysisOrchestrator:
         sentiment_crew = self.agent_factory.create_sentiment_analysis_agent(tools)
         synthesizer_crew = self.agent_factory.create_signal_synthesizer_agent()
 
-        # Create fallback rule-based agents
-        technical_fallback = TechnicalAnalysisAgent()
-        fundamental_fallback = FundamentalAnalysisAgent(db_path=self.db_path)
-        sentiment_fallback = SentimentAgent()
+        # Create fallback rule-based modules
+        technical_fallback = TechnicalAnalysisModule()
+        fundamental_fallback = FundamentalAnalysisModule(db_path=self.db_path)
+        sentiment_fallback = SentimentAnalysisModule()
 
         # Wrap in hybrid agents
         return {

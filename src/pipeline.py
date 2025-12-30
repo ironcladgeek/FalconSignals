@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from src.agents import AnalysisCrew
+from src.agents import RuleBasedOrchestrator
 from src.analysis import (
     AllocationEngine,
     DailyReport,
@@ -64,7 +64,7 @@ class AnalysisPipeline:
             self.recommendations_repo = RecommendationsRepository(db_path)
 
         # Initialize components
-        self.crew = AnalysisCrew(
+        self.crew = RuleBasedOrchestrator(
             llm_provider=llm_provider,
             test_mode_config=test_mode_config,
             db_path=db_path,

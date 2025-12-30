@@ -10,7 +10,7 @@ from src.agents.base import AgentConfig, BaseAgent
 from src.agents.llm import AITechnicalAnalysisAgent, HybridAnalysisAgent, HybridAnalysisCrew
 
 # Orchestrators
-from src.agents.orchestration import AnalysisCrew, RuleBasedOrchestrator
+from src.agents.orchestration import RuleBasedOrchestrator
 
 # Rule-based analysis modules
 from src.agents.rule_based import (
@@ -20,31 +20,19 @@ from src.agents.rule_based import (
     TechnicalAnalysisModule,
 )
 
-# Backward compatibility aliases (old names -> new names)
-TechnicalAnalysisAgent = TechnicalAnalysisModule
-FundamentalAnalysisAgent = FundamentalAnalysisModule
-SentimentAgent = SentimentAnalysisModule
-SignalSynthesisAgent = SignalSynthesisModule
-
 __all__ = [
     # Base classes
     "BaseAgent",
     "AgentConfig",
-    # Rule-based modules (new names)
+    # Rule-based modules
     "TechnicalAnalysisModule",
     "FundamentalAnalysisModule",
     "SentimentAnalysisModule",
     "SignalSynthesisModule",
-    # Backward compatibility (old names)
-    "TechnicalAnalysisAgent",
-    "FundamentalAnalysisAgent",
-    "SentimentAgent",
-    "SignalSynthesisAgent",
     # LLM agents
     "AITechnicalAnalysisAgent",
     "HybridAnalysisAgent",
     "HybridAnalysisCrew",
     # Orchestrators
     "RuleBasedOrchestrator",
-    "AnalysisCrew",  # Backward compatibility alias for RuleBasedOrchestrator
 ]
