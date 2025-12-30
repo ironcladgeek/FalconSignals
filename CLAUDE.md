@@ -296,8 +296,7 @@ FalconSignals/
 │   │   │   ├── output_models.py # Pydantic schemas for CrewAI
 │   │   │   ├── technical.py    # AITechnicalAnalysisAgent
 │   │   │   └── hybrid.py       # HybridAnalysisAgent + HybridAnalysisCrew
-│   │   └── orchestration/   # Orchestrators (coordinators)
-│   │       └── rule_based.py  # RuleBasedOrchestrator (was AnalysisCrew)
+│   │   └── orchestration/   # Legacy directory (empty - orchestration moved to src/orchestration/)
 │   ├── tools/               # Custom CrewAI tools for agents
 │   │   ├── base.py          # BaseTool and ToolRegistry
 │   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
@@ -316,8 +315,7 @@ FalconSignals/
 │   │   ├── fundamental.py   # Fundamental analysis
 │   │   ├── signals.py       # Signal generation
 │   │   └── report.py        # Report generation
-│   ├── llm/                 # LLM integration (Phase 6)
-│   │   ├── integration.py   # LLMAnalysisOrchestrator
+│   ├── llm/                 # LLM integration
 │   │   ├── token_tracker.py # Token usage & cost tracking
 │   │   ├── prompts.py       # Prompt templates
 │   │   └── tools.py         # CrewAI tool adapters
@@ -327,8 +325,9 @@ FalconSignals/
 │   │   ├── schemas.py       # Pydantic validation
 │   │   ├── loader.py        # YAML loading
 │   │   └── llm.py           # LLM client initialization
-│   ├── pipeline/            # Pipeline orchestration
-│   │   └── orchestrator.py  # AnalysisPipeline
+│   ├── orchestration/       # Analysis orchestration (SINGLE SOURCE OF TRUTH)
+│   │   └── unified.py       # UnifiedAnalysisOrchestrator (LLM + rule-based)
+│   ├── pipeline.py          # End-to-end analysis pipeline
 │   └── utils/               # Shared utilities
 │       ├── logging.py       # Logging setup
 │       └── llm_check.py     # LLM configuration check

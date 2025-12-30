@@ -1,5 +1,7 @@
-"""Analysis orchestrators."""
+"""Analysis orchestrators.
 
-from src.agents.orchestration.rule_based import RuleBasedOrchestrator
+Note: Legacy orchestrators (RuleBasedOrchestrator, LLMAnalysisOrchestrator) have been
+removed. Use UnifiedAnalysisOrchestrator from src.orchestration.unified instead.
+"""
 
-__all__ = ["RuleBasedOrchestrator"]
+__all__: list[str] = []
