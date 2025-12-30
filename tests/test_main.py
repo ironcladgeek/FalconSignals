@@ -428,7 +428,7 @@ class TestRunLLMAnalysis:
     """Test run_llm_analysis helper function."""
 
     @patch("src.cli.helpers.analysis.SignalCreator")
-    @patch("src.cli.helpers.analysis.LLMAnalysisOrchestrator")
+    @patch("src.cli.helpers.analysis.UnifiedAnalysisOrchestrator")
     @patch("src.cli.helpers.analysis.TokenTracker")
     def test_run_llm_analysis_success(
         self, mock_tracker_class, mock_orchestrator_class, mock_signal_creator_class
@@ -450,7 +450,10 @@ class TestRunLLMAnalysis:
         mock_orchestrator = mock_orchestrator_class.return_value
 
         # Mock successful analysis - analyze_instrument returns UnifiedAnalysisResult
-        mock_unified_result = MagicMock()
+        # Use spec to make isinstance() checks work
+        from src.analysis.models import UnifiedAnalysisResult
+
+        mock_unified_result = MagicMock(spec=UnifiedAnalysisResult)
         mock_unified_result.ticker = "AAPL"
         mock_orchestrator.analyze_instrument.return_value = mock_unified_result
 
@@ -487,7 +490,7 @@ class TestRunLLMAnalysis:
         mock_orchestrator.analyze_instrument.assert_called_once()
         mock_typer.echo.assert_called()
 
-    @patch("src.cli.helpers.analysis.LLMAnalysisOrchestrator")
+    @patch("src.cli.helpers.analysis.UnifiedAnalysisOrchestrator")
     @patch("src.cli.helpers.analysis.TokenTracker")
     def test_run_llm_analysis_with_debug(self, mock_tracker_class, mock_orchestrator_class):
         """Test LLM analysis with debug mode enabled."""
@@ -516,7 +519,7 @@ class TestRunLLMAnalysis:
             # Assert debug directory was created
             mock_path.return_value.__truediv__.return_value.__truediv__.return_value.mkdir.assert_called()
 
-    @patch("src.cli.helpers.analysis.LLMAnalysisOrchestrator")
+    @patch("src.cli.helpers.analysis.UnifiedAnalysisOrchestrator")
     @patch("src.cli.helpers.analysis.TokenTracker")
     def test_run_llm_analysis_error_handling(self, mock_tracker_class, mock_orchestrator_class):
         """Test LLM analysis error handling."""

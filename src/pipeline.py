@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from typing import Any
 
-from src.agents import RuleBasedOrchestrator
 from src.analysis import (
     AllocationEngine,
     DailyReport,
@@ -17,6 +16,7 @@ from src.cache.manager import CacheManager
 from src.config.schemas import Config
 from src.data.portfolio import PortfolioState
 from src.data.provider_manager import ProviderManager
+from src.orchestration import UnifiedAnalysisOrchestrator
 from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
@@ -63,8 +63,9 @@ class AnalysisPipeline:
 
             self.recommendations_repo = RecommendationsRepository(db_path)
 
-        # Initialize components
-        self.crew = RuleBasedOrchestrator(
+        # Initialize components (rule-based mode by default)
+        self.crew = UnifiedAnalysisOrchestrator(
+            llm_mode=False,  # Rule-based mode by default in pipeline
             llm_provider=llm_provider,
             test_mode_config=test_mode_config,
             db_path=db_path,

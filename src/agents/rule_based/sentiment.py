@@ -136,7 +136,7 @@ class SentimentAnalysisModule(BaseAgent):
                 score = 50 + (weighted_score * 50)
                 score = max(0, min(100, score))
 
-                logger.info(
+                logger.debug(
                     f"{ticker}: Using pre-calculated sentiment scores. "
                     f"Weighted score: {weighted_score:.3f} -> {score:.1f}/100"
                 )
