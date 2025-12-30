@@ -10,7 +10,6 @@ import typer
 
 from src.cache.manager import CacheManager
 from src.cli.app import app
-from src.cli.helpers.analysis import run_llm_analysis
 from src.cli.helpers.filtering import filter_tickers
 from src.config import load_config
 from src.data.db import init_db
@@ -477,9 +476,11 @@ def analyze(
             typer.echo(f"\n❌ Error: {str(e)}", err=True)
             sys.exit(1)
 
+        # Determine analysis mode
+        analysis_mode = "llm" if use_llm else "rule_based"
+
         # Remove tickers that already have recommendations for this date and analysis mode
         if recommendations_repo and not test and not force_reanalysis:
-            analysis_mode = "llm" if use_llm else "rule_based"
             check_date = historical_date if historical_date else datetime.now().date()
 
             typer.echo(
@@ -513,47 +514,40 @@ def analyze(
             else:
                 typer.echo("  ✓ No existing recommendations found. Proceeding with all tickers.")
 
-        # Run analysis (LLM or rule-based)
+        # Run analysis through unified pipeline
+        mode_label = "LLM-powered" if use_llm else "Rule-based"
+        mode_icon = "🤖" if use_llm else "📊"
+        typer.echo(f"\n{mode_icon} Stage 2: {mode_label} analysis")
         if use_llm:
-            typer.echo("\n🤖 Stage 2: Deep LLM-powered analysis")
             typer.echo(f"   LLM Provider: {config_obj.llm.provider}")
             typer.echo(f"   Model: {config_obj.llm.model}")
-            typer.echo(
-                f"   Analysis weights: Fundamental {config_obj.analysis.weight_fundamental:.0%}, "
-                f"Technical {config_obj.analysis.weight_technical:.0%}, "
-                f"Sentiment {config_obj.analysis.weight_sentiment:.0%}"
-            )
-
-            signals, portfolio_manager = run_llm_analysis(
-                filtered_ticker_list,
-                config_obj,
-                typer,
-                debug_llm,
-                is_filtered=True,
-                cache_manager=cache_manager,
-                provider_manager=provider_manager,
-                historical_date=historical_date,
-                run_session_id=run_session_id,
-                recommendations_repo=recommendations_repo,
-            )
-            analysis_mode = "llm"
         else:
-            typer.echo("\n📊 Stage 2: Rule-based analysis")
             typer.echo("   Using technical indicators & fundamental metrics")
-            typer.echo(
-                f"   Analysis weights: Fundamental {config_obj.analysis.weight_fundamental:.0%}, "
-                f"Technical {config_obj.analysis.weight_technical:.0%}, "
-                f"Sentiment {config_obj.analysis.weight_sentiment:.0%}"
-            )
-            # Pass historical context if available
-            analysis_context = {}
-            if historical_context_data:
-                analysis_context["historical_contexts"] = historical_context_data
-                analysis_context["analysis_date"] = historical_date
-            signals, portfolio_manager = pipeline.run_analysis(
-                filtered_ticker_list, analysis_context
-            )
-            analysis_mode = "rule_based"
+        typer.echo(
+            f"   Analysis weights: Fundamental {config_obj.analysis.weight_fundamental:.0%}, "
+            f"Technical {config_obj.analysis.weight_technical:.0%}, "
+            f"Sentiment {config_obj.analysis.weight_sentiment:.0%}"
+        )
+
+        # Create progress callback for typer output
+        def progress_callback(message: str):
+            """Display progress messages from the pipeline."""
+            typer.echo(f"  {message}")
+
+        # Pass historical context if available
+        analysis_context = {}
+        if historical_context_data:
+            analysis_context["historical_contexts"] = historical_context_data
+            analysis_context["analysis_date"] = historical_date
+
+        # Single unified entry point for both LLM and rule-based modes
+        signals, portfolio_manager = pipeline.run_analysis(
+            filtered_ticker_list,
+            context=analysis_context,
+            llm_mode=use_llm,
+            debug_llm=debug_llm,
+            progress_callback=progress_callback,
+        )
         signals_count = len(signals)
 
         # Complete run session if database is enabled
