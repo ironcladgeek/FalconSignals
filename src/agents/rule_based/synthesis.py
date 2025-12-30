@@ -98,7 +98,7 @@ class SignalSynthesisModule(BaseAgent):
                 ),
             }
 
-            logger.info(
+            logger.debug(
                 f"Signal synthesis for {ticker}: {recommendation} "
                 f"({final_score:.0f}/100, confidence: {confidence:.0f}%)"
             )
