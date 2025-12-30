@@ -86,13 +86,20 @@ class UnifiedAnalysisOrchestrator:
 
         # Check and log LLM configuration status
         llm_configured, provider = check_llm_configuration(llm_provider)
-        if self.llm_mode and llm_configured:
-            logger.debug(f"Unified orchestrator initialized in LLM mode with {provider}")
-        elif not self.llm_mode:
-            logger.warning(
-                "Unified orchestrator initialized in RULE-BASED MODE. "
-                "No LLM configured - using technical indicators and simple rules. "
-                "Set ANTHROPIC_API_KEY or OPENAI_API_KEY for AI-powered analysis."
+        if self.llm_mode:
+            if llm_configured:
+                logger.debug(f"Unified orchestrator initialized in LLM mode with {provider}")
+            else:
+                logger.warning(
+                    "LLM mode requested but no LLM configured. "
+                    "Set ANTHROPIC_API_KEY or OPENAI_API_KEY for AI-powered analysis. "
+                    "Falling back to rule-based mode."
+                )
+        else:
+            # Rule-based mode is intentional, not a warning condition
+            logger.debug(
+                "Unified orchestrator initialized in rule-based mode "
+                "(using technical indicators and quantitative analysis)"
             )
 
     def _initialize_llm_mode(self) -> None:
