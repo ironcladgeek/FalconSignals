@@ -5,13 +5,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from src.agents.analysis import (
-    FundamentalAnalysisAgent,
-    TechnicalAnalysisAgent,
+from src.agents.llm import (
+    CrewAIAgentFactory,
+    CrewAITaskFactory,
+    HybridAnalysisAgent,
+    HybridAnalysisCrew,
 )
-from src.agents.crewai_agents import CrewAIAgentFactory, CrewAITaskFactory
-from src.agents.hybrid import HybridAnalysisAgent, HybridAnalysisCrew
-from src.agents.sentiment import SentimentAgent
+from src.agents.rule_based import (
+    FundamentalAnalysisModule,
+    SentimentAnalysisModule,
+    TechnicalAnalysisModule,
+)
+
+# Backward compatibility aliases
+FundamentalAnalysisAgent = FundamentalAnalysisModule
+TechnicalAnalysisAgent = TechnicalAnalysisModule
+SentimentAgent = SentimentAnalysisModule
 from src.analysis.models import UnifiedAnalysisResult
 from src.analysis.normalizer import AnalysisResultNormalizer
 from src.config.schemas import LLMConfig

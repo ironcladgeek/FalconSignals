@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from src.agents.output_models import (
+from src.agents.llm.output_models import (
     FundamentalAnalysisOutput,
     SentimentAnalysisOutput,
     SignalSynthesisOutput,
@@ -55,7 +55,7 @@ class AnalysisResultNormalizer:
             UnifiedAnalysisResult with all detailed metrics preserved
         """
         # Import here to avoid circular dependency issues
-        from src.agents.output_models import (
+        from src.agents.llm.output_models import (
             FundamentalAnalysisOutput,
             SentimentAnalysisOutput,
             SignalSynthesisOutput,
@@ -522,7 +522,7 @@ class AnalysisResultNormalizer:
 
         Handles both Pydantic structured output and legacy markdown parsing.
         """
-        from src.agents.output_models import FundamentalAnalysisOutput
+        from src.agents.llm.output_models import FundamentalAnalysisOutput
 
         # Check if we have a Pydantic model
         result_data = fund_result.get("result", {})
@@ -643,7 +643,7 @@ class AnalysisResultNormalizer:
 
         Handles both Pydantic structured output and legacy markdown parsing.
         """
-        from src.agents.output_models import SentimentAnalysisOutput
+        from src.agents.llm.output_models import SentimentAnalysisOutput
 
         # Check if we have a Pydantic model
         result_data = sent_result.get("result", {})
@@ -1183,7 +1183,7 @@ class AnalysisResultNormalizer:
     @staticmethod
     def _parse_technical_markdown(result: dict[str, Any]) -> "TechnicalAnalysisOutput":
         """Parse technical analysis from markdown (fallback for non-Pydantic output)."""
-        from src.agents.output_models import TechnicalAnalysisOutput
+        from src.agents.llm.output_models import TechnicalAnalysisOutput
 
         # Extract raw text
         text = ""

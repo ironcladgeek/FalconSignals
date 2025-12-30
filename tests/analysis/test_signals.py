@@ -184,7 +184,7 @@ class TestSignalSynthesis:
         """Test that custom weights from config are used in scoring."""
         from unittest.mock import Mock
 
-        from src.agents.sentiment import SignalSynthesisAgent
+        from src.agents.rule_based import SignalSynthesisModule
 
         # Create a mock config with custom weights (different from default 0.35/0.35/0.30)
         mock_config = Mock()
@@ -194,8 +194,8 @@ class TestSignalSynthesis:
         mock_config.analysis.weight_sentiment = 0.2
 
         # Mock the get_config to return our custom config
-        with patch("src.agents.sentiment.get_config", return_value=mock_config):
-            agent = SignalSynthesisAgent()
+        with patch("src.agents.rule_based.synthesis.get_config", return_value=mock_config):
+            agent = SignalSynthesisModule()
 
             # Test data with known scores
             context = {
