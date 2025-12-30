@@ -9,9 +9,6 @@ from src.agents.base import AgentConfig, BaseAgent
 # LLM-powered agents
 from src.agents.llm import AITechnicalAnalysisAgent, HybridAnalysisAgent, HybridAnalysisCrew
 
-# Orchestrators
-from src.agents.orchestration import RuleBasedOrchestrator
-
 # Rule-based analysis modules
 from src.agents.rule_based import (
     FundamentalAnalysisModule,
@@ -33,6 +30,4 @@ __all__ = [
     "AITechnicalAnalysisAgent",
     "HybridAnalysisAgent",
     "HybridAnalysisCrew",
-    # Orchestrators
-    "RuleBasedOrchestrator",
 ]

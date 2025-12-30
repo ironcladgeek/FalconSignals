@@ -279,10 +279,11 @@ falconsignals/
 │   │   ├── analysis.py      # Technical & Sentiment tools
 │   │   └── reporting.py     # ReportGeneratorTool
 │   ├── llm/                 # LLM integration
-│   │   ├── integration.py   # LLMAnalysisOrchestrator
 │   │   ├── token_tracker.py # Token usage & cost tracking
 │   │   ├── prompts.py       # Prompt templates
 │   │   └── tools.py         # CrewAI tool adapters
+│   ├── orchestration/       # Analysis orchestration
+│   │   └── unified.py       # UnifiedAnalysisOrchestrator (LLM + rule-based)
 │   ├── analysis/            # Analysis modules
 │   │   ├── technical.py     # Technical indicators
 │   │   ├── fundamental.py   # Fundamental analysis

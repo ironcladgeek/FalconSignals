@@ -32,8 +32,8 @@ logger = get_logger(__name__)
 class UnifiedAnalysisOrchestrator:
     """Unified orchestrator that supports both LLM and rule-based analysis modes.
 
-    This class eliminates duplication between RuleBasedOrchestrator and
-    LLMAnalysisOrchestrator by providing a single interface for both modes.
+    This is the single source of truth for all analysis orchestration,
+    providing a unified interface for both LLM-powered and rule-based analysis.
     """
 
     def __init__(
