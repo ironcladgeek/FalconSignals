@@ -4,9 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 from src.analysis import InvestmentSignal
+from src.analysis.models import UnifiedAnalysisResult
 from src.analysis.signal_creator import SignalCreator
-from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
+from src.orchestration import UnifiedAnalysisOrchestrator
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -62,7 +63,8 @@ def run_llm_analysis(
             """Display progress messages."""
             typer_instance.echo(message)
 
-        orchestrator = LLMAnalysisOrchestrator(
+        orchestrator = UnifiedAnalysisOrchestrator(
+            llm_mode=True,  # Enable LLM mode
             llm_config=config_obj.llm,
             token_tracker=tracker,
             enable_fallback=config_obj.llm.enable_fallback,
@@ -99,26 +101,12 @@ def run_llm_analysis(
         ) as progress:
             for ticker in progress:
                 try:
-                    current_task = [0]  # Use list to allow mutation in nested function
-
-                    def agent_progress_callback(
-                        current, total, task_name, task_tracker=current_task
-                    ):
-                        """Update progress display for agent tasks."""
-                        if current > task_tracker[0]:
-                            task_tracker[0] = current
-                            # Show which agent is working
-                            agent_name = task_name.replace("_", " ").title()
-                            # Use regular newline instead of carriage return to avoid stdout pollution
-                            typer_instance.echo(f"  → {agent_name} ({current}/{total})")
-
                     # Analyze instrument - returns UnifiedAnalysisResult or None
-                    unified_result = orchestrator.analyze_instrument(
-                        ticker, progress_callback=agent_progress_callback
-                    )
+                    # Note: UnifiedAnalysisOrchestrator uses the progress_callback passed at init
+                    unified_result = orchestrator.analyze_instrument(ticker)
 
                     # Create signal from unified result using SignalCreator
-                    if unified_result:
+                    if unified_result and isinstance(unified_result, UnifiedAnalysisResult):
                         # Initialize SignalCreator with required dependencies
                         signal_creator = SignalCreator(
                             cache_manager=cache_manager,
