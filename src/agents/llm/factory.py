@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from crewai import Agent, Task
 
-from src.agents.output_models import (
+from src.agents.llm.output_models import (
     FundamentalAnalysisOutput,
     SentimentAnalysisOutput,
     SignalSynthesisOutput,
