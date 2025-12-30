@@ -1,17 +1,21 @@
-"""CrewAI Crew orchestration for agent coordination."""
+"""Rule-based analysis orchestration."""
 
 from typing import Any, Optional
 
-from src.agents.analysis import FundamentalAnalysisAgent, TechnicalAnalysisAgent
-from src.agents.sentiment import SentimentAgent, SignalSynthesisAgent
+from src.agents.rule_based import (
+    FundamentalAnalysisModule,
+    SentimentAnalysisModule,
+    SignalSynthesisModule,
+    TechnicalAnalysisModule,
+)
 from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class AnalysisCrew:
-    """Orchestrates multiple agents for comprehensive analysis."""
+class RuleBasedOrchestrator:
+    """Orchestrates rule-based analysis modules for comprehensive analysis."""
 
     def __init__(
         self,
@@ -30,11 +34,11 @@ class AnalysisCrew:
         """
         self.test_mode_config = test_mode_config
 
-        # Initialize analysis agents (no market scanner - filtering handled externally)
-        self.technical_agent = TechnicalAnalysisAgent()
-        self.fundamental_agent = FundamentalAnalysisAgent(db_path=db_path)
-        self.sentiment_agent = SentimentAgent()
-        self.signal_synthesizer = SignalSynthesisAgent()
+        # Initialize analysis modules (no market scanner - filtering handled externally)
+        self.technical_agent = TechnicalAnalysisModule()
+        self.fundamental_agent = FundamentalAnalysisModule(db_path=db_path)
+        self.sentiment_agent = SentimentAnalysisModule()
+        self.signal_synthesizer = SignalSynthesisModule()
 
         # Check LLM configuration and warn if using fallback
         llm_configured, provider = check_llm_configuration(llm_provider)
@@ -170,7 +174,7 @@ class AnalysisCrew:
             Dictionary with agent status
         """
         return {
-            "crew_name": "AnalysisCrew",
+            "crew_name": "RuleBasedOrchestrator",
             "total_agents": 4,
             "agents": {
                 "technical_analyst": {
