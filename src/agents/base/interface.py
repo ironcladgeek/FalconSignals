@@ -1,27 +1,12 @@
-"""Base agent class and agent configuration."""
+"""Base agent interface and abstract class."""
 
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from src.agents.base.config import AgentConfig
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class AgentConfig(BaseModel):
-    """Configuration for an agent."""
-
-    role: str = Field(description="Agent's role in the system")
-    goal: str = Field(description="Agent's goal and objectives")
-    backstory: str = Field(description="Agent's backstory and expertise")
-    max_iterations: int = Field(default=5, ge=1, le=20, description="Maximum iterations")
-    allow_delegation: bool = Field(default=False, description="Can delegate to other agents")
-    memory: bool = Field(default=True, description="Keep memory of interactions")
-    verbose: bool = Field(default=False, description="Enable verbose output")
-
-    model_config = ConfigDict(use_enum_values=True)
 
 
 class BaseAgent(ABC):
