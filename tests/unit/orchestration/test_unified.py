@@ -2,12 +2,20 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from src.analysis.models import (
     AnalysisComponentResult,
     UnifiedAnalysisResult,
 )
 from src.config.schemas import LLMConfig
 from src.orchestration import UnifiedAnalysisOrchestrator
+
+
+@pytest.fixture(autouse=True)
+def mock_anthropic_api_key(monkeypatch):
+    """Mock ANTHROPIC_API_KEY for testing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy-key-for-testing-only")
 
 
 class TestUnifiedAnalysisOrchestrator:
@@ -203,7 +211,17 @@ class TestUnifiedAnalysisOrchestrator:
         # Check that results are sorted by confidence
         assert all(r["ticker"] in ["AAPL", "MSFT"] for r in result["analysis_results"])
 
-    def test_analyze_instruments_llm_mode_unified_result(self):
+    @patch("src.orchestration.unified.CrewAIAgentFactory")
+    @patch("src.orchestration.unified.CrewAITaskFactory")
+    @patch("src.orchestration.unified.CrewAIToolAdapter")
+    @patch("src.orchestration.unified.HybridAnalysisCrew")
+    def test_analyze_instruments_llm_mode_unified_result(
+        self,
+        mock_crew,
+        mock_tool_adapter,
+        mock_task_factory,
+        mock_agent_factory,
+    ):
         """Test analyzing multiple instruments in LLM mode with UnifiedAnalysisResult."""
         orchestrator = UnifiedAnalysisOrchestrator(llm_mode=True)
 
