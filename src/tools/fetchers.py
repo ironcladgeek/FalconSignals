@@ -307,7 +307,7 @@ class PriceFetcherTool(BaseTool):
                 prices = self.provider.get_stock_prices(ticker, period=period)
             else:
                 # Date-range fetch (updating existing data)
-                logger.info(f"Fetching {ticker} prices: {fetch_start} to {fetch_end}")
+                logger.debug(f"Fetching {ticker} prices: {fetch_start} to {fetch_end}")
                 prices = self.provider.get_stock_prices(
                     ticker,
                     datetime.combine(fetch_start, datetime.min.time()),
@@ -318,7 +318,7 @@ class PriceFetcherTool(BaseTool):
                 # Store in unified CSV
                 price_dicts = [p.model_dump() for p in prices]
                 pm.store_prices(ticker, price_dicts, append=True)
-                logger.info(f"Stored {len(prices)} prices for {ticker} in unified CSV")
+                logger.debug(f"Stored {len(prices)} prices for {ticker} in unified CSV")
                 fetched_successfully = True
             else:
                 logger.warning(
