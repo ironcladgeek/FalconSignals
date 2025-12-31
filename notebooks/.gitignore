@@ -1,1 +1,7 @@
+# Ignore Jupyter notebook files (.ipynb)
+# We use jupytext to track Python versions (.py) instead
+# This prevents notebook output and metadata from cluttering git history
 *.ipynb
+
+# Jupyter checkpoint files
+.ipynb_checkpoints/

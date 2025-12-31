@@ -981,6 +981,89 @@ wheels = [
 ]
 
 [[package]]
+name = "falconsignals"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "crewai" },
+    { name = "crewai-tools" },
+    { name = "langchain" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-community" },
+    { name = "langchain-ollama" },
+    { name = "langchain-openai" },
+    { name = "litellm" },
+    { name = "loguru" },
+    { name = "mkdocs" },
+    { name = "mkdocs-awesome-pages-plugin" },
+    { name = "mkdocs-material" },
+    { name = "pandas" },
+    { name = "pandas-ta" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "sqlmodel" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "typer" },
+    { name = "yfinance" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "jupytext" },
+    { name = "notebook" },
+    { name = "poethepoet" },
+    { name = "pre-commit" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "vulture" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "crewai", specifier = ">=1.6.0" },
+    { name = "crewai-tools", specifier = ">=1.6.0" },
+    { name = "langchain", specifier = ">=0.1.0" },
+    { name = "langchain-anthropic", specifier = ">=0.1.0" },
+    { name = "langchain-community", specifier = ">=0.0.20" },
+    { name = "langchain-ollama", specifier = ">=1.0.0" },
+    { name = "langchain-openai", specifier = ">=0.1.0" },
+    { name = "litellm", specifier = ">=1.80.7" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "mkdocs", specifier = ">=1.6.1" },
+    { name = "mkdocs-awesome-pages-plugin", specifier = ">=2.10.1" },
+    { name = "mkdocs-material", specifier = ">=9.7.0" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "pandas-ta", specifier = ">=0.4.71b0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "requests", specifier = ">=2.31.0" },
+    { name = "sqlmodel", specifier = ">=0.0.27" },
+    { name = "torch", specifier = ">=2.9.1" },
+    { name = "transformers", specifier = ">=4.57.3" },
+    { name = "typer", specifier = ">=0.20.0" },
+    { name = "yfinance", specifier = ">=0.2.32" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "jupytext", specifier = ">=1.18.1" },
+    { name = "notebook", specifier = ">=7.5.0" },
+    { name = "poethepoet", specifier = ">=0.38.0" },
+    { name = "pre-commit", specifier = ">=4.5.0" },
+    { name = "pyright", specifier = ">=1.1.407" },
+    { name = "pytest", specifier = ">=9.0.1" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "ruff", specifier = ">=0.14.6" },
+    { name = "vulture", specifier = ">=2.14" },
+]
+
+[[package]]
 name = "fastjsonschema"
 version = "2.21.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1878,6 +1961,22 @@ wheels = [
 ]
 
 [[package]]
+name = "jupytext"
+version = "1.18.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "mdit-py-plugins" },
+    { name = "nbformat" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9b/5d/82a614a49493fa84b2019a3e03020a8b9927208ae177b81f7e0b30330c82/jupytext-1.18.1.tar.gz", hash = "sha256:5c0962ca8d222db45cbe1848b4805dbbe3ddb957603fc96651b6cd7fd403fafb", size = 4270997, upload-time = "2025-10-19T15:06:30.992Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/0d/2d240e7098e0cafba4d25e9530e7596b1bb1bd4476e41b10346bcaaa36d6/jupytext-1.18.1-py3-none-any.whl", hash = "sha256:24f999400726a1c658beae55e15fdd2a6255ab1a418697864cd779874e6011ab", size = 167143, upload-time = "2025-10-19T15:06:28.975Z" },
+]
+
+[[package]]
 name = "kubernetes"
 version = "33.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2429,6 +2528,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mdit-py-plugins"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/fd/a756d36c0bfba5f6e39a1cdbdbfdd448dc02692467d83816dff4592a1ebc/mdit_py_plugins-0.5.0.tar.gz", hash = "sha256:f4918cb50119f50446560513a8e311d574ff6aaed72606ddae6d35716fe809c6", size = 44655, upload-time = "2025-08-11T07:25:49.083Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/86/dd6e5db36df29e76c7a7699123569a4a18c1623ce68d826ed96c62643cae/mdit_py_plugins-0.5.0-py3-none-any.whl", hash = "sha256:07a08422fc1936a5d26d146759e9155ea466e842f5ab2f7d2266dd084c8dab1f", size = 57205, upload-time = "2025-08-11T07:25:47.597Z" },
+]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2830,87 +2941,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/16/fc88b08840de0e0a72a2f9d8c6bae36be573e475a6326ae854bcc549fc45/nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f", size = 47437, upload-time = "2024-06-04T18:44:11.171Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/1d/1b658dbd2b9fa9c4c9f32accbfc0205d532c8c6194dc0f2a4c0428e7128a/nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9", size = 22314, upload-time = "2024-06-04T18:44:08.352Z" },
-]
-
-[[package]]
-name = "falconsignals"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "crewai" },
-    { name = "crewai-tools" },
-    { name = "langchain" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-community" },
-    { name = "langchain-ollama" },
-    { name = "langchain-openai" },
-    { name = "litellm" },
-    { name = "loguru" },
-    { name = "mkdocs" },
-    { name = "mkdocs-awesome-pages-plugin" },
-    { name = "mkdocs-material" },
-    { name = "pandas" },
-    { name = "pandas-ta" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "sqlmodel" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "typer" },
-    { name = "yfinance" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "notebook" },
-    { name = "poethepoet" },
-    { name = "pre-commit" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "vulture" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "crewai", specifier = ">=1.6.0" },
-    { name = "crewai-tools", specifier = ">=1.6.0" },
-    { name = "langchain", specifier = ">=0.1.0" },
-    { name = "langchain-anthropic", specifier = ">=0.1.0" },
-    { name = "langchain-community", specifier = ">=0.0.20" },
-    { name = "langchain-ollama", specifier = ">=1.0.0" },
-    { name = "langchain-openai", specifier = ">=0.1.0" },
-    { name = "litellm", specifier = ">=1.80.7" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "mkdocs", specifier = ">=1.6.1" },
-    { name = "mkdocs-awesome-pages-plugin", specifier = ">=2.10.1" },
-    { name = "mkdocs-material", specifier = ">=9.7.0" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pandas-ta", specifier = ">=0.4.71b0" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "requests", specifier = ">=2.31.0" },
-    { name = "sqlmodel", specifier = ">=0.0.27" },
-    { name = "torch", specifier = ">=2.9.1" },
-    { name = "transformers", specifier = ">=4.57.3" },
-    { name = "typer", specifier = ">=0.20.0" },
-    { name = "yfinance", specifier = ">=0.2.32" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "notebook", specifier = ">=7.5.0" },
-    { name = "poethepoet", specifier = ">=0.38.0" },
-    { name = "pre-commit", specifier = ">=4.5.0" },
-    { name = "pyright", specifier = ">=1.1.407" },
-    { name = "pytest", specifier = ">=9.0.1" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.14.6" },
-    { name = "vulture", specifier = ">=2.14" },
 ]
 
 [[package]]
@@ -4221,6 +4251,8 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/72/74/448b6172927c829c6a3fba80078d7b0a016ebbe2c9ee528821f5ea21677a/pymupdf-1.26.7-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:31aa9c8377ea1eea02934b92f4dcf79fb2abba0bf41f8a46d64c3e31546a3c02", size = 22470101, upload-time = "2025-12-11T21:47:37.105Z" },
     { url = "https://files.pythonhosted.org/packages/65/e7/47af26f3ac76be7ac3dd4d6cc7ee105948a8355d774e5ca39857bf91c11c/pymupdf-1.26.7-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:e419b609996434a14a80fa060adec72c434a1cca6a511ec54db9841bc5d51b3c", size = 23502486, upload-time = "2025-12-12T09:51:25.824Z" },
     { url = "https://files.pythonhosted.org/packages/2a/6b/3de1714d734ff949be1e90a22375d0598d3540b22ae73eb85c2d7d1f36a9/pymupdf-1.26.7-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:69dfc78f206a96e5b3ac22741263ebab945fdf51f0dbe7c5757c3511b23d9d72", size = 24115727, upload-time = "2025-12-11T21:47:51.274Z" },
+    { url = "https://files.pythonhosted.org/packages/62/9b/f86224847949577a523be2207315ae0fd3155b5d909cd66c274d095349a3/pymupdf-1.26.7-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:1d5106f46e1ca0d64d46bd51892372a4f82076bdc14a9678d33d630702abca36", size = 24324386, upload-time = "2025-12-12T14:58:45.483Z" },
+    { url = "https://files.pythonhosted.org/packages/85/8e/a117d39092ca645fde8b903f4a941d9aa75b370a67b4f1f435f56393dc5a/pymupdf-1.26.7-cp310-abi3-win32.whl", hash = "sha256:7c9645b6f5452629c747690190350213d3e5bbdb6b2eca227d82702b327f6eee", size = 17203888, upload-time = "2025-12-12T13:59:57.613Z" },
     { url = "https://files.pythonhosted.org/packages/dd/c3/d0047678146c294469c33bae167c8ace337deafb736b0bf97b9bc481aa65/pymupdf-1.26.7-cp310-abi3-win_amd64.whl", hash = "sha256:425b1befe40d41b72eb0fe211711c7ae334db5eb60307e9dd09066ed060cceba", size = 18405952, upload-time = "2025-12-11T21:48:02.947Z" },
 ]
 
