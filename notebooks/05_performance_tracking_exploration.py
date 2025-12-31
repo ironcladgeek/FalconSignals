@@ -53,14 +53,14 @@ from src.data.provider_manager import ProviderManager
 
 # Initialize components
 config = load_config()
-cache_dir = str(Path("data") / "cache")
+cache_dir = str(project_root / "data" / "cache")
 cache_manager = CacheManager(cache_dir)
 provider_manager = ProviderManager(
     primary_provider=config.data.primary_provider,
     backup_providers=config.data.backup_providers,
     db_path=config.database.db_path,
 )
-price_manager = PriceDataManager(prices_dir="data/cache/prices")
+price_manager = PriceDataManager(prices_dir=str(project_root / "data" / "cache" / "prices"))
 from src.data.repository import Repository  # type: ignore[import-not-found]
 
 repository = Repository(config.database.db_path)

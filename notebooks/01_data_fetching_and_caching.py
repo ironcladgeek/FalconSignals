@@ -63,7 +63,7 @@ print(f"  - Database enabled: {config.database.enabled}")
 
 # %%
 # Initialize cache manager
-cache_dir = str(Path("data") / "cache")
+cache_dir = str(project_root / "data" / "cache")
 cache_manager = CacheManager(cache_dir)
 print("✅ CacheManager initialized")
 print(f"  - Cache directory: {cache_dir}")
@@ -106,7 +106,7 @@ else:
 # Let's see what files were created in the cache:
 
 # %%
-cache_dir_path = Path("data") / "cache"
+cache_dir_path = project_root / "data" / "cache"
 print("Cache directory contents:")
 print(f"{'=' * 60}")
 
