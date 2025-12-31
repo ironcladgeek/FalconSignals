@@ -75,7 +75,7 @@ lint = "sh -c 'ruff check --select I --select F --select B --select W --fix && r
 pre-commit = "pre-commit run --all-files"
 test = "pytest tests/ --cov=src --tb=short -q"
 rmpycache = "find . -type d -name '__pycache__' -exec rm -rf {} +"
-rmdatacache = "find data/cache \\( -name '*.json' -o -name '*.csv' \\) -exec rm -f {} +"
+rmdatacache = "sh -c 'rm -rf data/cache && mkdir data/cache && touch data/cache/.gitkeep'"
 rmreports = "find data/reports -name '*.md' -exec rm -f {} +"
 rmdatabase = "rm -f data/falconsignals.db"
 rmall = "sh -c 'uv run poe rmpycache && uv run poe rmdatacache && uv run poe rmreports && uv run poe rmdatabase'"
