@@ -67,7 +67,7 @@ try:
     # Test that we can actually use the imported function
     config = load_config()
     print("✅ Successfully imported and used load_config")
-    print(f"✅ Config loaded with {len(config.markets)} markets configured")
+    print(f"✅ Config loaded with {len(config.markets.included)} markets configured")
     print("✅ Jupytext setup is working correctly!")
 except ImportError as e:
     print(f"❌ Import failed: {e}")

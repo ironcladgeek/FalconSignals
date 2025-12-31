@@ -48,15 +48,21 @@ print(f"Project root: {project_root}")
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
 from src.data.price_manager import PriceDataManager
-from src.data.providers import ProviderManager
-from src.data.repository import Repository
+from src.data.provider_manager import ProviderManager
 
 # Initialize components
 config = load_config()
-cache_manager = CacheManager(config.cache_dir)
-provider_manager = ProviderManager(config, cache_manager)
-price_manager = PriceDataManager(provider_manager)
-repository = Repository(config.database_url)
+cache_dir = str(Path("data") / "cache")
+cache_manager = CacheManager(cache_dir)
+provider_manager = ProviderManager(
+    primary_provider=config.data.primary_provider,
+    backup_providers=config.data.backup_providers,
+    db_path=config.database.db_path,
+)
+price_manager = PriceDataManager(prices_dir="data/cache/prices")
+from src.data.repository import Repository  # type: ignore[import-not-found]
+
+repository = Repository(config.database.db_path)
 
 print("✅ Components initialized")
 
@@ -302,25 +308,28 @@ if recent_sessions:
     rb_sessions = [s for s in recent_sessions if s.analysis_mode == "rule-based" and s.completed_at]
     llm_sessions = [s for s in recent_sessions if s.analysis_mode == "llm" and s.completed_at]
 
+    rb_avg_time: float = 0.0
+    llm_avg_time: float = 0.0
+
     if rb_sessions:
         rb_times = [(s.completed_at - s.created_at).total_seconds() for s in rb_sessions]
-        rb_avg = sum(rb_times) / len(rb_times)
+        rb_avg_time = sum(rb_times) / len(rb_times)
         print(f"\nRule-Based Sessions ({len(rb_sessions)} total):")
-        print(f"  - Average duration: {rb_avg:.1f} seconds")
+        print(f"  - Average duration: {rb_avg_time:.1f} seconds")
         print(f"  - Range: {min(rb_times):.1f}s - {max(rb_times):.1f}s")
 
     if llm_sessions:
         llm_times = [(s.completed_at - s.created_at).total_seconds() for s in llm_sessions]
-        llm_avg = sum(llm_times) / len(llm_times)
+        llm_avg_time = sum(llm_times) / len(llm_times)
         print(f"\nLLM-Powered Sessions ({len(llm_sessions)} total):")
-        print(f"  - Average duration: {llm_avg:.1f} seconds")
+        print(f"  - Average duration: {llm_avg_time:.1f} seconds")
         print(f"  - Range: {min(llm_times):.1f}s - {max(llm_times):.1f}s")
 
     if rb_sessions and llm_sessions:
-        speedup = llm_avg / rb_avg
+        speedup = llm_avg_time / rb_avg_time
         print("\nComparison:")
         print(f"  - LLM is {speedup:.1f}x slower than rule-based")
-        print(f"  - Extra time per ticker: ~{(llm_avg - rb_avg):.1f} seconds")
+        print(f"  - Extra time per ticker: ~{(llm_avg_time - rb_avg_time):.1f} seconds")
 else:
     print("No session data available")
 

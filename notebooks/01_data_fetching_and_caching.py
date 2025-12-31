@@ -50,25 +50,30 @@ print(f"Cache directory: {project_root / 'data' / 'cache'}")
 # %%
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
-from src.data.providers import ProviderManager
+from src.data.provider_manager import ProviderManager
 
 # Initialize configuration
 config = load_config()
 print("✅ Configuration loaded")
-print(f"  - Markets: {', '.join(config.markets)}")
-print(f"  - Cache enabled: {config.cache_enabled}")
+print(f"  - Markets: {', '.join(config.markets.included)}")
+print(f"  - Database enabled: {config.database.enabled}")
 
 # %% [markdown]
 # ## Initialize Provider and Cache Managers
 
 # %%
 # Initialize cache manager
-cache_manager = CacheManager(config.cache_dir)
+cache_dir = str(Path("data") / "cache")
+cache_manager = CacheManager(cache_dir)
 print("✅ CacheManager initialized")
-print(f"  - Cache directory: {config.cache_dir}")
+print(f"  - Cache directory: {cache_dir}")
 
 # Initialize provider manager
-provider_manager = ProviderManager(config, cache_manager)
+provider_manager = ProviderManager(
+    primary_provider=config.data.primary_provider,
+    backup_providers=config.data.backup_providers,
+    db_path=config.database.db_path,
+)
 print("✅ ProviderManager initialized")
 print("  - Primary provider: Yahoo Finance")
 
@@ -85,17 +90,13 @@ print(f"Fetching price data for {ticker}...")
 start_date = datetime.now() - timedelta(days=30)
 end_date = datetime.now()
 
-price_data = provider_manager.get_stock_prices(
-    ticker=ticker,
-    start_date=start_date.strftime("%Y-%m-%d"),
-    end_date=end_date.strftime("%Y-%m-%d"),
-)
+price_data = provider_manager.get_stock_prices(ticker=ticker, period="30d")
 
 if price_data:
-    df = price_data.to_dataframe()
-    print(f"✅ Fetched {len(df)} price records for {ticker}")
+    print(f"✅ Fetched {len(price_data)} price records for {ticker}")
     print("\nLast 5 records:")
-    print(df.tail())
+    for price in price_data[-5:]:
+        print(f"  {price.date}: ${price.close:.2f}")  # type: ignore[attr-defined]
 else:
     print(f"❌ Failed to fetch price data for {ticker}")
 
@@ -105,13 +106,13 @@ else:
 # Let's see what files were created in the cache:
 
 # %%
-cache_dir = Path(config.cache_dir)
+cache_dir_path = Path("data") / "cache"
 print("Cache directory contents:")
 print(f"{'=' * 60}")
 
 # List all cache files
-for cache_file in sorted(cache_dir.rglob("*.json")):
-    relative_path = cache_file.relative_to(cache_dir)
+for cache_file in sorted(cache_dir_path.rglob("*.json")):
+    relative_path = cache_file.relative_to(cache_dir_path)
     file_size = cache_file.stat().st_size / 1024  # KB
     modified_time = datetime.fromtimestamp(cache_file.stat().st_mtime)
     print(f"{relative_path}")
@@ -126,7 +127,7 @@ for cache_file in sorted(cache_dir.rglob("*.json")):
 
 # %%
 # Find the AAPL price cache file
-aapl_cache_files = list(cache_dir.rglob(f"*{ticker}*.json"))
+aapl_cache_files = list(cache_dir_path.rglob(f"*{ticker}*.json"))
 if aapl_cache_files:
     cache_file = aapl_cache_files[0]
     print(f"Inspecting: {cache_file.name}")
@@ -159,11 +160,7 @@ import time
 
 # First fetch (should use cache)
 start_time = time.time()
-price_data_cached = provider_manager.get_stock_prices(
-    ticker=ticker,
-    start_date=start_date.strftime("%Y-%m-%d"),
-    end_date=end_date.strftime("%Y-%m-%d"),
-)
+price_data_cached = provider_manager.get_stock_prices(ticker=ticker, period="30d")
 cached_fetch_time = time.time() - start_time
 
 print(f"✅ Cached fetch completed in {cached_fetch_time:.4f} seconds")
@@ -177,7 +174,7 @@ print("  - This should be very fast (< 0.1s) because data is cached")
 # %%
 print(f"Fetching fundamental data for {ticker}...")
 
-fundamentals = provider_manager.get_fundamentals(ticker)
+fundamentals = provider_manager.primary_provider.get_fundamentals(ticker)  # type: ignore[attr-defined]
 
 if fundamentals:
     print(f"✅ Fetched fundamental data for {ticker}")
@@ -222,7 +219,7 @@ if news:
     for i, article in enumerate(news[:3], 1):
         print(f"\n{i}. {article.title}")
         print(f"   Source: {article.source}")
-        print(f"   Published: {article.published_at}")
+        print(f"   Published: {article.published_date}")
         print(f"   Sentiment: {article.sentiment}")
         print(
             f"   URL: {article.url[:80]}..." if len(article.url) > 80 else f"   URL: {article.url}"
@@ -263,16 +260,11 @@ print(f"{'=' * 60}")
 
 for ticker in tickers:
     start_time = time.time()
-    price_data = provider_manager.get_stock_prices(
-        ticker=ticker,
-        start_date=start_date.strftime("%Y-%m-%d"),
-        end_date=end_date.strftime("%Y-%m-%d"),
-    )
+    price_data = provider_manager.get_stock_prices(ticker=ticker, period="30d")
     fetch_time = time.time() - start_time
 
     if price_data:
-        df = price_data.to_dataframe()
-        print(f"✅ {ticker:6} - {len(df):3} records - {fetch_time:.4f}s")
+        print(f"✅ {ticker:6} - {len(price_data):3} records - {fetch_time:.4f}s")
     else:
         print(f"❌ {ticker:6} - Failed - {fetch_time:.4f}s")
 

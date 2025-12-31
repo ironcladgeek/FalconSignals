@@ -1,0 +1,16 @@
+{
+  "include": [
+    "src",
+    "tests"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/node_modules",
+    "notebooks"
+  ],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Darwin"
+}

@@ -49,15 +49,21 @@ from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
 from src.data.price_manager import PriceDataManager
-from src.data.providers import ProviderManager
-from src.data.repository import Repository
+from src.data.provider_manager import ProviderManager
 
 # Initialize configuration
 config = load_config()
-cache_manager = CacheManager(config.cache_dir)
-provider_manager = ProviderManager(config, cache_manager)
-price_manager = PriceDataManager(provider_manager)
-repository = Repository(config.database_url)
+cache_dir = str(Path("data") / "cache")
+cache_manager = CacheManager(cache_dir)
+provider_manager = ProviderManager(
+    primary_provider=config.data.primary_provider,
+    backup_providers=config.data.backup_providers,
+    db_path=config.database.db_path,
+)
+price_manager = PriceDataManager(prices_dir="data/cache/prices")
+from src.data.repository import Repository  # type: ignore[import-not-found]
+
+repository = Repository(config.database.db_path)
 
 print("✅ Components initialized")
 
@@ -78,9 +84,9 @@ historical_price = price_manager.get_price_at_date(ticker=ticker, target_date=an
 
 if historical_price:
     print("✅ Historical price found:")
-    print(f"  - Date: {historical_price.date}")
-    print(f"  - Close: ${historical_price.close:.2f}")
-    print(f"  - Volume: {historical_price.volume:,}")
+    print(f"  - Date: {historical_price['date']}")
+    print(f"  - Close: ${historical_price['close']:.2f}")
+    print(f"  - Volume: {historical_price['volume']:,}")
 else:
     print(f"❌ No historical price found for {ticker} on {analysis_date.strftime('%Y-%m-%d')}")
 
@@ -93,16 +99,16 @@ else:
 # Fetch current/latest price
 latest_prices = provider_manager.get_stock_prices(ticker=ticker, period="5d")
 
-if latest_prices and latest_prices.prices:
-    latest_price = latest_prices.prices[-1]
+if latest_prices:
+    latest_price = latest_prices[-1]
     print(f"Latest price for {ticker}:")
     print(f"  - Date: {latest_price.date}")
-    print(f"  - Close: ${latest_price.close:.2f}")
+    print(f"  - Close: ${latest_price.close:.2f}")  # type: ignore[attr-defined]
     print()
 
     if historical_price:
-        price_diff = latest_price.close - historical_price.close
-        price_change_pct = (price_diff / historical_price.close) * 100
+        price_diff = latest_price.close - historical_price["close"]  # type: ignore[attr-defined]
+        price_change_pct = (price_diff / historical_price["close"]) * 100
 
         print(f"Price change from {analysis_date.strftime('%Y-%m-%d')} to now:")
         print(f"  - Absolute: ${price_diff:+.2f}")
@@ -141,10 +147,10 @@ for test_case in test_cases:
     price = price_manager.get_price_at_date(ticker=ticker, target_date=target_date)
 
     if price:
-        is_in_range = expected_min <= price.close <= expected_max
+        is_in_range = expected_min <= price["close"] <= expected_max
         status = "✅" if is_in_range else "⚠️"
 
-        print(f"{status} {ticker:6} on {date_str}: ${price.close:.2f}")
+        print(f"{status} {ticker:6} on {date_str}: ${price['close']:.2f}")
         if not is_in_range:
             print(f"    Expected range: ${expected_min}-${expected_max}")
     else:
@@ -160,9 +166,7 @@ for test_case in test_cases:
 # %%
 
 # Create SignalCreator instance
-signal_creator = SignalCreator(
-    provider_manager=provider_manager, price_manager=price_manager, config=config
-)
+signal_creator = SignalCreator(provider_manager=provider_manager, price_manager=price_manager)
 
 print("Testing SignalCreator with historical date")
 print(f"{'=' * 60}")
@@ -228,7 +232,7 @@ if historical_recs:
             )
 
             if actual_price:
-                diff = abs(rec.current_price - actual_price.close)
+                diff = abs(rec.current_price - actual_price["close"])
                 if diff < 0.01:
                     print("  ✅ Price matches historical data exactly")
                 elif diff < 1.0:
@@ -258,25 +262,25 @@ def check_future_leakage(ticker: str, analysis_date: datetime) -> None:
 
     # Get current price
     current_prices = provider_manager.get_stock_prices(ticker=ticker, period="1d")
-    current_price = current_prices.prices[-1] if current_prices and current_prices.prices else None
+    current_price = current_prices[-1] if current_prices else None
 
     if hist_price and current_price:
         # Calculate date difference
-        days_diff = (current_price.date - hist_price.date).days
+        days_diff = (current_price.date - hist_price["date"]).days
 
-        print(f"Historical price: ${hist_price.close:.2f} on {hist_price.date}")
-        print(f"Current price:    ${current_price.close:.2f} on {current_price.date}")
+        print(f"Historical price: ${hist_price['close']:.2f} on {hist_price['date']}")
+        print(f"Current price:    ${current_price.close:.2f} on {current_price.date}")  # type: ignore[attr-defined]
         print(f"Days between:     {days_diff} days")
         print()
 
         if days_diff < 1:
             print("⚠️ WARNING: Dates are too close! Possible future information leakage!")
-        elif abs(hist_price.close - current_price.close) < 0.01:
+        elif abs(hist_price["close"] - current_price.close) < 0.01:  # type: ignore[attr-defined]
             print("⚠️ WARNING: Prices are identical! Possible future information leakage!")
         else:
             print("✅ No future information leakage detected")
             print(
-                f"   Price changed ${current_price.close - hist_price.close:+.2f} over {days_diff} days"
+                f"   Price changed ${current_price.close - hist_price['close']:+.2f} over {days_diff} days"  # type: ignore[attr-defined]
             )
     else:
         print("❌ Could not verify - missing price data")

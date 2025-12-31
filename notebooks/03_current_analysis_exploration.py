@@ -49,15 +49,21 @@ from src.analysis.signal_creator import SignalCreator
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
 from src.data.price_manager import PriceDataManager
-from src.data.providers import ProviderManager
-from src.data.repository import Repository
+from src.data.provider_manager import ProviderManager
 
 # Initialize components
 config = load_config()
-cache_manager = CacheManager(config.cache_dir)
-provider_manager = ProviderManager(config, cache_manager)
-price_manager = PriceDataManager(provider_manager)
-repository = Repository(config.database_url)
+cache_dir = str(Path("data") / "cache")
+cache_manager = CacheManager(cache_dir)
+provider_manager = ProviderManager(
+    primary_provider=config.data.primary_provider,
+    backup_providers=config.data.backup_providers,
+    db_path=config.database.db_path,
+)
+price_manager = PriceDataManager(prices_dir="data/cache/prices")
+from src.data.repository import Repository  # type: ignore[import-not-found]
+
+repository = Repository(config.database.db_path)
 
 print("✅ Components initialized")
 
@@ -75,17 +81,17 @@ print(f"{'=' * 60}")
 # Fetch latest price data
 latest_prices = provider_manager.get_stock_prices(ticker=ticker, period="5d")
 
-if latest_prices and latest_prices.prices:
+if latest_prices:
     # Get the most recent price
-    latest_price = latest_prices.prices[-1]
+    latest_price = latest_prices[-1]
 
     print("✅ Latest price data:")
     print(f"  - Ticker: {ticker}")
     print(f"  - Date: {latest_price.date}")
-    print(f"  - Close: ${latest_price.close:.2f}")
+    print(f"  - Close: ${latest_price.close:.2f}")  # type: ignore[attr-defined]
     print(f"  - Volume: {latest_price.volume:,}")
-    print(f"  - High: ${latest_price.high:.2f}")
-    print(f"  - Low: ${latest_price.low:.2f}")
+    print(f"  - High: ${latest_price.high:.2f}")  # type: ignore[attr-defined]
+    print(f"  - Low: ${latest_price.low:.2f}")  # type: ignore[attr-defined]
 
     # Check how recent this data is
     days_old = (datetime.now().date() - latest_price.date).days
@@ -110,9 +116,7 @@ else:
 # %%
 
 # Create SignalCreator
-signal_creator = SignalCreator(
-    provider_manager=provider_manager, price_manager=price_manager, config=config
-)
+signal_creator = SignalCreator(provider_manager=provider_manager, price_manager=price_manager)
 
 print("Testing SignalCreator with current date")
 print(f"{'=' * 60}")
@@ -298,22 +302,22 @@ def verify_current_price_accuracy(ticker: str) -> None:
     # Fetch price data
     price_data = provider_manager.get_stock_prices(ticker=ticker, period="5d")
 
-    if price_data and price_data.prices:
-        latest = price_data.prices[-1]
+    if price_data:
+        latest = price_data[-1]
 
         print("✅ Latest price retrieved:")
         print(f"  - Date: {latest.date}")
-        print(f"  - Close: ${latest.close:.2f}")
+        print(f"  - Close: ${latest.close:.2f}")  # type: ignore[attr-defined]
 
         # Check data freshness
         age_days = (datetime.now().date() - latest.date).days
         print(f"  - Age: {age_days} days")
 
         # Check if price is reasonable (not zero or negative)
-        if latest.close > 0:
+        if latest.close > 0:  # type: ignore[attr-defined]
             print("  ✅ Price is valid (> 0)")
         else:
-            print(f"  ❌ Invalid price: ${latest.close}")
+            print(f"  ❌ Invalid price: ${latest.close}")  # type: ignore[attr-defined]
 
         # Check volume
         if latest.volume > 0:
@@ -321,10 +325,10 @@ def verify_current_price_accuracy(ticker: str) -> None:
         else:
             print("  ⚠️ Volume is zero or missing")
 
-        return True
+        return None
     else:
         print("❌ Failed to fetch price data")
-        return False
+        return None
 
 
 # Test with multiple tickers

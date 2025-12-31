@@ -49,15 +49,21 @@ print(f"Project root: {project_root}")
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
 from src.data.price_manager import PriceDataManager
-from src.data.providers import ProviderManager
-from src.data.repository import Repository
+from src.data.provider_manager import ProviderManager
 
 # Initialize components
 config = load_config()
-cache_manager = CacheManager(config.cache_dir)
-provider_manager = ProviderManager(config, cache_manager)
-price_manager = PriceDataManager(provider_manager)
-repository = Repository(config.database_url)
+cache_dir = str(Path("data") / "cache")
+cache_manager = CacheManager(cache_dir)
+provider_manager = ProviderManager(
+    primary_provider=config.data.primary_provider,
+    backup_providers=config.data.backup_providers,
+    db_path=config.database.db_path,
+)
+price_manager = PriceDataManager(prices_dir="data/cache/prices")
+from src.data.repository import Repository  # type: ignore[import-not-found]
+
+repository = Repository(config.database.db_path)
 
 print("✅ Components initialized")
 
@@ -155,11 +161,11 @@ if buy_recs:
             price_updates.append(
                 {
                     "ticker": ticker,
-                    "date": latest_price.date,
-                    "price": latest_price.close,
+                    "date": latest_price["date"],
+                    "price": latest_price["close"],
                 }
             )
-            print(f"✅ {ticker:6} ${latest_price.close:>8.2f} ({latest_price.date})")
+            print(f"✅ {ticker:6} ${latest_price['close']:>8.2f} ({latest_price['date']})")
         else:
             print(f"❌ {ticker:6} - Failed to fetch price")
 
@@ -172,11 +178,10 @@ if buy_recs:
 # Let's calculate returns for tracked recommendations:
 
 # %%
+returns_data = []
 if buy_recs:
     print("Return Calculation")
     print(f"{'=' * 80}\n")
-
-    returns_data = []
 
     for rec in buy_recs[:10]:  # Analyze first 10
         # Get latest price
@@ -184,17 +189,17 @@ if buy_recs:
 
         if latest_price and rec.current_price > 0:
             # Calculate return
-            price_change = latest_price.close - rec.current_price
+            price_change = latest_price["close"] - rec.current_price
             return_pct = (price_change / rec.current_price) * 100
 
             # Calculate days held
-            days_held = (latest_price.date - rec.analysis_date.date()).days
+            days_held = (latest_price["date"] - rec.analysis_date.date()).days
 
             returns_data.append(
                 {
                     "ticker": rec.ticker,
                     "entry_price": rec.current_price,
-                    "current_price": latest_price.close,
+                    "current_price": latest_price["close"],
                     "return_pct": return_pct,
                     "days_held": days_held,
                     "signal": rec.signal,
@@ -225,15 +230,17 @@ if buy_recs:
 
         print()
 
-        # Calculate aggregate metrics
-        avg_return = sum(x["return_pct"] for x in returns_data) / len(returns_data)
-        win_rate = sum(1 for x in returns_data if x["return_pct"] > 0) / len(returns_data) * 100
+# Calculate aggregate metrics
+avg_return: float = 0.0
+if returns_data:
+    avg_return = sum(x["return_pct"] for x in returns_data) / len(returns_data)
+    win_rate = sum(1 for x in returns_data if x["return_pct"] > 0) / len(returns_data) * 100
 
-        print("Aggregate Metrics:")
-        print(f"  - Average Return: {avg_return:+.2f}%")
-        print(f"  - Win Rate: {win_rate:.1f}%")
-        print(f"  - Winners: {sum(1 for x in returns_data if x['return_pct'] > 0)}")
-        print(f"  - Losers: {sum(1 for x in returns_data if x['return_pct'] <= 0)}")
+    print("Aggregate Metrics:")
+    print(f"  - Average Return: {avg_return:+.2f}%")
+    print(f"  - Win Rate: {win_rate:.1f}%")
+    print(f"  - Winners: {sum(1 for x in returns_data if x['return_pct'] > 0)}")
+    print(f"  - Losers: {sum(1 for x in returns_data if x['return_pct'] <= 0)}")
 
 # %% [markdown]
 # ## Benchmark Comparison
@@ -250,17 +257,13 @@ if buy_recs and returns_data:
     earliest_date = min(rec.analysis_date for rec in buy_recs)
     latest_date = datetime.now()
 
-    # Fetch SPY prices
-    spy_prices = provider_manager.get_stock_prices(
-        ticker="SPY",
-        start_date=earliest_date.strftime("%Y-%m-%d"),
-        end_date=latest_date.strftime("%Y-%m-%d"),
-    )
+    # Fetch SPY prices (approximate period)
+    days_diff = (latest_date - earliest_date).days
+    spy_prices = provider_manager.get_stock_prices(ticker="SPY", period=f"{days_diff}d")
 
-    if spy_prices and spy_prices.prices:
-        spy_df = spy_prices.to_dataframe()
-        spy_start = spy_df.iloc[0]["close"]
-        spy_end = spy_df.iloc[-1]["close"]
+    if spy_prices:
+        spy_start = spy_prices[0].close  # type: ignore[attr-defined]
+        spy_end = spy_prices[-1].close  # type: ignore[attr-defined]
         spy_return = ((spy_end - spy_start) / spy_start) * 100
 
         print("SPY Performance:")
