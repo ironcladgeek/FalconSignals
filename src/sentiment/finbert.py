@@ -4,6 +4,7 @@ Provides zero-cost sentiment analysis using the ProsusAI/finbert model,
 with optional LLM fallback for theme extraction.
 """
 
+import logging as stdlib_logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -82,15 +83,24 @@ class FinBERTSentimentScorer:
 
         logger.debug(f"Loading FinBERT model: {self.model_name}")
 
-        # Create pipeline with device auto-detection
-        device_arg = self.device if self.device is not None else -1  # -1 = CPU, >=0 = GPU
-        self._pipeline = pipeline(
-            "text-classification",
-            model=self.model_name,
-            device=device_arg,
-            truncation=True,
-            max_length=self.max_length,
-        )
+        # Suppress transformers logging during pipeline creation
+        transformers_logger = stdlib_logging.getLogger("transformers")
+        original_level = transformers_logger.level
+        transformers_logger.setLevel(stdlib_logging.ERROR)
+
+        try:
+            # Create pipeline with device auto-detection
+            device_arg = self.device if self.device is not None else -1  # -1 = CPU, >=0 = GPU
+            self._pipeline = pipeline(
+                "text-classification",
+                model=self.model_name,
+                device=device_arg,
+                truncation=True,
+                max_length=self.max_length,
+            )
+        finally:
+            # Restore original logging level
+            transformers_logger.setLevel(original_level)
 
         self._loaded = True
         logger.debug("FinBERT pipeline loaded successfully")

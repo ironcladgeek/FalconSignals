@@ -1,20 +1,33 @@
-"""CrewAI agent definitions for financial analysis."""
+"""Agent definitions for financial analysis."""
 
 # Ensure data providers are registered on import
 import src.data  # noqa: F401
-from src.agents.ai_technical_agent import AITechnicalAnalysisAgent
-from src.agents.analysis import FundamentalAnalysisAgent, TechnicalAnalysisAgent
+
+# Base classes
 from src.agents.base import AgentConfig, BaseAgent
-from src.agents.crew import AnalysisCrew
-from src.agents.sentiment import SentimentAgent, SignalSynthesisAgent
+
+# LLM-powered agents
+from src.agents.llm import AITechnicalAnalysisAgent, HybridAnalysisAgent, HybridAnalysisCrew
+
+# Rule-based analysis modules
+from src.agents.rule_based import (
+    FundamentalAnalysisModule,
+    SentimentAnalysisModule,
+    SignalSynthesisModule,
+    TechnicalAnalysisModule,
+)
 
 __all__ = [
+    # Base classes
     "BaseAgent",
     "AgentConfig",
-    "TechnicalAnalysisAgent",
+    # Rule-based modules
+    "TechnicalAnalysisModule",
+    "FundamentalAnalysisModule",
+    "SentimentAnalysisModule",
+    "SignalSynthesisModule",
+    # LLM agents
     "AITechnicalAnalysisAgent",
-    "FundamentalAnalysisAgent",
-    "SentimentAgent",
-    "SignalSynthesisAgent",
-    "AnalysisCrew",
+    "HybridAnalysisAgent",
+    "HybridAnalysisCrew",
 ]

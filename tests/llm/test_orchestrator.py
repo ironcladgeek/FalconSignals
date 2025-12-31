@@ -1,10 +1,10 @@
-"""Tests for LLM integration module."""
+"""Tests for unified orchestrator in LLM mode."""
 
 import pytest
 
 from src.config.schemas import LLMConfig, TokenTrackerConfig
-from src.llm.integration import LLMAnalysisOrchestrator
 from src.llm.token_tracker import TokenTracker
+from src.orchestration.unified import UnifiedAnalysisOrchestrator
 
 
 @pytest.fixture(autouse=True)
@@ -88,12 +88,14 @@ class TestTokenTracker:
 
 
 @pytest.mark.unit
-class TestLLMAnalysisOrchestrator:
-    """Test LLM Analysis Orchestrator."""
+class TestUnifiedAnalysisOrchestrator:
+    """Test Unified Analysis Orchestrator in LLM mode."""
 
     def test_orchestrator_initialization(self, llm_config):
-        """Test orchestrator initialization."""
-        orchestrator = LLMAnalysisOrchestrator(llm_config=llm_config, enable_fallback=True)
+        """Test orchestrator initialization in LLM mode."""
+        orchestrator = UnifiedAnalysisOrchestrator(
+            llm_mode=True, llm_config=llm_config, enable_fallback=True
+        )
 
         assert orchestrator.llm_config == llm_config
         assert len(orchestrator.hybrid_agents) > 0
@@ -102,8 +104,8 @@ class TestLLMAnalysisOrchestrator:
         assert "sentiment" in orchestrator.hybrid_agents
 
     def test_orchestrator_status(self, llm_config):
-        """Test orchestrator status reporting."""
-        orchestrator = LLMAnalysisOrchestrator(llm_config=llm_config)
+        """Test orchestrator status reporting in LLM mode."""
+        orchestrator = UnifiedAnalysisOrchestrator(llm_mode=True, llm_config=llm_config)
         status = orchestrator.get_orchestrator_status()
 
         assert status["llm_provider"] == "anthropic"
@@ -112,8 +114,8 @@ class TestLLMAnalysisOrchestrator:
         assert "agents" in status
 
     def test_hybrid_agent_creation(self, llm_config):
-        """Test hybrid agent creation."""
-        orchestrator = LLMAnalysisOrchestrator(llm_config=llm_config)
+        """Test hybrid agent creation in LLM mode."""
+        orchestrator = UnifiedAnalysisOrchestrator(llm_mode=True, llm_config=llm_config)
 
         for agent_name, hybrid_agent in orchestrator.hybrid_agents.items():
             assert hybrid_agent.crewai_agent is not None
@@ -123,8 +125,8 @@ class TestLLMAnalysisOrchestrator:
                 assert hybrid_agent.enable_fallback is True
 
     def test_tool_adapter_creation(self, llm_config):
-        """Test tool adapter initialization."""
-        orchestrator = LLMAnalysisOrchestrator(llm_config=llm_config)
+        """Test tool adapter initialization in LLM mode."""
+        orchestrator = UnifiedAnalysisOrchestrator(llm_mode=True, llm_config=llm_config)
         tools = orchestrator.tool_adapter.get_crewai_tools()
 
         assert len(tools) > 0

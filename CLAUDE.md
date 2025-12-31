@@ -282,14 +282,21 @@ FalconSignals/
 │   │   │   ├── downloads.py # Price data download logic (140 lines)
 │   │   │   └── watchlist.py # Watchlist scan logic (176 lines)
 │   │   └── shared/          # Shared CLI utilities
-│   ├── agents/              # CrewAI agent definitions
-│   │   ├── base.py          # BaseAgent and AgentConfig
-│   │   ├── crew.py          # AnalysisCrew orchestrator
-│   │   ├── scanner.py       # MarketScannerAgent
-│   │   ├── analysis.py      # Technical & Fundamental agents
-│   │   ├── sentiment.py     # Sentiment & Signal Synthesis agents
-│   │   ├── crewai_agents.py # CrewAI Agent factory
-│   │   └── hybrid.py        # Hybrid intelligence wrapper
+│   ├── agents/              # Analysis agents and modules
+│   │   ├── base/            # Base classes and interfaces
+│   │   │   ├── config.py    # AgentConfig
+│   │   │   └── interface.py # BaseAgent (abstract interface)
+│   │   ├── rule_based/      # Rule-based analysis modules
+│   │   │   ├── technical.py   # TechnicalAnalysisModule
+│   │   │   ├── fundamental.py # FundamentalAnalysisModule
+│   │   │   ├── sentiment.py   # SentimentAnalysisModule
+│   │   │   └── synthesis.py   # SignalSynthesisModule
+│   │   ├── llm/             # LLM-powered agents (CrewAI)
+│   │   │   ├── factory.py      # CrewAIAgentFactory + CrewAITaskFactory
+│   │   │   ├── output_models.py # Pydantic schemas for CrewAI
+│   │   │   ├── technical.py    # AITechnicalAnalysisAgent
+│   │   │   └── hybrid.py       # HybridAnalysisAgent + HybridAnalysisCrew
+│   │   └── orchestration/   # Legacy directory (empty - orchestration moved to src/orchestration/)
 │   ├── tools/               # Custom CrewAI tools for agents
 │   │   ├── base.py          # BaseTool and ToolRegistry
 │   │   ├── fetchers.py      # PriceFetcherTool, NewsFetcherTool
@@ -308,8 +315,7 @@ FalconSignals/
 │   │   ├── fundamental.py   # Fundamental analysis
 │   │   ├── signals.py       # Signal generation
 │   │   └── report.py        # Report generation
-│   ├── llm/                 # LLM integration (Phase 6)
-│   │   ├── integration.py   # LLMAnalysisOrchestrator
+│   ├── llm/                 # LLM integration
 │   │   ├── token_tracker.py # Token usage & cost tracking
 │   │   ├── prompts.py       # Prompt templates
 │   │   └── tools.py         # CrewAI tool adapters
@@ -319,8 +325,9 @@ FalconSignals/
 │   │   ├── schemas.py       # Pydantic validation
 │   │   ├── loader.py        # YAML loading
 │   │   └── llm.py           # LLM client initialization
-│   ├── pipeline/            # Pipeline orchestration
-│   │   └── orchestrator.py  # AnalysisPipeline
+│   ├── orchestration/       # Analysis orchestration (SINGLE SOURCE OF TRUTH)
+│   │   └── unified.py       # UnifiedAnalysisOrchestrator (LLM + rule-based)
+│   ├── pipeline.py          # End-to-end analysis pipeline
 │   └── utils/               # Shared utilities
 │       ├── logging.py       # Logging setup
 │       └── llm_check.py     # LLM configuration check
@@ -349,15 +356,17 @@ FalconSignals/
 
 **⚠️ IMPORTANT**: Before following these patterns, check if functionality already exists. Always prefer **reusing and extending** existing code over creating duplicates.
 
-### Creating New Agents
+### Creating New Agents/Modules
 
-1. **Check first**: Does a similar agent already exist?
-2. Create agent class in `src/agents/`
-3. Define role, goal, backstory using clear job descriptions
-4. Assign custom tools from `src/tools/`
-5. Add to crew configuration in `src/agents/crew.py`
-6. Create hybrid wrapper if LLM fallback is needed
-7. **DO NOT** create separate orchestration for LLM mode - use existing crew
+1. **Check first**: Does a similar agent/module already exist?
+2. **For rule-based modules**: Create in `src/agents/rule_based/` with suffix `Module`
+   - Example: `TechnicalAnalysisModule`, `FundamentalAnalysisModule`
+3. **For LLM agents**: Create in `src/agents/llm/` or use factory pattern
+   - Example: `AITechnicalAnalysisAgent`, `HybridAnalysisAgent`
+4. Define role, goal, backstory using clear job descriptions
+5. Assign custom tools from `src/tools/`
+6. Add to orchestrator in `src/agents/orchestration/rule_based.py`
+7. **DO NOT** create separate orchestration - extend existing orchestrators
 
 ### Adding New Tools
 

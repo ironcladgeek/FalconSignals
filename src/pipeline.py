@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from typing import Any
 
-from src.agents import AnalysisCrew
 from src.analysis import (
     AllocationEngine,
     DailyReport,
@@ -17,6 +16,7 @@ from src.cache.manager import CacheManager
 from src.config.schemas import Config
 from src.data.portfolio import PortfolioState
 from src.data.provider_manager import ProviderManager
+from src.orchestration import UnifiedAnalysisOrchestrator
 from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
@@ -63,8 +63,9 @@ class AnalysisPipeline:
 
             self.recommendations_repo = RecommendationsRepository(db_path)
 
-        # Initialize components
-        self.crew = AnalysisCrew(
+        # Initialize components (rule-based mode by default)
+        self.crew = UnifiedAnalysisOrchestrator(
+            llm_mode=False,  # Rule-based mode by default in pipeline
             llm_provider=llm_provider,
             test_mode_config=test_mode_config,
             db_path=db_path,
@@ -99,12 +100,18 @@ class AnalysisPipeline:
         self,
         tickers: list[str],
         context: dict[str, Any] | None = None,
+        llm_mode: bool = False,
+        debug_llm: bool = False,
+        progress_callback: Any = None,
     ) -> tuple[list[InvestmentSignal], PortfolioState | None]:
         """Execute full analysis pipeline for given tickers.
 
         Args:
             tickers: List of tickers to analyze
             context: Optional additional context
+            llm_mode: If True, use LLM-powered analysis; if False, use rule-based
+            debug_llm: Enable LLM debug mode (save inputs/outputs)
+            progress_callback: Optional callback function(message: str) for progress updates
 
         Returns:
             Tuple of (signals, updated portfolio state)
@@ -119,23 +126,113 @@ class AnalysisPipeline:
                 self.config.analysis.historical_data_lookback_days
             )
 
-        logger.debug(f"Starting analysis pipeline for {len(tickers)} instruments")
+        # Extract analysis_date from context for historical analysis support
+        analysis_date = context.get("analysis_date") if context else None
+
+        mode_label = "LLM-powered" if llm_mode else "rule-based"
+        logger.debug(f"Starting {mode_label} analysis pipeline for {len(tickers)} instruments")
 
         signals = []
 
         try:
-            # Phase 1: Execute crew analysis (tickers should be pre-filtered by main.py)
-            logger.debug("Phase 1: Running crew analysis on pre-filtered tickers")
-            analysis_result = self.crew.analyze_instruments(tickers, context)
+            # Create orchestrator based on mode
+            if llm_mode:
+                # LLM mode: Create fresh orchestrator with LLM components
+                from pathlib import Path
 
-            if analysis_result.get("status") != "success":
-                logger.error(f"Crew analysis failed: {analysis_result.get('message')}")
-                return signals, self.portfolio_manager
+                from src.llm.token_tracker import TokenTracker
 
-            analysis_results = analysis_result.get("analysis_results", [])
+                # Initialize token tracker
+                data_dir = Path("data")
+                tracker = TokenTracker(
+                    self.config.token_tracker,
+                    storage_dir=data_dir / "tracking",
+                )
 
-            # Phase 2: Normalize results and create signals with risk assessment
-            logger.debug("Phase 2: Normalizing analysis results and creating signals")
+                # Setup debug directory if requested
+                debug_dir = None
+                if debug_llm:
+                    debug_dir = data_dir / "llm_debug" / datetime.now().strftime("%Y%m%d_%H%M%S")
+                    debug_dir.mkdir(parents=True, exist_ok=True)
+                    logger.debug(f"LLM debug mode enabled: {debug_dir}")
+
+                orchestrator = UnifiedAnalysisOrchestrator(
+                    llm_mode=True,
+                    llm_config=self.config.llm,
+                    token_tracker=tracker,
+                    enable_fallback=self.config.llm.enable_fallback,
+                    debug_dir=debug_dir,
+                    progress_callback=progress_callback,
+                    db_path=self.config.database.db_path if self.config.database.enabled else None,
+                    config=self.config,
+                )
+
+                # Set historical date on tools if provided
+                if analysis_date:
+                    logger.debug(f"Setting historical date {analysis_date} on LLM tools")
+                    if hasattr(orchestrator, "tool_adapter"):
+                        if hasattr(orchestrator.tool_adapter, "price_fetcher"):
+                            orchestrator.tool_adapter.price_fetcher.set_historical_date(
+                                analysis_date
+                            )
+                        if hasattr(orchestrator.tool_adapter, "fundamental_fetcher"):
+                            orchestrator.tool_adapter.fundamental_fetcher.set_historical_date(
+                                analysis_date
+                            )
+                        if hasattr(orchestrator.tool_adapter, "news_fetcher"):
+                            orchestrator.tool_adapter.news_fetcher.set_historical_date(
+                                analysis_date
+                            )
+
+                # Analyze instruments with LLM
+                analysis_results = []
+                for ticker in tickers:
+                    try:
+                        unified_result = orchestrator.analyze_instrument(ticker)
+                        if unified_result:
+                            analysis_results.append(unified_result)
+                    except Exception as e:
+                        logger.error(f"Error analyzing {ticker} with LLM: {e}")
+
+                # Log token usage if available
+                if hasattr(orchestrator, "token_tracker") and orchestrator.token_tracker:
+                    daily_stats = orchestrator.token_tracker.get_daily_stats()
+                    if daily_stats:
+                        logger.debug(
+                            f"Token usage: {daily_stats.total_input_tokens:,} input, "
+                            f"{daily_stats.total_output_tokens:,} output, "
+                            f"€{daily_stats.total_cost_eur:.2f}"
+                        )
+
+                analysis_mode = "llm"
+                llm_model = self.config.llm.model
+            else:
+                # Rule-based mode: Use existing orchestrator
+                logger.debug("Phase 1: Running rule-based crew analysis")
+                analysis_result = self.crew.analyze_instruments(tickers, context)
+
+                if analysis_result.get("status") != "success":
+                    logger.error(f"Crew analysis failed: {analysis_result.get('message')}")
+                    return signals, self.portfolio_manager
+
+                # Normalize rule-based results to UnifiedAnalysisResult
+                raw_results = analysis_result.get("analysis_results", [])
+                analysis_results = []
+                for analysis in raw_results:
+                    try:
+                        unified_result = AnalysisResultNormalizer.normalize_rule_based_result(
+                            analysis
+                        )
+                        analysis_results.append(unified_result)
+                    except Exception as e:
+                        ticker = analysis.get("ticker", "UNKNOWN")
+                        logger.warning(f"Failed to normalize analysis for {ticker}: {e}")
+
+                analysis_mode = "rule_based"
+                llm_model = None
+
+            # Phase 2: Create signals from unified results
+            logger.debug("Phase 2: Creating signals from analysis results")
             portfolio_context = self.portfolio_manager.to_dict() if self.portfolio_manager else {}
 
             # Initialize SignalCreator for unified signal creation
@@ -145,43 +242,37 @@ class AnalysisPipeline:
                 risk_assessor=self.risk_assessor,
             )
 
-            # Extract analysis_date from context for historical analysis support
-            analysis_date = context.get("analysis_date") if context else None
-
-            for analysis in analysis_results:
-                # Normalize to unified structure for consistent processing
+            for unified_result in analysis_results:
                 try:
-                    unified_result = AnalysisResultNormalizer.normalize_rule_based_result(analysis)
-                    logger.debug(f"Normalized rule-based result for {unified_result.ticker}")
+                    # Create signal using SignalCreator (unified for both modes)
+                    signal = signal_creator.create_signal(
+                        result=unified_result,
+                        portfolio_context=portfolio_context,
+                        analysis_date=analysis_date,
+                    )
+
+                    if signal:
+                        signals.append(signal)
+
+                        # Store signal to database if enabled
+                        if self.recommendations_repo and self.run_session_id:
+                            try:
+                                self.recommendations_repo.store_recommendation(
+                                    signal=signal,
+                                    run_session_id=self.run_session_id,
+                                    analysis_mode=analysis_mode,
+                                    llm_model=llm_model,
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to store recommendation for {signal.ticker} to database: {e}"
+                                )
+                                # Continue execution - DB failures don't halt pipeline
                 except Exception as e:
-                    ticker = analysis.get("ticker", "UNKNOWN")
-                    logger.warning(f"Failed to normalize analysis for {ticker}: {e}")
-                    continue  # Skip if normalization fails
-
-                # Create signal using SignalCreator (unified for both LLM and rule-based)
-                signal = signal_creator.create_signal(
-                    result=unified_result,
-                    portfolio_context=portfolio_context,
-                    analysis_date=analysis_date,
-                )
-
-                if signal:
-                    signals.append(signal)
-
-                    # Store signal to database if enabled
-                    if self.recommendations_repo and self.run_session_id:
-                        try:
-                            self.recommendations_repo.store_recommendation(
-                                signal=signal,
-                                run_session_id=self.run_session_id,
-                                analysis_mode="rule_based",
-                                llm_model=None,
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to store recommendation for {signal.ticker} to database: {e}"
-                            )
-                            # Continue execution - DB failures don't halt pipeline
+                    ticker = (
+                        unified_result.ticker if hasattr(unified_result, "ticker") else "UNKNOWN"
+                    )
+                    logger.error(f"Error creating signal for {ticker}: {e}")
 
             logger.debug(f"Generated {len(signals)} investment signals")
 
@@ -264,9 +355,15 @@ class AnalysisPipeline:
             allocation_suggestion = None
             if generate_allocation and signals:
                 signal_dicts = [self._signal_to_dict(s) for s in signals]
+                # Convert positions to dict format expected by allocation engine
+                existing_positions = (
+                    self.portfolio_manager.to_dict()["positions"]
+                    if self.portfolio_manager
+                    else None
+                )
                 allocation_suggestion = self.allocation_engine.allocate_signals(
                     signal_dicts,
-                    self.portfolio_manager.positions if self.portfolio_manager else None,
+                    existing_positions,
                 )
                 allocation_suggestion.generated_at = datetime.now()
 

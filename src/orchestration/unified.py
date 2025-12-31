@@ -1,74 +1,130 @@
-"""High-level integration of CrewAI and hybrid intelligence system."""
+"""Unified analysis orchestrator supporting both LLM and rule-based modes."""
 
 import json
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from src.agents.analysis import (
-    FundamentalAnalysisAgent,
-    TechnicalAnalysisAgent,
+from src.agents.llm import (
+    CrewAIAgentFactory,
+    CrewAITaskFactory,
+    HybridAnalysisAgent,
+    HybridAnalysisCrew,
 )
-from src.agents.crewai_agents import CrewAIAgentFactory, CrewAITaskFactory
-from src.agents.hybrid import HybridAnalysisAgent, HybridAnalysisCrew
-from src.agents.sentiment import SentimentAgent
+from src.agents.rule_based import (
+    FundamentalAnalysisModule,
+    SentimentAnalysisModule,
+    SignalSynthesisModule,
+    TechnicalAnalysisModule,
+)
 from src.analysis.models import UnifiedAnalysisResult
 from src.analysis.normalizer import AnalysisResultNormalizer
 from src.config.schemas import LLMConfig
 from src.llm.token_tracker import TokenTracker
 from src.llm.tools import CrewAIToolAdapter
+from src.utils.llm_check import check_llm_configuration
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class LLMAnalysisOrchestrator:
-    """Orchestrates LLM-powered analysis using hybrid intelligence."""
+class UnifiedAnalysisOrchestrator:
+    """Unified orchestrator that supports both LLM and rule-based analysis modes.
+
+    This is the single source of truth for all analysis orchestration,
+    providing a unified interface for both LLM-powered and rule-based analysis.
+    """
 
     def __init__(
         self,
+        llm_mode: bool = False,
         llm_config: Optional[LLMConfig] = None,
+        llm_provider: Optional[str] = None,
         token_tracker: Optional[TokenTracker] = None,
         enable_fallback: bool = True,
         debug_dir: Optional[Path] = None,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
+        test_mode_config: Optional[Any] = None,
         db_path: Optional[str] = None,
         config=None,
     ):
-        """Initialize analysis orchestrator.
+        """Initialize unified orchestrator.
 
         Args:
-            llm_config: LLM configuration
-            token_tracker: Token usage tracker
-            enable_fallback: Enable fallback to rule-based analysis
-            debug_dir: Directory to save debug outputs (inputs/outputs from LLM)
+            llm_mode: If True, use LLM-powered agents; if False, use rule-based modules
+            llm_config: LLM configuration (only used if llm_mode=True)
+            llm_provider: Optional LLM provider to check configuration for
+            token_tracker: Token usage tracker (only used if llm_mode=True)
+            enable_fallback: Enable fallback to rule-based analysis in LLM mode
+            debug_dir: Directory to save debug outputs (LLM mode only)
             progress_callback: Optional callback function(message: str) for progress updates
+            test_mode_config: Optional test mode configuration for fixtures/mock LLM
             db_path: Optional path to database for storing analyst ratings
             config: Full configuration object for accessing analysis settings
         """
+        self.llm_mode = llm_mode
         self.llm_config = llm_config or LLMConfig()
         self.token_tracker = token_tracker
         self.enable_fallback = enable_fallback
         self.debug_dir = debug_dir
         self.progress_callback = progress_callback
+        self.test_mode_config = test_mode_config
         self.db_path = db_path
         self.config = config
 
-        # Create debug directory if needed
-        if self.debug_dir:
+        # Create debug directory if needed (LLM mode only)
+        if self.llm_mode and self.debug_dir:
             self.debug_dir.mkdir(parents=True, exist_ok=True)
             logger.debug(f"LLM debug mode enabled: outputs will be saved to {self.debug_dir}")
 
+        # Initialize agents/modules based on mode
+        if self.llm_mode:
+            self._initialize_llm_mode()
+        else:
+            self._initialize_rule_based_mode()
+
+        # Check and log LLM configuration status
+        llm_configured, provider = check_llm_configuration(llm_provider)
+        if self.llm_mode:
+            if llm_configured:
+                logger.debug(f"Unified orchestrator initialized in LLM mode with {provider}")
+            else:
+                logger.warning(
+                    "LLM mode requested but no LLM configured. "
+                    "Set ANTHROPIC_API_KEY or OPENAI_API_KEY for AI-powered analysis. "
+                    "Falling back to rule-based mode."
+                )
+        else:
+            # Rule-based mode is intentional, not a warning condition
+            logger.debug(
+                "Unified orchestrator initialized in rule-based mode "
+                "(using technical indicators and quantitative analysis)"
+            )
+
+    def _initialize_llm_mode(self) -> None:
+        """Initialize CrewAI components for LLM mode."""
         # Initialize CrewAI components
         self.agent_factory = CrewAIAgentFactory(self.llm_config)
         self.task_factory = CrewAITaskFactory()
-        self.tool_adapter = CrewAIToolAdapter(db_path=db_path, config=config)
+        # Type ignore: CrewAIToolAdapter has incorrect type annotation for db_path
+        self.tool_adapter = CrewAIToolAdapter(db_path=self.db_path, config=self.config)  # type: ignore[arg-type]
 
         # Initialize hybrid agents with fallback
         self.hybrid_agents = self._create_hybrid_agents()
         self.crew = HybridAnalysisCrew(self.hybrid_agents, self.token_tracker)
 
-        logger.debug("Initialized LLM Analysis Orchestrator")
+        logger.debug("Initialized LLM mode components")
+
+    def _initialize_rule_based_mode(self) -> None:
+        """Initialize rule-based analysis modules."""
+        # Initialize analysis modules (no market scanner - filtering handled externally)
+        self.technical_agent = TechnicalAnalysisModule()
+        self.fundamental_agent = FundamentalAnalysisModule(db_path=self.db_path)
+        self.sentiment_agent = SentimentAnalysisModule()
+        self.signal_synthesizer = SignalSynthesisModule()
+
+        logger.debug("Initialized rule-based mode modules")
 
     def _create_hybrid_agents(self) -> dict[str, HybridAnalysisAgent]:
         """Create hybrid agents combining CrewAI with fallback.
@@ -85,10 +141,10 @@ class LLMAnalysisOrchestrator:
         sentiment_crew = self.agent_factory.create_sentiment_analysis_agent(tools)
         synthesizer_crew = self.agent_factory.create_signal_synthesizer_agent()
 
-        # Create fallback rule-based agents
-        technical_fallback = TechnicalAnalysisAgent()
-        fundamental_fallback = FundamentalAnalysisAgent(db_path=self.db_path)
-        sentiment_fallback = SentimentAgent()
+        # Create fallback rule-based modules
+        technical_fallback = TechnicalAnalysisModule()
+        fundamental_fallback = FundamentalAnalysisModule(db_path=self.db_path)
+        sentiment_fallback = SentimentAnalysisModule()
 
         # Wrap in hybrid agents
         return {
@@ -119,14 +175,14 @@ class LLMAnalysisOrchestrator:
         }
 
     def _save_debug_data(self, ticker: str, stage: str, data: Any) -> None:
-        """Save debug data to disk.
+        """Save debug data to disk (LLM mode only).
 
         Args:
             ticker: Stock ticker
             stage: Analysis stage (input/output/synthesis_input/synthesis_output)
             data: Data to save
         """
-        if not self.debug_dir:
+        if not self.llm_mode or not self.debug_dir:
             return
 
         try:
@@ -153,10 +209,96 @@ class LLMAnalysisOrchestrator:
     def analyze_instrument(
         self,
         ticker: str,
-        context: dict[str, Any] = None,
-        progress_callback: Optional[callable] = None,
+        additional_context: Optional[dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> UnifiedAnalysisResult | dict[str, Any] | None:
+        """Analyze a single instrument comprehensively.
+
+        Args:
+            ticker: Stock ticker symbol
+            additional_context: Additional context for analysis
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            UnifiedAnalysisResult (LLM mode) or dict (rule-based mode) or None if failed
+        """
+        if self.llm_mode:
+            return self._analyze_instrument_llm(ticker, additional_context, progress_callback)
+        else:
+            return self._analyze_instrument_rule_based(ticker, additional_context)
+
+    def _analyze_instrument_rule_based(
+        self,
+        ticker: str,
+        additional_context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Analyze instrument using rule-based modules.
+
+        Args:
+            ticker: Stock ticker symbol
+            additional_context: Additional context for analysis
+
+        Returns:
+            Analysis result dictionary
+        """
+        try:
+            context = additional_context or {}
+            context["ticker"] = ticker
+
+            logger.debug(f"Starting comprehensive analysis for {ticker}")
+
+            # Execute parallel analyses
+            technical_result = self.technical_agent.execute("Analyze technical indicators", context)
+            context["technical_score"] = technical_result.get("technical_score", 50)
+
+            fundamental_result = self.fundamental_agent.execute("Analyze fundamentals", context)
+            context["fundamental_score"] = fundamental_result.get("fundamental_score", 50)
+
+            sentiment_result = self.sentiment_agent.execute("Analyze sentiment", context)
+            context["sentiment_score"] = sentiment_result.get("sentiment_score", 50)
+
+            # Execute signal synthesis
+            synthesis_result = self.signal_synthesizer.execute("Synthesize all signals", context)
+
+            # Aggregate results
+            result = {
+                "status": "success",
+                "ticker": ticker,
+                "analysis": {
+                    "technical": technical_result,
+                    "fundamental": fundamental_result,
+                    "sentiment": sentiment_result,
+                    "synthesis": synthesis_result,
+                },
+                "final_recommendation": synthesis_result.get("recommendation", "hold"),
+                "confidence": synthesis_result.get("confidence", 0),
+                "final_score": synthesis_result.get("final_score", 50),
+            }
+
+            logger.debug(
+                f"Analysis complete for {ticker}: "
+                f"{result['final_recommendation']} "
+                f"(confidence: {result['confidence']:.0f}%)"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing {ticker}: {e}")
+            return {
+                "status": "error",
+                "ticker": ticker,
+                "message": str(e),
+                "analysis": {},
+            }
+
+    def _analyze_instrument_llm(
+        self,
+        ticker: str,
+        context: Optional[dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
     ) -> UnifiedAnalysisResult | None:
-        """Perform comprehensive analysis of a single instrument.
+        """Perform comprehensive analysis using LLM-powered agents.
 
         Args:
             ticker: Stock ticker symbol
@@ -182,8 +324,7 @@ class LLMAnalysisOrchestrator:
         logger.debug(f"Starting comprehensive analysis for {ticker}")
 
         # Save debug: input context
-        if self.debug_dir:
-            self._save_debug_data(ticker, "input_context", context)
+        self._save_debug_data(ticker, "input_context", context)
 
         # Create tasks for each agent (no market scan - filtering handled externally)
         technical_task = self.task_factory.create_technical_analysis_task(
@@ -220,8 +361,7 @@ class LLMAnalysisOrchestrator:
         analysis_results = self.crew.execute_analysis(tasks, context, progress_callback)
 
         # Save debug: analysis outputs
-        if self.debug_dir:
-            self._save_debug_data(ticker, "analysis_outputs", analysis_results)
+        self._save_debug_data(ticker, "analysis_outputs", analysis_results)
 
         # Extract individual analysis results for synthesis
         technical_results = analysis_results.get("results", {}).get("technical_analysis", {})
@@ -234,7 +374,7 @@ class LLMAnalysisOrchestrator:
             and fundamental_results.get("status") == "success"
             and sentiment_results.get("status") == "success"
         ):
-            synthesis_result = self.synthesize_signal(
+            synthesis_result = self._synthesize_signal(
                 ticker,
                 technical_results.get("result", {}),
                 fundamental_results.get("result", {}),
@@ -267,14 +407,14 @@ class LLMAnalysisOrchestrator:
             )
             return None
 
-    def synthesize_signal(
+    def _synthesize_signal(
         self,
         ticker: str,
         technical_results: dict[str, Any],
         fundamental_results: dict[str, Any],
         sentiment_results: dict[str, Any],
     ) -> dict[str, Any]:
-        """Synthesize individual analyses into investment signal.
+        """Synthesize individual analyses into investment signal (LLM mode).
 
         Args:
             ticker: Stock ticker symbol
@@ -292,16 +432,15 @@ class LLMAnalysisOrchestrator:
             self.progress_callback("  🔄 Synthesizing investment signal...")
 
         # Save debug: synthesis inputs
-        if self.debug_dir:
-            self._save_debug_data(
-                ticker,
-                "synthesis_input",
-                {
-                    "technical": technical_results,
-                    "fundamental": fundamental_results,
-                    "sentiment": sentiment_results,
-                },
-            )
+        self._save_debug_data(
+            ticker,
+            "synthesis_input",
+            {
+                "technical": technical_results,
+                "fundamental": fundamental_results,
+                "sentiment": sentiment_results,
+            },
+        )
 
         # Create synthesis task
         synthesizer_agent = self.hybrid_agents.get("synthesizer")
@@ -349,8 +488,7 @@ class LLMAnalysisOrchestrator:
         result = synthesizer_hybrid.execute_task(synthesis_task)
 
         # Save debug: synthesis output
-        if self.debug_dir:
-            self._save_debug_data(ticker, "synthesis_output", result)
+        self._save_debug_data(ticker, "synthesis_output", result)
 
         # Notify completion
         if self.progress_callback:
@@ -360,13 +498,110 @@ class LLMAnalysisOrchestrator:
 
         return result
 
+    def analyze_instruments(
+        self,
+        tickers: list[str],
+        additional_context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Analyze multiple instruments without prior market scanning.
+
+        This method should be used when tickers have been pre-filtered
+        by the FilterOrchestrator in main.py, following DRY principles.
+
+        Args:
+            tickers: List of pre-filtered tickers to analyze
+            additional_context: Additional context
+
+        Returns:
+            Analysis results for all tickers
+        """
+        try:
+            context = additional_context or {}
+            logger.debug(f"Starting analysis for {len(tickers)} pre-filtered instruments")
+
+            analysis_results = []
+            for ticker in tickers:
+                result = self.analyze_instrument(ticker, context)
+
+                # Handle both LLM mode (UnifiedAnalysisResult or None) and rule-based (dict)
+                if result is not None:
+                    if isinstance(result, dict) and result.get("status") == "success":
+                        analysis_results.append(result)
+                    elif isinstance(result, UnifiedAnalysisResult):
+                        # Convert to dict format for consistency
+                        analysis_results.append(
+                            {
+                                "status": "success",
+                                "ticker": result.ticker,
+                                "final_recommendation": result.recommendation,
+                                "confidence": result.confidence,
+                                "final_score": result.final_score,
+                            }
+                        )
+
+            # Sort by confidence
+            analysis_results.sort(key=lambda x: x.get("confidence", 0), reverse=True)
+
+            return {
+                "status": "success",
+                "analysis_results": analysis_results,
+                "total_analyzed": len(analysis_results),
+                "strong_signals": [r for r in analysis_results if r.get("confidence", 0) >= 70],
+            }
+
+        except Exception as e:
+            logger.error(f"Error in analyze_instruments: {e}")
+            return {
+                "status": "error",
+                "message": str(e),
+                "analysis_results": [],
+            }
+
+    def get_agent_status(self) -> dict[str, Any]:
+        """Get status of all agents/modules.
+
+        Returns:
+            Dictionary with agent status
+        """
+        if self.llm_mode:
+            return self.get_orchestrator_status()
+        else:
+            return {
+                "crew_name": "UnifiedOrchestrator (rule-based)",
+                "mode": "rule-based",
+                "total_agents": 4,
+                "agents": {
+                    "technical_analyst": {
+                        "role": self.technical_agent.role,
+                        "goal": self.technical_agent.goal,
+                    },
+                    "fundamental_analyst": {
+                        "role": self.fundamental_agent.role,
+                        "goal": self.fundamental_agent.goal,
+                    },
+                    "sentiment_analyst": {
+                        "role": self.sentiment_agent.role,
+                        "goal": self.sentiment_agent.goal,
+                    },
+                    "signal_synthesizer": {
+                        "role": self.signal_synthesizer.role,
+                        "goal": self.signal_synthesizer.goal,
+                    },
+                },
+            }
+
     def get_orchestrator_status(self) -> dict[str, Any]:
-        """Get status of orchestrator and all agents.
+        """Get status of orchestrator and all agents (LLM mode).
 
         Returns:
             Status dictionary
         """
+        if not self.llm_mode:
+            return self.get_agent_status()
+
         return {
+            "crew_name": "UnifiedOrchestrator (LLM)",
+            "mode": "llm",
             "llm_provider": self.llm_config.provider,
             "llm_model": self.llm_config.model,
             "token_tracking": self.token_tracker is not None,
@@ -377,4 +612,7 @@ class LLMAnalysisOrchestrator:
 
     def log_summary(self) -> None:
         """Log execution summary."""
-        self.crew.log_summary()
+        if self.llm_mode and hasattr(self, "crew"):
+            self.crew.log_summary()
+        else:
+            logger.debug("Rule-based mode - no execution log available")

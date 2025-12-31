@@ -5,7 +5,7 @@ from datetime import date
 from rich.console import Console
 from rich.table import Table
 
-from src.agents.ai_technical_agent import AITechnicalAnalysisAgent
+from src.agents.llm import AITechnicalAnalysisAgent
 from src.config.llm import initialize_llm_client
 from src.utils.logging import get_logger
 
