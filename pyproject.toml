@@ -69,6 +69,11 @@ filterwarnings = [
     "ignore::DeprecationWarning:litellm.*",
 ]
 
+# Jupytext configuration
+# Notebooks are paired with Python scripts using percent format
+[tool.jupytext]
+formats = "ipynb,py:percent"
+
 # Poethepoet task definitions
 # Usage: uv run poe <task>
 [tool.poe.tasks]
@@ -81,8 +86,4 @@ rmreports = "find data/reports -name '*.md' -exec rm -f {} +"
 rmdatabase = "rm -f data/falconsignals.db"
 rmall = "sh -c 'uv run poe rmpycache && uv run poe rmdatacache && uv run poe rmreports && uv run poe rmdatabase'"
 verify-agent-execution = "python scripts/verify_agent_execution.py data/llm_debug"
-
-# Jupytext configuration
-# Notebooks are paired with Python scripts using percent format
-[tool.jupytext]
-formats = "ipynb,py:percent"
+sync-notebooks = "jupytext --sync notebooks/**/*.py"
