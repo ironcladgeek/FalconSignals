@@ -69,6 +69,7 @@ print(f"Cache directory: {project_root / 'data' / 'cache'}")
 # %%
 from src.cache.manager import CacheManager
 from src.config.loader import load_config
+from src.data.price_manager import PriceDataManager
 from src.data.provider_manager import ProviderManager
 
 # Initialize configuration
@@ -122,40 +123,107 @@ else:
 # %% [markdown]
 # ## Understanding the Caching Mechanism
 #
-# **Important Note:** The current implementation doesn't use file-based JSON cache for price data.
-# Instead:
-# - Price data is fetched directly from yfinance
-# - yfinance has its own internal caching mechanism
-# - Performance improvements come from yfinance's cache, not filesystem cache
+# **Two Layers of Caching:**
 #
-# The `CacheManager` is designed for future use but currently not integrated with
-# `ProviderManager` for price data. This is documented as a known architectural issue.
+# 1. **In this notebook**: We use `ProviderManager` directly, which doesn't cache to disk
+#    - Data is fetched directly from yfinance
+#    - No CSV files are created
+#    - Useful for quick exploration
+#
+# 2. **In production analysis**: The system uses `PriceFetcherTool` + `PriceDataManager`
+#    - Caches price data as CSV files in `data/cache/prices/`
+#    - One CSV file per ticker (e.g., `AAPL.csv`)
+#    - Incremental updates: only fetches missing date ranges
+#    - Used by `analyze` command and all production workflows
+#
+# Let's demonstrate the **production caching** using `PriceDataManager`:
 
 # %%
+# Initialize price manager (production caching)
+price_manager = PriceDataManager(prices_dir=project_root / "data" / "cache" / "prices")
+print("✅ PriceDataManager initialized (production caching)")
+print(f"  - Cache directory: {price_manager.prices_dir}")
+
+# Check what's in the cache
 cache_dir_path = project_root / "data" / "cache"
-print("Cache directory structure:")
+prices_dir = cache_dir_path / "prices"
+
+print("\nCache directory structure:")
 print(f"{'=' * 60}")
 
-# Check if cache directory exists and has content
-cache_files = list(cache_dir_path.rglob("*"))
-if len(cache_files) <= 1:  # Only .gitkeep or empty
-    print("📝 Note: Cache directory is empty or only contains .gitkeep")
-    print("   Price data caching is handled by yfinance internally,")
-    print("   not through filesystem-based JSON cache.")
-    print()
-    print("   The CacheManager exists for future integration but is")
-    print("   currently not used by ProviderManager for price data.")
+if prices_dir.exists():
+    csv_files = list(prices_dir.glob("*.csv"))
+    if csv_files:
+        print(f"Found {len(csv_files)} cached ticker(s):")
+        for csv_file in sorted(csv_files):
+            file_size = csv_file.stat().st_size / 1024  # KB
+            modified_time = datetime.fromtimestamp(csv_file.stat().st_mtime)
+            print(f"\n  📄 {csv_file.name}")
+            print(f"     Size: {file_size:.2f} KB")
+            print(f"     Modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            # Show date range if file has data
+            try:
+                start, end = price_manager.get_data_range(csv_file.stem)
+                if start and end:
+                    print(f"     Date range: {start} to {end}")
+            except Exception:
+                pass
+    else:
+        print("📝 No CSV files yet - let's create one!")
 else:
-    # If there are cache files, list them
-    for cache_file in sorted(cache_dir_path.rglob("*")):
-        if cache_file.is_file() and cache_file.name != ".gitkeep":
-            relative_path = cache_file.relative_to(cache_dir_path)
-            file_size = cache_file.stat().st_size / 1024  # KB
-            modified_time = datetime.fromtimestamp(cache_file.stat().st_mtime)
-            print(f"{relative_path}")
-            print(f"  Size: {file_size:.2f} KB")
-            print(f"  Modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print()
+    print("📝 Prices directory doesn't exist yet")
+
+# %% [markdown]
+# ## Test: Fetch and Cache Price Data Using PriceDataManager
+#
+# Let's use the production caching mechanism to fetch and store price data:
+
+# %%
+# Fetch prices using ProviderManager (no caching)
+print(f"Fetching prices for {ticker} using ProviderManager (no caching)...")
+prices = provider_manager.get_stock_prices(ticker=ticker, period="30d")
+
+if prices:
+    print(f"✅ Fetched {len(prices)} price records")
+
+    # Now store them using PriceDataManager (production caching)
+    print("\nStoring prices in CSV cache using PriceDataManager...")
+    price_dicts = [p.model_dump() for p in prices]
+    price_manager.store_prices(ticker, price_dicts)
+
+    csv_path = price_manager.get_file_path(ticker)
+    if csv_path.exists():
+        file_size = csv_path.stat().st_size / 1024  # KB
+        print(f"✅ Cached to: {csv_path.name}")
+        print(f"   Size: {file_size:.2f} KB")
+
+        # Verify we can read it back
+        start, end = price_manager.get_data_range(ticker)
+        print(f"   Date range: {start} to {end}")
+else:
+    print("❌ Failed to fetch prices")
+
+# %% [markdown]
+# ## Verify Cache Hit Performance
+#
+# Now let's read from the cache to see the performance improvement:
+
+# %%
+import time
+
+# Read from CSV cache (should be very fast)
+start_time = time.time()
+cached_df = price_manager.get_prices(ticker)
+cache_read_time = time.time() - start_time
+
+if cached_df is not None and not cached_df.empty:
+    print(f"✅ Read {len(cached_df)} records from CSV cache in {cache_read_time:.4f}s")
+    print("   This is the production caching used by the analyze command!")
+    print("\nLast 5 records from cache:")
+    print(cached_df[["date", "close"]].tail(5).to_string(index=False))
+else:
+    print("❌ No cached data found")
 
 # %% [markdown]
 # ## Test 2: Cache Hit vs Cache Miss
