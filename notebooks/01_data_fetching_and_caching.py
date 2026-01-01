@@ -96,7 +96,7 @@ if price_data:
     print(f"✅ Fetched {len(price_data)} price records for {ticker}")
     print("\nLast 5 records:")
     for price in price_data[-5:]:
-        print(f"  {price.date}: ${price.close:.2f}")  # type: ignore[attr-defined]
+        print(f"  {price.date}: ${price.close_price:.2f}")
 else:
     print(f"❌ Failed to fetch price data for {ticker}")
 

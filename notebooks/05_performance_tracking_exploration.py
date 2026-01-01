@@ -262,8 +262,8 @@ if buy_recs and returns_data:
     spy_prices = provider_manager.get_stock_prices(ticker="SPY", period=f"{days_diff}d")
 
     if spy_prices:
-        spy_start = spy_prices[0].close  # type: ignore[attr-defined]
-        spy_end = spy_prices[-1].close  # type: ignore[attr-defined]
+        spy_start = spy_prices[0].close_price
+        spy_end = spy_prices[-1].close_price
         spy_return = ((spy_end - spy_start) / spy_start) * 100
 
         print("SPY Performance:")

@@ -103,11 +103,11 @@ if latest_prices:
     latest_price = latest_prices[-1]
     print(f"Latest price for {ticker}:")
     print(f"  - Date: {latest_price.date}")
-    print(f"  - Close: ${latest_price.close:.2f}")  # type: ignore[attr-defined]
+    print(f"  - Close: ${latest_price.close_price:.2f}")
     print()
 
     if historical_price:
-        price_diff = latest_price.close - historical_price["close"]  # type: ignore[attr-defined]
+        price_diff = latest_price.close_price - historical_price["close"]
         price_change_pct = (price_diff / historical_price["close"]) * 100
 
         print(f"Price change from {analysis_date.strftime('%Y-%m-%d')} to now:")
@@ -269,18 +269,18 @@ def check_future_leakage(ticker: str, analysis_date: datetime) -> None:
         days_diff = (current_price.date - hist_price["date"]).days
 
         print(f"Historical price: ${hist_price['close']:.2f} on {hist_price['date']}")
-        print(f"Current price:    ${current_price.close:.2f} on {current_price.date}")  # type: ignore[attr-defined]
+        print(f"Current price:    ${current_price.close_price:.2f} on {current_price.date}")
         print(f"Days between:     {days_diff} days")
         print()
 
         if days_diff < 1:
             print("⚠️ WARNING: Dates are too close! Possible future information leakage!")
-        elif abs(hist_price["close"] - current_price.close) < 0.01:  # type: ignore[attr-defined]
+        elif abs(hist_price["close"] - current_price.close_price) < 0.01:
             print("⚠️ WARNING: Prices are identical! Possible future information leakage!")
         else:
             print("✅ No future information leakage detected")
             print(
-                f"   Price changed ${current_price.close - hist_price['close']:+.2f} over {days_diff} days"  # type: ignore[attr-defined]
+                f"   Price changed ${current_price.close_price - hist_price['close']:+.2f} over {days_diff} days"
             )
     else:
         print("❌ Could not verify - missing price data")

@@ -88,10 +88,10 @@ if latest_prices:
     print("✅ Latest price data:")
     print(f"  - Ticker: {ticker}")
     print(f"  - Date: {latest_price.date}")
-    print(f"  - Close: ${latest_price.close:.2f}")  # type: ignore[attr-defined]
+    print(f"  - Close: ${latest_price.close_price:.2f}")
     print(f"  - Volume: {latest_price.volume:,}")
-    print(f"  - High: ${latest_price.high:.2f}")  # type: ignore[attr-defined]
-    print(f"  - Low: ${latest_price.low:.2f}")  # type: ignore[attr-defined]
+    print(f"  - High: ${latest_price.high_price:.2f}")
+    print(f"  - Low: ${latest_price.low_price:.2f}")
 
     # Check how recent this data is
     days_old = (datetime.now().date() - latest_price.date).days
@@ -307,17 +307,17 @@ def verify_current_price_accuracy(ticker: str) -> None:
 
         print("✅ Latest price retrieved:")
         print(f"  - Date: {latest.date}")
-        print(f"  - Close: ${latest.close:.2f}")  # type: ignore[attr-defined]
+        print(f"  - Close: ${latest.close_price:.2f}")
 
         # Check data freshness
         age_days = (datetime.now().date() - latest.date).days
         print(f"  - Age: {age_days} days")
 
         # Check if price is reasonable (not zero or negative)
-        if latest.close > 0:  # type: ignore[attr-defined]
+        if latest.close_price > 0:
             print("  ✅ Price is valid (> 0)")
         else:
-            print(f"  ❌ Invalid price: ${latest.close}")  # type: ignore[attr-defined]
+            print(f"  ❌ Invalid price: ${latest.close_price}")
 
         # Check volume
         if latest.volume > 0:
