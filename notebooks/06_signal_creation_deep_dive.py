@@ -58,7 +58,7 @@ cache_manager = CacheManager(cache_dir)
 provider_manager = ProviderManager(
     primary_provider=config.data.primary_provider,
     backup_providers=config.data.backup_providers,
-    db_path=config.database.db_path,
+    db_path=str(project_root / config.database.db_path),
 )
 price_manager = PriceDataManager(prices_dir=str(project_root / "data" / "cache" / "prices"))
 

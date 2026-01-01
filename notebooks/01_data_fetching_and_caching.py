@@ -72,7 +72,7 @@ print(f"  - Cache directory: {cache_dir}")
 provider_manager = ProviderManager(
     primary_provider=config.data.primary_provider,
     backup_providers=config.data.backup_providers,
-    db_path=config.database.db_path,
+    db_path=str(project_root / config.database.db_path),
 )
 print("✅ ProviderManager initialized")
 print("  - Primary provider: Yahoo Finance")
