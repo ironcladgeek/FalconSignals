@@ -41,9 +41,26 @@ from pathlib import Path
 
 # Add project root to path
 # Detect project root by looking for pyproject.toml
-current_path = Path(__file__).resolve().parent
-parent_has_pyproject = (current_path.parent / "pyproject.toml").exists()
-project_root = current_path.parent if parent_has_pyproject else current_path
+# Handle both script execution (__file__ exists) and Jupyter (__file__ doesn't exist)
+try:
+    # Running as a script
+    current_path = Path(__file__).resolve().parent
+except NameError:
+    # Running in Jupyter notebook
+    current_path = Path.cwd()
+    # If we're in the notebooks directory, go up one level
+    if current_path.name == "notebooks":
+        current_path = current_path.parent
+
+# Now find project root (directory containing pyproject.toml)
+if (current_path / "pyproject.toml").exists():
+    project_root = current_path
+elif (current_path.parent / "pyproject.toml").exists():
+    project_root = current_path.parent
+else:
+    # Fallback: assume we're already at project root
+    project_root = current_path
+
 sys.path.insert(0, str(project_root))
 
 print(f"Project root: {project_root}")
