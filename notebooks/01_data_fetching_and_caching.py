@@ -35,13 +35,15 @@
 # Initialize the environment and import necessary modules:
 
 # %%
-import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add project root to path
-project_root = Path.cwd().parent
+# Detect project root by looking for pyproject.toml
+current_path = Path(__file__).resolve().parent
+parent_has_pyproject = (current_path.parent / "pyproject.toml").exists()
+project_root = current_path.parent if parent_has_pyproject else current_path
 sys.path.insert(0, str(project_root))
 
 print(f"Project root: {project_root}")
@@ -101,54 +103,42 @@ else:
     print(f"❌ Failed to fetch price data for {ticker}")
 
 # %% [markdown]
-# ## Explore Cache Directory Structure
+# ## Understanding the Caching Mechanism
 #
-# Let's see what files were created in the cache:
+# **Important Note:** The current implementation doesn't use file-based JSON cache for price data.
+# Instead:
+# - Price data is fetched directly from yfinance
+# - yfinance has its own internal caching mechanism
+# - Performance improvements come from yfinance's cache, not filesystem cache
+#
+# The `CacheManager` is designed for future use but currently not integrated with
+# `ProviderManager` for price data. This is documented as a known architectural issue.
 
 # %%
 cache_dir_path = project_root / "data" / "cache"
-print("Cache directory contents:")
+print("Cache directory structure:")
 print(f"{'=' * 60}")
 
-# List all cache files
-for cache_file in sorted(cache_dir_path.rglob("*.json")):
-    relative_path = cache_file.relative_to(cache_dir_path)
-    file_size = cache_file.stat().st_size / 1024  # KB
-    modified_time = datetime.fromtimestamp(cache_file.stat().st_mtime)
-    print(f"{relative_path}")
-    print(f"  Size: {file_size:.2f} KB")
-    print(f"  Modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+# Check if cache directory exists and has content
+cache_files = list(cache_dir_path.rglob("*"))
+if len(cache_files) <= 1:  # Only .gitkeep or empty
+    print("📝 Note: Cache directory is empty or only contains .gitkeep")
+    print("   Price data caching is handled by yfinance internally,")
+    print("   not through filesystem-based JSON cache.")
     print()
-
-# %% [markdown]
-# ## Inspect Cache File Contents
-#
-# Let's look at the structure of a cached price data file:
-
-# %%
-# Find the AAPL price cache file
-aapl_cache_files = list(cache_dir_path.rglob(f"*{ticker}*.json"))
-if aapl_cache_files:
-    cache_file = aapl_cache_files[0]
-    print(f"Inspecting: {cache_file.name}")
-    print(f"{'=' * 60}")
-
-    with open(cache_file, "r") as f:
-        cache_data = json.load(f)
-
-    print("Cache data structure:")
-    print(f"  - Keys: {list(cache_data.keys())}")
-    print(f"  - Timestamp: {cache_data.get('timestamp', 'N/A')}")
-    print(f"  - Data type: {type(cache_data.get('data', {}))}")
-
-    # Show sample data (first 2 records)
-    data = cache_data.get("data", {})
-    if isinstance(data, dict) and "prices" in data:
-        prices = data["prices"][:2]
-        print("\nSample price records (first 2):")
-        print(json.dumps(prices, indent=2))
+    print("   The CacheManager exists for future integration but is")
+    print("   currently not used by ProviderManager for price data.")
 else:
-    print(f"No cache file found for {ticker}")
+    # If there are cache files, list them
+    for cache_file in sorted(cache_dir_path.rglob("*")):
+        if cache_file.is_file() and cache_file.name != ".gitkeep":
+            relative_path = cache_file.relative_to(cache_dir_path)
+            file_size = cache_file.stat().st_size / 1024  # KB
+            modified_time = datetime.fromtimestamp(cache_file.stat().st_mtime)
+            print(f"{relative_path}")
+            print(f"  Size: {file_size:.2f} KB")
+            print(f"  Modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print()
 
 # %% [markdown]
 # ## Test 2: Cache Hit vs Cache Miss
@@ -167,41 +157,54 @@ print(f"✅ Cached fetch completed in {cached_fetch_time:.4f} seconds")
 print("  - This should be very fast (< 0.1s) because data is cached")
 
 # %% [markdown]
-# ## Test 3: Fetch Fundamental Data
+# ## Test 3: Fetch Company Information
 #
-# Let's fetch fundamental data and see how it's cached:
+# Let's fetch company information using ProviderManager:
 
 # %%
-print(f"Fetching fundamental data for {ticker}...")
+print(f"Fetching company information for {ticker}...")
 
-fundamentals = provider_manager.primary_provider.get_fundamentals(ticker)  # type: ignore[attr-defined]
+company_info = provider_manager.get_company_info(ticker)
 
-if fundamentals:
-    print(f"✅ Fetched fundamental data for {ticker}")
-    print("\nKey metrics:")
-    print(
-        f"  - Market Cap: ${fundamentals.market_cap / 1e9:.2f}B"
-        if fundamentals.market_cap
-        else "  - Market Cap: N/A"
-    )
-    print(
-        f"  - P/E Ratio: {fundamentals.pe_ratio:.2f}"
-        if fundamentals.pe_ratio
-        else "  - P/E Ratio: N/A"
-    )
-    print(f"  - EPS: ${fundamentals.eps:.2f}" if fundamentals.eps else "  - EPS: N/A")
-    print(
-        f"  - Revenue: ${fundamentals.revenue / 1e9:.2f}B"
-        if fundamentals.revenue
-        else "  - Revenue: N/A"
-    )
-    print(
-        f"  - Profit Margin: {fundamentals.profit_margin * 100:.2f}%"
-        if fundamentals.profit_margin
-        else "  - Profit Margin: N/A"
-    )
+if company_info:
+    print(f"✅ Fetched company information for {ticker}")
+    print("\nCompany Details:")
+    print(f"  - Name: {company_info.get('name', 'N/A')}")
+    print(f"  - Sector: {company_info.get('sector', 'N/A')}")
+    print(f"  - Industry: {company_info.get('industry', 'N/A')}")
+
+    print("\nKey Metrics:")
+    market_cap = company_info.get("market_cap")
+    if market_cap:
+        print(f"  - Market Cap: ${market_cap / 1e9:.2f}B")
+    else:
+        print("  - Market Cap: N/A")
+
+    pe_ratio = company_info.get("pe_ratio")
+    if pe_ratio:
+        print(f"  - P/E Ratio: {pe_ratio:.2f}")
+    else:
+        print("  - P/E Ratio: N/A")
+
+    eps = company_info.get("eps")
+    if eps:
+        print(f"  - EPS: ${eps:.2f}")
+    else:
+        print("  - EPS: N/A")
+
+    revenue = company_info.get("revenue")
+    if revenue:
+        print(f"  - Revenue: ${revenue / 1e9:.2f}B")
+    else:
+        print("  - Revenue: N/A")
+
+    profit_margin = company_info.get("profit_margin")
+    if profit_margin:
+        print(f"  - Profit Margin: {profit_margin * 100:.2f}%")
+    else:
+        print("  - Profit Margin: N/A")
 else:
-    print(f"❌ Failed to fetch fundamental data for {ticker}")
+    print(f"❌ Failed to fetch company information for {ticker}")
 
 # %% [markdown]
 # ## Test 4: Fetch News and Sentiment
