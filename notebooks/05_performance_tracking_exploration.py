@@ -63,7 +63,7 @@ provider_manager = ProviderManager(
 price_manager = PriceDataManager(prices_dir=str(project_root / "data" / "cache" / "prices"))
 from src.data.repository import Repository  # type: ignore[import-not-found]
 
-repository = Repository(config.database.db_path)
+repository = Repository(str(project_root / config.database.db_path))
 
 print("✅ Components initialized")
 
