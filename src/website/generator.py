@@ -222,6 +222,8 @@ class WebsiteGenerator:
             symbol = "🟡"
         elif "SELL" in recommendation:
             symbol = "🔴"
+        else:
+            symbol = "⚪"  # Default/unknown symbol
         lines = [
             f"#### [{signal.ticker} - {signal.name}]"
             f'(https://finance.yahoo.com/quote/{signal.ticker}/){{:target="_blank"}}',

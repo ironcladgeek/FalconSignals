@@ -14,12 +14,14 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Try to import pandas_ta, fallback to manual calculations if not available
+ta: Any = None  # Type hint for pyright
+PANDAS_TA_AVAILABLE = False
+
 try:
-    import pandas_ta as ta
+    import pandas_ta as ta  # type: ignore[no-redef]
 
     PANDAS_TA_AVAILABLE = True
 except ImportError:
-    PANDAS_TA_AVAILABLE = False
     logger.warning("pandas-ta not installed, using fallback calculations")
 
 
