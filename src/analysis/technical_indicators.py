@@ -188,15 +188,24 @@ class ConfigurableTechnicalAnalyzer:
         name = ind_config.name.lower()
         params = ind_config.params
 
+        # Extract columns and assert they are Series (not DataFrames)
+        # This is for pyright type checking - df[col] returns Series | DataFrame
+        close_series = df["close"]
+        assert isinstance(close_series, pd.Series), "close should be a Series"
+        high_series = df["high"]
+        assert isinstance(high_series, pd.Series), "high should be a Series"
+        low_series = df["low"]
+        assert isinstance(low_series, pd.Series), "low should be a Series"
+
         try:
             if name == "rsi":
-                result = ta.rsi(df["close"], length=params.get("length", 14))
+                result = ta.rsi(close_series, length=params.get("length", 14))
                 if result is not None and not result.empty:
                     return {"value": float(result.iloc[-1])}
 
             elif name == "macd":
                 result = ta.macd(
-                    df["close"],
+                    close_series,
                     fast=params.get("fast", 12),
                     slow=params.get("slow", 26),
                     signal=params.get("signal", 9),
@@ -216,7 +225,7 @@ class ConfigurableTechnicalAnalyzer:
 
             elif name == "bbands":
                 result = ta.bbands(
-                    df["close"],
+                    close_series,
                     length=params.get("length", 20),
                     std=params.get("std", 2.0),
                 )
@@ -240,29 +249,29 @@ class ConfigurableTechnicalAnalyzer:
 
             elif name == "atr":
                 result = ta.atr(
-                    df["high"],
-                    df["low"],
-                    df["close"],
+                    high_series,
+                    low_series,
+                    close_series,
                     length=params.get("length", 14),
                 )
                 if result is not None and not result.empty:
                     return {"value": float(result.iloc[-1])}
 
             elif name == "sma":
-                result = ta.sma(df["close"], length=params.get("length", 20))
+                result = ta.sma(close_series, length=params.get("length", 20))
                 if result is not None and not result.empty:
                     return {"value": float(result.iloc[-1])}
 
             elif name == "ema":
-                result = ta.ema(df["close"], length=params.get("length", 20))
+                result = ta.ema(close_series, length=params.get("length", 20))
                 if result is not None and not result.empty:
                     return {"value": float(result.iloc[-1])}
 
             elif name == "adx":
                 result = ta.adx(
-                    df["high"],
-                    df["low"],
-                    df["close"],
+                    high_series,
+                    low_series,
+                    close_series,
                     length=params.get("length", 14),
                 )
                 if result is not None and not result.empty:
@@ -277,9 +286,9 @@ class ConfigurableTechnicalAnalyzer:
 
             elif name == "stoch":
                 result = ta.stoch(
-                    df["high"],
-                    df["low"],
-                    df["close"],
+                    high_series,
+                    low_series,
+                    close_series,
                     k=params.get("k", 14),
                     d=params.get("d", 3),
                 )
@@ -293,9 +302,9 @@ class ConfigurableTechnicalAnalyzer:
 
             elif name == "ichimoku":
                 result = ta.ichimoku(
-                    df["high"],
-                    df["low"],
-                    df["close"],
+                    high_series,
+                    low_series,
+                    close_series,
                     tenkan=params.get("tenkan", 9),
                     kijun=params.get("kijun", 26),
                     senkou=params.get("senkou", 52),
@@ -344,7 +353,7 @@ class ConfigurableTechnicalAnalyzer:
                 # Try to call indicator dynamically
                 func = getattr(ta, name, None)
                 if func is not None:
-                    result = func(df["close"], **params)
+                    result = func(close_series, **params)
                     if result is not None:
                         if isinstance(result, pd.DataFrame):
                             return {col: float(result[col].iloc[-1]) for col in result.columns}
@@ -366,13 +375,17 @@ class ConfigurableTechnicalAnalyzer:
         name = ind_config.name.lower()
         params = ind_config.params
 
+        # Extract columns and assert they are Series (for type checking)
+        close_series = df["close"]
+        assert isinstance(close_series, pd.Series), "close should be a Series"
+
         try:
             if name == "rsi":
-                return {"value": self._manual_rsi(df["close"], params.get("length", 14))}
+                return {"value": self._manual_rsi(close_series, params.get("length", 14))}
 
             elif name == "macd":
                 return self._manual_macd(
-                    df["close"],
+                    close_series,
                     params.get("fast", 12),
                     params.get("slow", 26),
                     params.get("signal", 9),
@@ -380,13 +393,13 @@ class ConfigurableTechnicalAnalyzer:
 
             elif name == "sma":
                 length = params.get("length", 20)
-                sma = df["close"].rolling(length).mean()
+                sma = close_series.rolling(length).mean()
                 if not sma.empty and not pd.isna(sma.iloc[-1]):
                     return {"value": float(sma.iloc[-1])}
 
             elif name == "ema":
                 length = params.get("length", 20)
-                ema = df["close"].ewm(span=length).mean()
+                ema = close_series.ewm(span=length).mean()
                 if not ema.empty:
                     return {"value": float(ema.iloc[-1])}
 
