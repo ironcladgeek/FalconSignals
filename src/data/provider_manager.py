@@ -22,7 +22,7 @@ class ProviderManager:
     def __init__(
         self,
         primary_provider: str = "yahoo_finance",
-        backup_providers: list[str] = None,
+        backup_providers: list[str] | None = None,
         db_path: Path | str | None = None,
         historical_data_lookback_days: int = 730,
     ):

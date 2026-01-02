@@ -29,7 +29,7 @@ def extract_ticker_from_filename(filename: str) -> str:
     return "UNKNOWN"
 
 
-def parse_synthesis_output(file_path: Path) -> dict:
+def parse_synthesis_output(file_path: Path) -> dict | None:
     """Parse a synthesis output JSON file and extract key metrics.
 
     Args:

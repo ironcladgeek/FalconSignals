@@ -82,7 +82,7 @@ def json_serial(obj):
 class CrewAIToolAdapter:
     """Adapts existing tools for use with CrewAI agents."""
 
-    def __init__(self, db_path: str = None, config=None):
+    def __init__(self, db_path: str | None = None, config=None):
         """Initialize tool adapters.
 
         Args:

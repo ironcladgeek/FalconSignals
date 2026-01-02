@@ -23,9 +23,9 @@ class PriceFetcherTool(BaseTool):
 
     def __init__(
         self,
-        cache_manager: CacheManager = None,
-        provider_name: str = None,
-        fixture_path: str = None,
+        cache_manager: CacheManager | None = None,
+        provider_name: str | None = None,
+        fixture_path: str | None = None,
         use_unified_storage: bool = True,
         config=None,
     ):
@@ -83,10 +83,10 @@ class PriceFetcherTool(BaseTool):
     def run(
         self,
         ticker: str,
-        start_date: datetime = None,
-        end_date: datetime = None,
-        days_back: int = None,
-        period: str = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        days_back: int | None = None,
+        period: str | None = None,
     ) -> dict[str, Any]:
         """Fetch price data for ticker using unified CSV storage.
 
@@ -168,8 +168,8 @@ class PriceFetcherTool(BaseTool):
         ticker: str,
         start_date: date | None,
         end_date: date | None,
-        days_back: int = None,
-        period: str = None,
+        days_back: int | None = None,
+        period: str | None = None,
     ) -> dict[str, Any]:
         """Fetch prices using unified CSV storage.
 
@@ -962,7 +962,7 @@ class NewsFetcherTool(BaseTool):
 
     def __init__(
         self,
-        cache_manager: CacheManager = None,
+        cache_manager: CacheManager | None = None,
         use_local_sentiment: bool = True,
     ):
         """Initialize news fetcher.
@@ -1051,7 +1051,7 @@ class NewsFetcherTool(BaseTool):
     def run(
         self,
         ticker: str,
-        limit: int = None,
+        limit: int | None = None,
     ) -> dict[str, Any]:
         """Fetch news articles with sentiment for ticker.
 

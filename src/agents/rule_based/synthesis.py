@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class SignalSynthesisModule(BaseAgent):
     """Module for synthesizing multiple signals into final recommendations (rule-based)."""
 
-    def __init__(self, tools: list = None):
+    def __init__(self, tools: list | None = None):
         """Initialize Signal Synthesis module.
 
         Args:
@@ -29,7 +29,7 @@ class SignalSynthesisModule(BaseAgent):
         )
         super().__init__(config, tools or [])
 
-    def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def execute(self, task: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Synthesize signals into recommendation.
 
         Args:

@@ -19,7 +19,7 @@ class Position:
         quantity: float,
         entry_price: float,
         entry_date: datetime,
-        metadata: dict[str, Any] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """Initialize position.
 
@@ -118,10 +118,10 @@ class WatchlistItem:
     def __init__(
         self,
         ticker: str,
-        added_date: datetime = None,
-        notes: str = None,
-        target_price: float = None,
-        metadata: dict[str, Any] = None,
+        added_date: datetime | None = None,
+        notes: str | None = None,
+        target_price: float | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """Initialize watchlist item.
 
@@ -203,7 +203,7 @@ class PortfolioState:
         ticker: str,
         quantity: float,
         entry_price: float,
-        entry_date: datetime = None,
+        entry_date: datetime | None = None,
     ) -> None:
         """Add or update position.
 
@@ -257,8 +257,8 @@ class PortfolioState:
     def add_to_watchlist(
         self,
         ticker: str,
-        notes: str = None,
-        target_price: float = None,
+        notes: str | None = None,
+        target_price: float | None = None,
     ) -> None:
         """Add item to watchlist.
 

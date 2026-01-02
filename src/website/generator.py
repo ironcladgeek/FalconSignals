@@ -448,7 +448,7 @@ class WebsiteGenerator:
 
         return lines
 
-    def generate_ticker_page(self, ticker: str) -> Path:
+    def generate_ticker_page(self, ticker: str) -> Path | None:
         """Generate ticker-specific page with all signals/analysis.
 
         Args:

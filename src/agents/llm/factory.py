@@ -43,7 +43,7 @@ class CrewAIAgentFactory:
         self.llm_client = initialize_llm_client(self.llm_config)
         logger.debug(f"Initialized CrewAI factory with {self.llm_config.provider} provider")
 
-    def create_technical_analysis_agent(self, tools: list = None) -> Agent:
+    def create_technical_analysis_agent(self, tools: list | None = None) -> Agent:
         """Create technical analysis agent.
 
         Args:
@@ -94,7 +94,7 @@ class CrewAIAgentFactory:
             allow_delegation=False,
         )
 
-    def create_fundamental_analysis_agent(self, tools: list = None) -> Agent:
+    def create_fundamental_analysis_agent(self, tools: list | None = None) -> Agent:
         """Create fundamental analysis agent.
 
         Args:
@@ -124,7 +124,7 @@ class CrewAIAgentFactory:
             allow_delegation=False,
         )
 
-    def create_sentiment_analysis_agent(self, tools: list = None) -> Agent:
+    def create_sentiment_analysis_agent(self, tools: list | None = None) -> Agent:
         """Create sentiment analysis agent.
 
         Args:

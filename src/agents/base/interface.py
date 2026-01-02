@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 class BaseAgent(ABC):
     """Abstract base class for CrewAI agents."""
 
-    def __init__(self, config: AgentConfig, tools: list = None):
+    def __init__(self, config: AgentConfig, tools: list | None = None):
         """Initialize agent.
 
         Args:
@@ -40,7 +40,7 @@ class BaseAgent(ABC):
         return self.config.backstory
 
     @abstractmethod
-    def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def execute(self, task: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute agent task.
 
         Args:

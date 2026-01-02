@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 class SentimentAnalysisModule(BaseAgent):
     """Module for analyzing news sentiment and market perception (rule-based)."""
 
-    def __init__(self, tools: list = None):
+    def __init__(self, tools: list | None = None):
         """Initialize Sentiment analysis module.
 
         Args:
@@ -32,7 +32,7 @@ class SentimentAnalysisModule(BaseAgent):
         default_tools = [NewsFetcherTool(), SentimentAnalyzerTool()]
         super().__init__(config, tools or default_tools)
 
-    def execute(self, task: str, context: dict[str, Any] = None) -> dict[str, Any]:
+    def execute(self, task: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute sentiment analysis.
 
         Args:

@@ -29,9 +29,9 @@ class FundamentalAnalyzer:
 
     @staticmethod
     def calculate_score(
-        analyst_data: dict[str, Any] = None,
-        price_context: dict[str, Any] = None,
-        sentiment_score: float = None,
+        analyst_data: dict[str, Any] | None = None,
+        price_context: dict[str, Any] | None = None,
+        sentiment_score: float | None = None,
     ) -> dict[str, Any]:
         """Calculate fundamental score from free tier data sources.
 
@@ -149,10 +149,10 @@ class FundamentalAnalyzer:
 
     @staticmethod
     def calculate_enhanced_score(
-        analyst_data: dict[str, Any] = None,
-        price_context: dict[str, Any] = None,
-        sentiment_score: float = None,
-        metrics_data: dict[str, Any] = None,
+        analyst_data: dict[str, Any] | None = None,
+        price_context: dict[str, Any] | None = None,
+        sentiment_score: float | None = None,
+        metrics_data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Calculate enhanced fundamental score with metrics.
 
