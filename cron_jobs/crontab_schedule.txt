@@ -14,29 +14,44 @@
 
 # Collect for watchlist/portfolio - Daily at 6:00 AM (before market opens)
 # Example: Balanced moderate portfolio
-0 6 * * * cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_portfolio_balanced_moderate >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+0 6 * * * /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_portfolio_balanced_moderate
 
 # Alternative: Collect for specific groups on different days to spread API usage
-# Monday: Tech groups
-0 6 * * 1 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_tech_software,us_ai_ml >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+# Monday: Tech groups (using comma-separated groups requires inline command)
+0 6 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_tech_software
+
+# Monday: AI/ML group - 10 minutes later
+10 6 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_ai_ml
 
 # Tuesday: Healthcare groups
-0 6 * * 2 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_healthcare_pharma,us_biotech_genomics >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+0 6 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_healthcare_pharma
+
+# Tuesday: Biotech group - 10 minutes later
+10 6 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_biotech_genomics
 
 # Wednesday: Financial groups
-0 6 * * 3 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_financials_banks,us_financials_fintech >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+0 6 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_financials_banks
+
+# Wednesday: Fintech group - 10 minutes later
+10 6 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_financials_fintech
 
 # Thursday: Energy & Industrial groups
-0 6 * * 4 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_energy,us_industrials >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+0 6 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_energy
+
+# Thursday: Industrials group - 10 minutes later
+10 6 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_industrials
 
 # Friday: Consumer & Communications groups
-0 6 * * 5 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --group us_consumer_retail,us_communication >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+0 6 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_consumer_retail
 
-# Example: Collect for specific high-priority tickers daily
-# 0 7 * * * cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --ticker AAPL,MSFT,GOOGL,NVDA,TSLA >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+# Friday: Communications group - 10 minutes later
+10 6 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_communication
 
-# Example: Collect with market limit (spread across different days)
-# 0 6 * * 6 cd /Users/s0001860/Academy/Projects/FalconSignals && /Users/s0001860/.local/bin/uv run python -m src.main collect-fundamentals --market us --limit 100 >> /Users/s0001860/Academy/Projects/FalconSignals/logs/collect_fundamentals.log 2>&1
+# Example: Collect with force refresh flag
+# 0 7 * * 0 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_mega_cap --force
+
+# Example: Collect for historical date (backfilling)
+# 0 8 * * 6 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_tech_software --date 2024-12-01
 
 ################################
 # MONDAY - Tech & Fintech
