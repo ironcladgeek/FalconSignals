@@ -40,7 +40,7 @@ class HybridAnalysisAgent:
     def execute_task(
         self,
         task: Task,
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute task using LLM with fallback to rule-based.
 
@@ -199,7 +199,7 @@ class HybridAnalysisCrew:
     def execute_analysis(
         self,
         tasks: dict[str, Task],
-        context: dict[str, Any] = None,
+        context: dict[str, Any] | None = None,
         progress_callback: Optional[callable] = None,
     ) -> dict[str, Any]:
         """Execute analysis with all agents.

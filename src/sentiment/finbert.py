@@ -14,12 +14,14 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Try to import transformers
+pipeline: Any = None  # Type hint for pyright
+TRANSFORMERS_AVAILABLE = False
+
 try:
-    from transformers import pipeline
+    from transformers import pipeline  # type: ignore[no-redef]
 
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
-    TRANSFORMERS_AVAILABLE = False
     logger.info("transformers not installed, FinBERT scoring not available")
 
 

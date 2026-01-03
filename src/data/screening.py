@@ -12,12 +12,12 @@ logger = get_logger(__name__)
 class ScreeningCriteria:
     """Criteria for instrument screening."""
 
-    markets: list[Market] = None
-    instrument_types: list[InstrumentType] = None
+    markets: list[Market] | None = None
+    instrument_types: list[InstrumentType] | None = None
     exclude_penny_stocks: bool = True
     min_price: float = 1.0
     min_volume_usd: float = 1_000_000
-    exclude_tickers: list[str] = None
+    exclude_tickers: list[str] | None = None
 
     def __post_init__(self):
         """Set defaults."""

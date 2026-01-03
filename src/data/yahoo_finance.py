@@ -37,9 +37,9 @@ class YahooFinanceProvider(DataProvider):
     def get_stock_prices(
         self,
         ticker: str,
-        start_date: datetime = None,
-        end_date: datetime = None,
-        period: str = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        period: str | None = None,
     ) -> list[StockPrice]:
         """Fetch historical stock price data from Yahoo Finance.
 
@@ -100,7 +100,10 @@ class YahooFinanceProvider(DataProvider):
                     if isinstance(val, pd.Series):
                         val = val.iloc[0] if len(val) > 0 else None
 
-                    return float(val) if pd.notna(val) else None
+                    # Type guard: check for None and NaN before converting to float
+                    if val is None or (hasattr(val, "__float__") and pd.isna(val)):
+                        return None
+                    return float(val)
 
                 # Extract price values
                 adjusted_close = get_price_value(row, "Adj Close")
@@ -119,6 +122,13 @@ class YahooFinanceProvider(DataProvider):
                 if any(v is None for v in [open_price, high_price, low_price, close_price, volume]):
                     logger.warning(f"Missing price data for {ticker} on {index}")
                     continue
+
+                # Type assertions for pyright (we've verified these are not None above)
+                assert open_price is not None
+                assert high_price is not None
+                assert low_price is not None
+                assert close_price is not None
+                assert volume is not None
 
                 market = self._infer_market(ticker)
 
