@@ -18,6 +18,7 @@ from src.data.db import DatabaseManager
 from src.data.models import (
     AnalystData,
     AnalystRating,
+    FundamentalSnapshot,
     PerformanceSummary,
     PriceTracking,
     Recommendation,
@@ -2769,3 +2770,407 @@ class TradingJournalRepository:
             "created_at": trade.created_at,
             "updated_at": trade.updated_at,
         }
+
+
+class FundamentalSnapshotRepository:
+    """Repository for storing and retrieving historical fundamental data snapshots.
+
+    Stores comprehensive fundamental data from all sources (Alpha Vantage, Finnhub,
+    Yahoo Finance) as daily snapshots for accurate historical backtesting.
+    """
+
+    def __init__(self, db_path: Path | str = "data/falconsignals.db"):
+        """Initialize repository with database manager.
+
+        Args:
+            db_path: Path to SQLite database file.
+        """
+        self.db_manager = DatabaseManager(db_path)
+        self.db_manager.initialize()
+
+    def store_snapshot(self, ticker: str, snapshot_date: date, fundamental_data: dict) -> bool:
+        """Store daily fundamental data snapshot.
+
+        Args:
+            ticker: Stock ticker symbol.
+            snapshot_date: Date of snapshot.
+            fundamental_data: Complete fundamental data dict from cache/provider.
+                             Should contain: company_info, earnings_estimates,
+                             analyst_data, price_context, metrics, etc.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        ticker = ticker.upper()
+
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get or create ticker
+                ticker_obj = get_or_create_ticker(session, ticker)
+
+                # Extract flattened metrics from fundamental_data
+                company_info = fundamental_data.get("company_info", {})
+                analyst_data = fundamental_data.get("analyst_data", {})
+                price_context = fundamental_data.get("price_context", {})
+
+                # Check if snapshot already exists (upsert pattern)
+                existing = session.exec(
+                    select(FundamentalSnapshot).where(
+                        (FundamentalSnapshot.ticker_id == ticker_obj.id)
+                        & (FundamentalSnapshot.snapshot_date == snapshot_date)
+                    )
+                ).first()
+
+                if existing:
+                    # Update existing snapshot
+                    existing.data_json = json.dumps(fundamental_data)
+                    existing.market_cap = company_info.get("market_cap")
+                    existing.pe_ratio = company_info.get("pe_ratio")
+                    existing.forward_pe = company_info.get("forward_pe")
+                    existing.peg_ratio = company_info.get("peg_ratio")
+                    existing.price_to_book = company_info.get("price_to_book")
+                    existing.price_to_sales = company_info.get("price_to_sales")
+                    existing.ev_to_revenue = company_info.get("ev_to_revenue")
+                    existing.ev_to_ebitda = company_info.get("ev_to_ebitda")
+                    existing.profit_margin = company_info.get("profit_margin")
+                    existing.operating_margin = company_info.get("operating_margin")
+                    existing.return_on_equity = company_info.get("return_on_equity")
+                    existing.return_on_assets = company_info.get("return_on_assets")
+                    existing.quarterly_earnings_growth_yoy = company_info.get(
+                        "quarterly_earnings_growth_yoy"
+                    )
+                    existing.quarterly_revenue_growth_yoy = company_info.get(
+                        "quarterly_revenue_growth_yoy"
+                    )
+                    existing.analyst_target_price = company_info.get("analyst_target_price")
+                    existing.total_analysts = analyst_data.get("total_analysts")
+                    existing.strong_buy_count = analyst_data.get("strong_buy")
+                    existing.buy_count = analyst_data.get("buy")
+                    existing.hold_count = analyst_data.get("hold")
+                    existing.latest_price = price_context.get("latest_price")
+                    existing.price_change_percent = price_context.get("change_percent")
+                    existing.price_trend = price_context.get("trend")
+                    existing.data_sources = fundamental_data.get("data_sources")
+                    existing.data_availability = fundamental_data.get("data_availability")
+                    existing.fetched_at = datetime.now()
+                    session.add(existing)
+                    logger.debug(f"Updated fundamental snapshot for {ticker} on {snapshot_date}")
+                else:
+                    # Create new snapshot
+                    snapshot = FundamentalSnapshot(
+                        ticker_id=ticker_obj.id,
+                        snapshot_date=snapshot_date,
+                        data_json=json.dumps(fundamental_data),
+                        # Valuation metrics
+                        market_cap=company_info.get("market_cap"),
+                        pe_ratio=company_info.get("pe_ratio"),
+                        forward_pe=company_info.get("forward_pe"),
+                        peg_ratio=company_info.get("peg_ratio"),
+                        price_to_book=company_info.get("price_to_book"),
+                        price_to_sales=company_info.get("price_to_sales"),
+                        ev_to_revenue=company_info.get("ev_to_revenue"),
+                        ev_to_ebitda=company_info.get("ev_to_ebitda"),
+                        # Profitability metrics
+                        profit_margin=company_info.get("profit_margin"),
+                        operating_margin=company_info.get("operating_margin"),
+                        return_on_equity=company_info.get("return_on_equity"),
+                        return_on_assets=company_info.get("return_on_assets"),
+                        # Growth metrics
+                        quarterly_earnings_growth_yoy=company_info.get(
+                            "quarterly_earnings_growth_yoy"
+                        ),
+                        quarterly_revenue_growth_yoy=company_info.get(
+                            "quarterly_revenue_growth_yoy"
+                        ),
+                        # Analyst data
+                        analyst_target_price=company_info.get("analyst_target_price"),
+                        total_analysts=analyst_data.get("total_analysts"),
+                        strong_buy_count=analyst_data.get("strong_buy"),
+                        buy_count=analyst_data.get("buy"),
+                        hold_count=analyst_data.get("hold"),
+                        # Price context
+                        latest_price=price_context.get("latest_price"),
+                        price_change_percent=price_context.get("change_percent"),
+                        price_trend=price_context.get("trend"),
+                        # Metadata
+                        data_sources=fundamental_data.get("data_sources"),
+                        data_availability=fundamental_data.get("data_availability"),
+                    )
+                    session.add(snapshot)
+                    logger.debug(f"Created fundamental snapshot for {ticker} on {snapshot_date}")
+
+                session.commit()
+                return True
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to store fundamental snapshot for {ticker}: {e}")
+            return False
+
+    def get_snapshot(self, ticker: str, as_of_date: date) -> dict | None:
+        """Get complete fundamental snapshot for a specific date.
+
+        Args:
+            ticker: Stock ticker symbol.
+            as_of_date: Date to retrieve snapshot for.
+
+        Returns:
+            Complete fundamental data dict or None if not found.
+        """
+        ticker = ticker.upper()
+
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get ticker object first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return None
+
+                # Get snapshot for the exact date
+                snapshot = session.exec(
+                    select(FundamentalSnapshot).where(
+                        (FundamentalSnapshot.ticker_id == ticker_obj.id)
+                        & (FundamentalSnapshot.snapshot_date == as_of_date)
+                    )
+                ).first()
+
+                if snapshot:
+                    return json.loads(snapshot.data_json)
+                return None
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve fundamental snapshot for {ticker}: {e}")
+            return None
+
+    def get_snapshot_range(self, ticker: str, start_date: date, end_date: date) -> list[dict]:
+        """Get all fundamental snapshots in date range.
+
+        Args:
+            ticker: Stock ticker symbol.
+            start_date: Start of date range.
+            end_date: End of date range.
+
+        Returns:
+            List of dicts with 'snapshot_date' and 'data' keys.
+        """
+        ticker = ticker.upper()
+
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get ticker object first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return []
+
+                # Get all snapshots in range
+                snapshots = session.exec(
+                    select(FundamentalSnapshot)
+                    .where(
+                        (FundamentalSnapshot.ticker_id == ticker_obj.id)
+                        & (FundamentalSnapshot.snapshot_date >= start_date)
+                        & (FundamentalSnapshot.snapshot_date <= end_date)
+                    )
+                    .order_by(FundamentalSnapshot.snapshot_date)
+                ).all()
+
+                return [
+                    {
+                        "snapshot_date": snapshot.snapshot_date,
+                        "data": json.loads(snapshot.data_json),
+                    }
+                    for snapshot in snapshots
+                ]
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve fundamental snapshots for {ticker}: {e}")
+            return []
+
+    def get_latest_snapshot(
+        self, ticker: str, before_date: date | None = None
+    ) -> tuple[date, dict] | None:
+        """Get most recent snapshot, optionally before a specific date.
+
+        Useful for backtesting - get the most recent data available
+        at a historical point in time.
+
+        Args:
+            ticker: Stock ticker symbol.
+            before_date: Optional date limit (get latest before this date).
+
+        Returns:
+            Tuple of (snapshot_date, fundamental_data) or None.
+        """
+        ticker = ticker.upper()
+
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get ticker object first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return None
+
+                # Build query
+                query = select(FundamentalSnapshot).where(
+                    FundamentalSnapshot.ticker_id == ticker_obj.id
+                )
+
+                # Add date filter if provided
+                if before_date:
+                    query = query.where(FundamentalSnapshot.snapshot_date <= before_date)
+
+                # Order by date descending and get first
+                query = query.order_by(FundamentalSnapshot.snapshot_date.desc()).limit(1)
+
+                snapshot = session.exec(query).first()
+
+                if snapshot:
+                    return (snapshot.snapshot_date, json.loads(snapshot.data_json))
+                return None
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve latest fundamental snapshot for {ticker}: {e}")
+            return None
+
+    def get_snapshots_for_date(
+        self, snapshot_date: date, ticker_symbols: list[str] | None = None
+    ) -> list[dict]:
+        """Get all fundamental snapshots for a specific date.
+
+        Useful for batch processing and analysis of multiple tickers.
+
+        Args:
+            snapshot_date: Date to retrieve snapshots for.
+            ticker_symbols: Optional list of ticker symbols to filter by.
+
+        Returns:
+            List of dicts with 'ticker', 'snapshot_date', and 'data' keys.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Build base query
+                query = (
+                    select(FundamentalSnapshot, Ticker)
+                    .join(Ticker, FundamentalSnapshot.ticker_id == Ticker.id)
+                    .where(FundamentalSnapshot.snapshot_date == snapshot_date)
+                )
+
+                # Add ticker filter if provided
+                if ticker_symbols:
+                    upper_symbols = [s.upper() for s in ticker_symbols]
+                    query = query.where(Ticker.symbol.in_(upper_symbols))
+
+                results = session.exec(query).all()
+
+                return [
+                    {
+                        "ticker": ticker.symbol,
+                        "snapshot_date": snapshot.snapshot_date,
+                        "data": json.loads(snapshot.data_json),
+                    }
+                    for snapshot, ticker in results
+                ]
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve fundamental snapshots for date {snapshot_date}: {e}")
+            return []
+
+    def count_snapshots(self, ticker: str | None = None) -> int:
+        """Count total number of snapshots, optionally filtered by ticker.
+
+        Args:
+            ticker: Optional ticker symbol to filter by.
+
+        Returns:
+            Number of snapshots.
+        """
+        try:
+            session = self.db_manager.get_session()
+            try:
+                if ticker:
+                    ticker = ticker.upper()
+                    ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                    if not ticker_obj:
+                        return 0
+
+                    count = session.exec(
+                        select(func.count(FundamentalSnapshot.id)).where(
+                            FundamentalSnapshot.ticker_id == ticker_obj.id
+                        )
+                    ).one()
+                else:
+                    count = session.exec(select(func.count(FundamentalSnapshot.id))).one()
+
+                return count
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to count fundamental snapshots: {e}")
+            return 0
+
+    def delete_snapshot(self, ticker: str, snapshot_date: date) -> bool:
+        """Delete a specific fundamental snapshot.
+
+        Args:
+            ticker: Stock ticker symbol.
+            snapshot_date: Date of snapshot to delete.
+
+        Returns:
+            True if deleted, False otherwise.
+        """
+        ticker = ticker.upper()
+
+        try:
+            session = self.db_manager.get_session()
+            try:
+                # Get ticker object first
+                ticker_obj = session.exec(select(Ticker).where(Ticker.symbol == ticker)).first()
+
+                if not ticker_obj:
+                    return False
+
+                # Get and delete snapshot
+                snapshot = session.exec(
+                    select(FundamentalSnapshot).where(
+                        (FundamentalSnapshot.ticker_id == ticker_obj.id)
+                        & (FundamentalSnapshot.snapshot_date == snapshot_date)
+                    )
+                ).first()
+
+                if snapshot:
+                    session.delete(snapshot)
+                    session.commit()
+                    logger.info(f"Deleted fundamental snapshot for {ticker} on {snapshot_date}")
+                    return True
+                return False
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to delete fundamental snapshot for {ticker}: {e}")
+            return False
