@@ -8,6 +8,7 @@ Complete guide to using the FalconSignals command-line interface.
 - [Global Options](#global-options)
 - [Commands](#commands)
   - [analyze](#analyze)
+  - [collect-fundamentals](#collect-fundamentals)
   - [report](#report)
   - [publish](#publish)
   - [watchlist](#watchlist)
@@ -27,6 +28,7 @@ Complete guide to using the FalconSignals command-line interface.
 
 The FalconSignals CLI provides commands for:
 - **Analysis**: Generate investment signals using rule-based or LLM-powered methods
+- **Data Collection**: Collect and persist fundamental data for historical analysis and backtesting
 - **Watchlist Management**: AI-powered technical analysis with tactical trading recommendations
 - **Reporting**: Generate reports from historical analysis sessions
 - **Performance Tracking**: Track and analyze recommendation performance
@@ -205,6 +207,181 @@ uv run python -m src.main analyze --ticker AAPL --no-save-report
 ```bash
 uv run python -m src.main analyze --ticker AAPL --config config/production.yaml
 ```
+
+---
+
+### collect-fundamentals
+
+Collect comprehensive fundamental data and persist to database for historical analysis and backtesting.
+
+**Syntax:**
+```bash
+uv run python -m src.main collect-fundamentals [OPTIONS]
+```
+
+#### Required Options (choose one)
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--market`, `-m` | Market(s) to collect | `--market us` |
+| `--group`, `-g` | Category or portfolio | `--group us_tech_software` |
+| `--ticker`, `-t` | Specific ticker(s) | `--ticker AAPL,MSFT` |
+
+#### Optional Settings
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--config`, `-c` | `config/default.yaml` | Path to configuration file |
+| `--limit`, `-l` | None | Maximum instruments per market/group |
+| `--dry-run` | `False` | Preview without storing to database |
+| `--force` | `False` | Re-fetch even if snapshot exists |
+| `--date` | Today | Snapshot date (YYYY-MM-DD format) |
+
+#### What Gets Collected
+
+The command fetches and stores comprehensive fundamental data from multiple sources:
+
+**Data Sources:**
+- **Alpha Vantage**: Company overview, earnings estimates, financial ratios
+- **Finnhub**: Analyst ratings and consensus
+- **Yahoo Finance**: Current prices, technical metrics, market data
+
+**Stored Data:**
+- Complete fundamental snapshot (as JSON)
+- 29 flattened key metrics for efficient querying:
+  - Valuation: P/E ratio, PEG ratio, Price-to-Book, Price-to-Sales, EV/Revenue, EV/EBITDA
+  - Profitability: Profit margin, Operating margin, ROE, ROA
+  - Growth: Quarterly earnings growth, Quarterly revenue growth
+  - Analyst data: Target price, ratings breakdown, total analysts
+  - Price context: Latest price, price change %, trend
+
+#### Examples
+
+**Basic Collection:**
+```bash
+# Collect for specific tickers (today's date)
+uv run python -m src.main collect-fundamentals --ticker AAPL,MSFT,GOOGL
+
+# Collect for a market
+uv run python -m src.main collect-fundamentals --market us --limit 50
+
+# Collect for a category
+uv run python -m src.main collect-fundamentals --group us_tech_software
+
+# Collect for multiple markets
+uv run python -m src.main collect-fundamentals --market us,eu --limit 30
+```
+
+**Preview Mode:**
+```bash
+# Dry run to see what would be collected
+uv run python -m src.main collect-fundamentals --ticker AAPL,MSFT --dry-run
+
+# Preview market collection
+uv run python -m src.main collect-fundamentals --market nordic --dry-run
+```
+
+**Force Refresh:**
+```bash
+# Re-fetch even if snapshot exists for today
+uv run python -m src.main collect-fundamentals --ticker AAPL --force
+
+# Force refresh for entire group
+uv run python -m src.main collect-fundamentals --group us_mega_cap --force
+```
+
+**Historical Snapshots:**
+```bash
+# Collect snapshot for specific date
+uv run python -m src.main collect-fundamentals --ticker AAPL --date 2025-12-01
+
+# Backfill historical data for backtesting
+uv run python -m src.main collect-fundamentals --ticker AAPL,MSFT --date 2024-06-01
+
+# Collect group snapshot for historical date
+uv run python -m src.main collect-fundamentals --group us_ai_ml --date 2024-12-31
+```
+
+**Custom Configuration:**
+```bash
+uv run python -m src.main collect-fundamentals --ticker AAPL --config config/production.yaml
+```
+
+#### Output Example
+
+```
+📊 Fundamental Data Collection Pipeline
+  Snapshot date: 2026-01-03
+  Data sources: Alpha Vantage, Finnhub, Yahoo Finance
+  Mode: Specific tickers (3 specified)
+  Tickers to process: 3
+
+[1/3] AAPL: Fetching data... ✓ Stored
+[2/3] MSFT: ⊘ Skipped (snapshot exists)
+[3/3] GOOGL: Fetching data... ✓ Stored
+
+======================================================================
+✅ COLLECTION SUMMARY
+======================================================================
+Successfully stored: 2
+Skipped (already exists): 1
+Errors: 0
+Total processed: 3
+
+💾 Database: data/falconsignals.db
+
+📈 2 fundamental snapshot(s) stored for 2026-01-03
+```
+
+#### Use Cases
+
+**Daily Data Collection:**
+Run daily to maintain fresh fundamental data snapshots.
+```bash
+# Collect for watchlist or portfolio
+uv run python -m src.main collect-fundamentals --group us_portfolio_balanced_moderate
+```
+
+**Backtesting Preparation:**
+Backfill historical snapshots for accurate backtesting.
+```bash
+# Collect historical data points
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-01-01
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-04-01
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-07-01
+```
+
+**Research & Analysis:**
+Collect comprehensive data for deep-dive research.
+```bash
+# Collect full sector data
+uv run python -m src.main collect-fundamentals --group us_tech_software
+```
+
+#### Important Notes
+
+- **Rate Limiting**: Command automatically limits to 1 request per second to respect API limits
+- **Database Required**: Database must be enabled in configuration (`database.enabled: true`)
+- **Storage Location**: Data stored in `fundamental_snapshots` table
+- **Duplicate Protection**: Unique constraint on (ticker, date) prevents duplicate snapshots
+- **Skip Behavior**: By default, skips if snapshot exists for date (use `--force` to override)
+- **API Costs**: Uses Alpha Vantage Premium API - monitor your usage limits
+- **Data Freshness**: Snapshots are point-in-time - daily collection recommended
+
+#### Database Schema
+
+Snapshots are stored with:
+- Complete JSON data structure (same as cache files)
+- 29 flattened columns with indexes for fast queries
+- Foreign key to tickers table
+- Unique constraint on (ticker_id, snapshot_date)
+- Indexes on: ticker+date, date, P/E ratio, market cap
+
+**Notes:**
+- Enables accurate historical backtesting with fundamental context
+- Foundation for fundamental-based screening and filtering
+- Complements price data for comprehensive analysis
+- Can be queried directly via repository methods
 
 ---
 
@@ -1077,14 +1254,39 @@ uv run python -m src.main validate-config --config config/production.yaml
 ### Daily Analysis Workflow
 
 ```bash
-# 1. Analyze market with LLM
+# 1. Collect fundamental data for portfolio (daily routine)
+uv run python -m src.main collect-fundamentals --group us_portfolio_balanced_moderate
+
+# 2. Analyze market with LLM
 uv run python -m src.main analyze --market us --limit 50 --llm
 
-# 2. Track performance of active recommendations
+# 3. Track performance of active recommendations
 uv run python -m src.main track-performance
 
-# 3. Review performance report
+# 4. Review performance report
 uv run python -m src.main performance-report
+```
+
+### Data Collection and Backtesting Workflow
+
+```bash
+# 1. Backfill historical fundamental data
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-01-01
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-04-01
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-07-01
+uv run python -m src.main collect-fundamentals --ticker NVDA --date 2024-10-01
+
+# 2. Run historical analysis using collected snapshots
+uv run python -m src.main analyze --ticker NVDA --date 2024-01-01
+uv run python -m src.main analyze --ticker NVDA --date 2024-04-01
+uv run python -m src.main analyze --ticker NVDA --date 2024-07-01
+uv run python -m src.main analyze --ticker NVDA --date 2024-10-01
+
+# 3. Track performance across time periods
+uv run python -m src.main track-performance --max-age 365
+
+# 4. Generate comprehensive backtesting report
+uv run python -m src.main performance-report --period 180 --ticker NVDA
 ```
 
 ### Backtesting Workflow
