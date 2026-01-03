@@ -34,7 +34,7 @@ def get_or_create_ticker(session, ticker_symbol: str, name: str = "") -> Ticker:
     """Get existing ticker or create new one.
 
     Shared helper function used by multiple repositories to ensure consistent
-    ticker creation with automatic company name fetching.
+    ticker creation with automatic company metadata fetching.
 
     Args:
         session: Database session.
@@ -52,21 +52,44 @@ def get_or_create_ticker(session, ticker_symbol: str, name: str = "") -> Ticker:
     if existing:
         return existing
 
-    # Fetch company name if not provided or if it's just the ticker symbol
+    # Initialize company metadata
+    description = None
+    sector = None
+    industry = None
+    currency = "USD"  # Default
+    exchange = None
+
+    # Fetch company metadata if name not provided or if it's just the ticker symbol
     if not name or name == ticker_symbol:
         try:
             ticker_obj = yf.Ticker(ticker_symbol)
             info = ticker_obj.info
+
+            # Extract company information
             name = info.get("longName") or info.get("shortName") or ticker_symbol
-            logger.debug(f"Fetched company name for {ticker_symbol}: {name}")
+            description = info.get("longBusinessSummary")
+            sector = info.get("sector")
+            industry = info.get("industry")
+            currency = info.get("currency") or info.get("financialCurrency") or "USD"
+            exchange = info.get("exchange")
+
+            logger.debug(
+                f"Fetched metadata for {ticker_symbol}: "
+                f"name={name}, sector={sector}, industry={industry}"
+            )
         except Exception as e:
-            logger.warning(f"Could not fetch company name for {ticker_symbol}: {e}")
+            logger.warning(f"Could not fetch company metadata for {ticker_symbol}: {e}")
             name = ticker_symbol
 
-    # Create new ticker
+    # Create new ticker with all metadata
     new_ticker = Ticker(
         symbol=ticker_symbol,
         name=name,
+        description=description,
+        sector=sector,
+        industry=industry,
+        currency=currency,
+        exchange=exchange,
         market="us",  # Default, can be overridden later
         instrument_type="stock",
     )
