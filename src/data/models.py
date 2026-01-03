@@ -4,6 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field as SQLField
 from sqlmodel import Relationship, SQLModel
 
@@ -167,6 +168,13 @@ class Ticker(SQLModel, table=True):
     id: int | None = SQLField(default=None, primary_key=True)
     symbol: str = SQLField(unique=True, index=True, description="Ticker symbol (e.g., AAPL)")
     name: str = SQLField(description="Company or instrument name")
+    description: str | None = SQLField(default=None, description="Company description")
+    sector: str | None = SQLField(default=None, description="Business sector (e.g., TECHNOLOGY)")
+    industry: str | None = SQLField(
+        default=None, description="Industry classification (e.g., SOFTWARE)"
+    )
+    currency: str = SQLField(default="USD", description="Trading currency (USD, EUR, etc.)")
+    exchange: str | None = SQLField(default=None, description="Stock exchange (e.g., NASDAQ)")
     market: str = SQLField(default="us", description="Market: nordic, eu, us")
     instrument_type: str = SQLField(default="stock", description="Type: stock, etf, fund")
     created_at: datetime = SQLField(
@@ -180,6 +188,7 @@ class Ticker(SQLModel, table=True):
     analyst_ratings: list["AnalystData"] = Relationship(back_populates="ticker_obj")
     recommendations: list["Recommendation"] = Relationship(back_populates="ticker_obj")
     performance_summaries: list["PerformanceSummary"] = Relationship(back_populates="ticker_obj")
+    fundamental_snapshots: list["FundamentalSnapshot"] = Relationship(back_populates="ticker_obj")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -616,5 +625,105 @@ class TradingJournal(SQLModel, table=True):
 
     # Relationships
     ticker_obj: Ticker = Relationship()
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FundamentalSnapshot(SQLModel, table=True):
+    """Historical fundamental data snapshots for backtesting.
+
+    Stores comprehensive fundamental data from all sources (Alpha Vantage, Finnhub,
+    Yahoo Finance) as daily snapshots. Enables accurate historical analysis by
+    preserving the exact fundamental context available at any point in time.
+
+    The complete data structure is stored in JSON format, with key metrics flattened
+    to indexed columns for efficient querying.
+    """
+
+    __tablename__ = "fundamental_snapshots"
+    __table_args__ = (
+        UniqueConstraint("ticker_id", "snapshot_date", name="uq_ticker_snapshot_date"),
+        Index("idx_fundamental_snapshots_ticker_date", "ticker_id", "snapshot_date"),
+        Index("idx_fundamental_snapshots_date", "snapshot_date"),
+        Index("idx_fundamental_snapshots_pe_ratio", "pe_ratio"),
+        Index("idx_fundamental_snapshots_market_cap", "market_cap"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: int | None = SQLField(default=None, primary_key=True, description="Auto-incrementing ID")
+    ticker_id: int = SQLField(
+        foreign_key="tickers.id", index=True, description="Foreign key to ticker"
+    )
+    snapshot_date: date = SQLField(index=True, description="Date of this snapshot")
+
+    # Complete fundamental data (entire JSON structure from cache)
+    # Includes: company_info, earnings_estimates, analyst_data, price_context, metrics
+    data_json: str = SQLField(
+        description="Complete fundamental data as JSON (same structure as cache files)"
+    )
+
+    # Flattened key columns for efficient querying (from company_info)
+    # Valuation Metrics
+    market_cap: float | None = SQLField(default=None, description="Market capitalization")
+    pe_ratio: float | None = SQLField(default=None, description="Price-to-Earnings ratio")
+    forward_pe: float | None = SQLField(default=None, description="Forward P/E ratio")
+    peg_ratio: float | None = SQLField(default=None, description="PEG ratio")
+    price_to_book: float | None = SQLField(default=None, description="Price-to-Book ratio")
+    price_to_sales: float | None = SQLField(default=None, description="Price-to-Sales ratio")
+    ev_to_revenue: float | None = SQLField(
+        default=None, description="Enterprise Value to Revenue ratio"
+    )
+    ev_to_ebitda: float | None = SQLField(
+        default=None, description="Enterprise Value to EBITDA ratio"
+    )
+
+    # Profitability Metrics
+    profit_margin: float | None = SQLField(default=None, description="Profit margin")
+    operating_margin: float | None = SQLField(default=None, description="Operating margin")
+    return_on_equity: float | None = SQLField(default=None, description="Return on Equity (ROE)")
+    return_on_assets: float | None = SQLField(default=None, description="Return on Assets (ROA)")
+
+    # Growth Metrics
+    quarterly_earnings_growth_yoy: float | None = SQLField(
+        default=None, description="Quarterly earnings growth YoY"
+    )
+    quarterly_revenue_growth_yoy: float | None = SQLField(
+        default=None, description="Quarterly revenue growth YoY"
+    )
+
+    # Analyst Data (from analyst_data section)
+    analyst_target_price: float | None = SQLField(
+        default=None, description="Average analyst target price"
+    )
+    total_analysts: int | None = SQLField(default=None, description="Total number of analysts")
+    strong_buy_count: int | None = SQLField(
+        default=None, description="Number of strong buy ratings"
+    )
+    buy_count: int | None = SQLField(default=None, description="Number of buy ratings")
+    hold_count: int | None = SQLField(default=None, description="Number of hold ratings")
+
+    # Price Context (from price_context section)
+    latest_price: float | None = SQLField(default=None, description="Latest price at snapshot date")
+    price_change_percent: float | None = SQLField(
+        default=None, description="Price change % over period"
+    )
+    price_trend: str | None = SQLField(
+        default=None, description="Price trend: bullish, bearish, neutral"
+    )
+
+    # Metadata
+    data_sources: str | None = SQLField(
+        default=None, description="Data sources used (e.g., 'Alpha Vantage + Finnhub + Yahoo')"
+    )
+    data_availability: str | None = SQLField(
+        default=None,
+        description="Available data types (e.g., 'company_overview, earnings_estimates, ...')",
+    )
+    fetched_at: datetime = SQLField(
+        default_factory=datetime.now, description="Timestamp when data was fetched"
+    )
+
+    # Relationships
+    ticker_obj: Ticker = Relationship(back_populates="fundamental_snapshots")
 
     model_config = ConfigDict(from_attributes=True)
