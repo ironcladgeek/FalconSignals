@@ -2929,7 +2929,7 @@ class FundamentalSnapshotRepository:
                     existing.return_on_assets = return_on_assets
                     existing.quarterly_earnings_growth_yoy = quarterly_earnings_growth_yoy
                     existing.quarterly_revenue_growth_yoy = quarterly_revenue_growth_yoy
-                    existing.analyst_target_price = analyst_data.get("analyst_target_price")
+                    existing.analyst_target_price = company_info.get("analyst_target_price")
                     existing.total_analysts = analyst_data.get("total_analysts")
                     existing.strong_buy_count = analyst_data.get("strong_buy")
                     existing.buy_count = analyst_data.get("buy")
@@ -2968,7 +2968,7 @@ class FundamentalSnapshotRepository:
                         quarterly_earnings_growth_yoy=quarterly_earnings_growth_yoy,
                         quarterly_revenue_growth_yoy=quarterly_revenue_growth_yoy,
                         # Analyst data
-                        analyst_target_price=analyst_data.get("analyst_target_price"),
+                        analyst_target_price=company_info.get("analyst_target_price"),
                         total_analysts=analyst_data.get("total_analysts"),
                         strong_buy_count=analyst_data.get("strong_buy"),
                         buy_count=analyst_data.get("buy"),
