@@ -2904,6 +2904,40 @@ class FundamentalSnapshotRepository:
                     "quarterly_revenue_growth_yoy"
                 ) or growth.get("revenue_growth")
 
+                # Analyst data - prefer company_info (Alpha Vantage),
+                # fallback to analyst_data (Finnhub)
+                strong_buy_count = company_info.get(
+                    "analyst_rating_strong_buy"
+                ) or analyst_data.get("strong_buy")
+                buy_count = company_info.get("analyst_rating_buy") or analyst_data.get("buy")
+                hold_count = company_info.get("analyst_rating_hold") or analyst_data.get("hold")
+                sell_count = company_info.get("analyst_rating_sell") or analyst_data.get("sell")
+                strong_sell_count = company_info.get(
+                    "analyst_rating_strong_sell"
+                ) or analyst_data.get("strong_sell")
+                # Calculate total_analysts: if using company_info ratings, sum them;
+                # otherwise use analyst_data total
+                using_company_info_ratings = (
+                    company_info.get("analyst_rating_strong_buy") is not None
+                )
+                if using_company_info_ratings and any(
+                    [strong_buy_count, buy_count, hold_count, sell_count, strong_sell_count]
+                ):
+                    total_analysts = sum(
+                        filter(
+                            None,
+                            [
+                                strong_buy_count,
+                                buy_count,
+                                hold_count,
+                                sell_count,
+                                strong_sell_count,
+                            ],
+                        )
+                    )
+                else:
+                    total_analysts = analyst_data.get("total_analysts")
+
                 # Check if snapshot already exists (upsert pattern)
                 existing = session.exec(
                     select(FundamentalSnapshot).where(
@@ -2930,12 +2964,12 @@ class FundamentalSnapshotRepository:
                     existing.quarterly_earnings_growth_yoy = quarterly_earnings_growth_yoy
                     existing.quarterly_revenue_growth_yoy = quarterly_revenue_growth_yoy
                     existing.analyst_target_price = company_info.get("analyst_target_price")
-                    existing.total_analysts = analyst_data.get("total_analysts")
-                    existing.strong_buy_count = analyst_data.get("strong_buy")
-                    existing.buy_count = analyst_data.get("buy")
-                    existing.hold_count = analyst_data.get("hold")
-                    existing.sell_count = analyst_data.get("sell")
-                    existing.strong_sell_count = analyst_data.get("strong_sell")
+                    existing.total_analysts = total_analysts
+                    existing.strong_buy_count = strong_buy_count
+                    existing.buy_count = buy_count
+                    existing.hold_count = hold_count
+                    existing.sell_count = sell_count
+                    existing.strong_sell_count = strong_sell_count
                     existing.latest_price = price_context.get("latest_price")
                     existing.price_change_percent = price_context.get("change_percent")
                     existing.price_trend = price_context.get("trend")
@@ -2969,12 +3003,12 @@ class FundamentalSnapshotRepository:
                         quarterly_revenue_growth_yoy=quarterly_revenue_growth_yoy,
                         # Analyst data
                         analyst_target_price=company_info.get("analyst_target_price"),
-                        total_analysts=analyst_data.get("total_analysts"),
-                        strong_buy_count=analyst_data.get("strong_buy"),
-                        buy_count=analyst_data.get("buy"),
-                        hold_count=analyst_data.get("hold"),
-                        sell_count=analyst_data.get("sell"),
-                        strong_sell_count=analyst_data.get("strong_sell"),
+                        total_analysts=total_analysts,
+                        strong_buy_count=strong_buy_count,
+                        buy_count=buy_count,
+                        hold_count=hold_count,
+                        sell_count=sell_count,
+                        strong_sell_count=strong_sell_count,
                         # Price context
                         latest_price=price_context.get("latest_price"),
                         price_change_percent=price_context.get("change_percent"),
