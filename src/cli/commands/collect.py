@@ -191,9 +191,12 @@ def collect_fundamentals(
                         continue
 
                 # Fetch fundamental data
+                # Note: Only pass as_of_date for historical backtesting (when explicitly set)
+                # For current data collection, use None to get Alpha Vantage enriched data
                 typer.echo(f"{prefix}: Fetching data...", nl=False)
+                as_of_date_param = target_date if snapshot_date else None
                 fundamental_data = provider_manager.get_enriched_fundamentals(
-                    ticker_symbol, as_of_date=target_date
+                    ticker_symbol, as_of_date=as_of_date_param
                 )
 
                 if not fundamental_data:
