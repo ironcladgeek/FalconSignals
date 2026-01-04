@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+from src.cache.manager import CacheManager
 from src.data.models import AnalystRating, NewsArticle, StockPrice
 from src.data.providers import DataProvider, DataProviderFactory
 from src.data.repository import AnalystRatingsRepository
@@ -421,6 +422,63 @@ class ProviderManager:
             logger.warning(
                 f"Provider {provider_name} has failed {self.provider_failures[provider_name]} times"
             )
+
+    def get_enriched_fundamentals(self, ticker: str, as_of_date: date | None = None) -> dict | None:
+        """Get comprehensive fundamental data from all sources.
+
+        Fetches enriched fundamental data from Alpha Vantage, Finnhub, and Yahoo Finance.
+        Returns the same structure that gets cached in JSON files
+        (e.g., data/cache/TICKER_fundamental_YYYY-MM-DD.json).
+
+        Args:
+            ticker: Stock ticker symbol.
+            as_of_date: Optional historical date for backtesting. If None, fetches current data.
+
+        Returns:
+            Dictionary with complete fundamental data structure:
+            {
+                "ticker": str,
+                "company_info": dict,  # From Alpha Vantage or Yahoo Finance
+                "earnings_estimates": dict,  # From Alpha Vantage
+                "analyst_data": dict,  # From Finnhub
+                "price_context": dict,  # From Yahoo Finance
+                "metrics": dict,  # From Yahoo Finance
+                "data_availability": str,
+                "timestamp": str,
+                "data_sources": str
+            }
+            Returns None if fetch fails.
+        """
+        try:
+            # Import here to avoid circular dependency
+            from src.tools.fetchers import FinancialDataFetcherTool
+
+            # Initialize fetcher with cache manager and db path
+            cache_manager = CacheManager()
+            db_path = str(self.repository.db_manager.db_path) if self.repository else None
+
+            fetcher = FinancialDataFetcherTool(cache_manager=cache_manager, db_path=db_path)
+
+            # Set historical date if provided
+            if as_of_date:
+                fetcher.set_historical_date(as_of_date)
+
+            # Fetch enriched fundamental data
+            logger.debug(
+                f"Fetching enriched fundamentals for {ticker}"
+                + (f" as of {as_of_date}" if as_of_date else "")
+            )
+            result = fetcher.run(ticker)
+
+            if result and result.get("ticker") == ticker:
+                return result
+
+            logger.warning(f"Failed to fetch enriched fundamentals for {ticker}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error fetching enriched fundamentals for {ticker}: {e}")
+            return None
 
     def get_health_status(self) -> dict:
         """Get provider health status.

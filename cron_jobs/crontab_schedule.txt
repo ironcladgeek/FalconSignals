@@ -1,0 +1,189 @@
+# FalconSignals Automated Tasks
+################################
+# DAILY DATABASE BACKUP
+################################
+# Backup database daily at 13:15 with timestamp prefix
+15 13 * * * cp /Users/s0001860/Academy/Projects/FalconSignals/data/falconsignals.db /Users/s0001860/Library/CloudStorage/Dropbox/Backups/FalconSignals/database/$(date +\%Y\%m\%d_\%H\%M\%S)_falconsignals.db
+
+################################
+# DAILY FUNDAMENTAL DATA COLLECTION
+################################
+# Collect fundamental data snapshots for historical backtesting and analysis
+# NOTE: Fundamental data changes less frequently than prices, so daily collection is sufficient
+# Rate limited to 1 req/sec automatically - monitor Alpha Vantage API usage
+
+# Collect for watchlist/portfolio - Daily at 6:00 AM (before market opens)
+# Example: Balanced moderate portfolio
+0 6 * * * /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_portfolio_balanced_moderate
+
+# Alternative: Collect for specific groups on different days to spread API usage
+# Monday: Tech groups (using comma-separated groups requires inline command)
+0 6 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_tech_software
+
+# Monday: AI/ML group - 10 minutes later
+10 6 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_ai_ml
+
+# Tuesday: Healthcare groups
+0 6 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_healthcare_pharma
+
+# Tuesday: Biotech group - 10 minutes later
+10 6 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_biotech_genomics
+
+# Wednesday: Financial groups
+0 6 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_financials_banks
+
+# Wednesday: Fintech group - 10 minutes later
+10 6 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_financials_fintech
+
+# Thursday: Energy & Industrial groups
+0 6 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_energy
+
+# Thursday: Industrials group - 10 minutes later
+10 6 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_industrials
+
+# Friday: Consumer & Communications groups
+0 6 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_consumer_retail
+
+# Friday: Communications group - 10 minutes later
+10 6 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_communication
+
+# Example: Collect with force refresh flag
+# 0 7 * * 0 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_mega_cap --force
+
+# Example: Collect for historical date (backfilling)
+# 0 8 * * 6 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/collect_fundamentals.sh us_tech_software --date 2024-12-01
+
+################################
+# MONDAY - Tech & Fintech
+################################
+# Download prices for us_tech_software - Monday at 10:15 AM
+15 10 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_tech_software
+
+# Download prices for us_tech_hardware - Monday at 10:30 AM
+30 10 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_tech_hardware
+
+# Download prices for us_tech_semiconductors - Monday at 10:45 AM
+45 10 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_tech_semiconductors
+
+# Download prices for us_financials_fintech - Monday at 11:00 AM
+0 11 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_financials_fintech
+
+# Analyze us_tech_software with momentum strategy - Monday at 11:15 AM
+15 11 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_tech_software momentum --llm --debug-llm
+
+# Analyze us_tech_hardware with momentum strategy - Monday at 11:30 AM
+30 11 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_tech_hardware momentum --llm --debug-llm
+
+# Analyze us_tech_semiconductors with momentum strategy - Monday at 11:45 AM
+45 11 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_tech_semiconductors momentum --llm --debug-llm
+
+# Analyze us_financials_fintech with momentum strategy - Monday at 12:00 PM
+0 12 * * 1 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_financials_fintech momentum --llm --debug-llm
+
+################################
+# TUESDAY - Healthcare, Clean Energy & Consumer
+################################
+# Download prices for us_healthcare_pharma - Tuesday at 10:15 AM
+15 10 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_healthcare_pharma
+
+# Download prices for us_clean_energy - Tuesday at 10:30 AM
+30 10 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_clean_energy
+
+# Download prices for us_consumer_retail - Tuesday at 10:45 AM
+45 10 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_consumer_retail
+
+# Download prices for us_biotech_genomics - Tuesday at 11:00 AM
+0 11 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_biotech_genomics
+
+# Analyze us_healthcare_pharma with momentum strategy - Tuesday at 11:15 AM
+15 11 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_healthcare_pharma momentum --llm --debug-llm
+
+# Analyze us_clean_energy with momentum strategy - Tuesday at 11:30 AM
+30 11 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_clean_energy momentum --llm --debug-llm
+
+# Analyze us_consumer_retail with momentum strategy - Tuesday at 11:45 AM
+45 11 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_consumer_retail momentum --llm --debug-llm
+
+# Analyze us_biotech_genomics with momentum strategy - Tuesday at 12:00 PM
+0 12 * * 2 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_biotech_genomics momentum --llm --debug-llm
+
+################################
+# WEDNESDAY - Banking, Consumer Dining, Utilities & Communications
+################################
+# Download prices for us_financials_banks - Wednesday at 10:15 AM
+15 10 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_financials_banks
+
+# Download prices for us_consumer_restaurants - Wednesday at 10:30 AM
+30 10 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_consumer_restaurants
+
+# Download prices for us_utilities - Wednesday at 10:45 AM
+45 10 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_utilities
+
+# Download prices for us_communication - Wednesday at 11:00 AM
+0 11 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_communication
+
+# Analyze us_financials_banks with momentum strategy - Wednesday at 11:15 AM
+15 11 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_financials_banks momentum --llm --debug-llm
+
+# Analyze us_consumer_restaurants with momentum strategy - Wednesday at 11:30 AM
+30 11 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_consumer_restaurants momentum --llm --debug-llm
+
+# Analyze us_utilities with momentum strategy - Wednesday at 11:45 AM
+45 11 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_utilities momentum --llm --debug-llm
+
+# Analyze us_communication with momentum strategy - Wednesday at 12:00 PM
+0 12 * * 3 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_communication momentum --llm --debug-llm
+
+################################
+# THURSDAY - Resources, Defense & Manufacturing
+################################
+# Download prices for us_materials - Thursday at 10:15 AM
+15 10 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_materials
+
+# Download prices for us_energy - Thursday at 10:30 AM
+30 10 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_energy
+
+# Download prices for us_space_defense - Thursday at 10:45 AM
+45 10 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_space_defense
+
+# Download prices for us_industrials - Thursday at 11:00 AM
+0 11 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_industrials
+
+# Analyze us_materials with momentum strategy - Thursday at 11:15 AM
+15 11 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_materials momentum --llm --debug-llm
+
+# Analyze us_energy with momentum strategy - Thursday at 11:30 AM
+30 11 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_energy momentum --llm --debug-llm
+
+# Analyze us_space_defense with momentum strategy - Thursday at 11:45 AM
+45 11 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_space_defense momentum --llm --debug-llm
+
+# Analyze us_industrials with momentum strategy - Thursday at 12:00 PM
+0 12 * * 4 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_industrials momentum --llm --debug-llm
+
+################################
+# FRIDAY - Internet, EV, Real Estate & Medical Devices
+################################
+# Download prices for us_tech_internet - Friday at 10:15 AM
+15 10 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_tech_internet
+
+# Download prices for us_ev_autonomous - Friday at 10:30 AM
+30 10 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_ev_autonomous
+
+# Download prices for us_real_estate - Friday at 10:45 AM
+45 10 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_real_estate
+
+# Download prices for us_healthcare_devices - Friday at 11:00 AM
+0 11 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/download_prices.sh us_healthcare_devices
+
+# Analyze us_tech_internet with momentum strategy - Friday at 11:15 AM
+15 11 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_tech_internet momentum --llm --debug-llm
+
+# Analyze us_ev_autonomous with momentum strategy - Friday at 11:30 AM
+30 11 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_ev_autonomous momentum --llm --debug-llm
+
+# Analyze us_real_estate with momentum strategy - Friday at 11:45 AM
+45 11 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_real_estate momentum --llm --debug-llm
+
+# Analyze us_healthcare_devices with momentum strategy - Friday at 12:00 PM
+0 12 * * 5 /Users/s0001860/Academy/Projects/FalconSignals/cron_jobs/run_analysis.sh us_healthcare_devices momentum --llm --debug-llm

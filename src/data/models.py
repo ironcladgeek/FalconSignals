@@ -701,6 +701,10 @@ class FundamentalSnapshot(SQLModel, table=True):
     )
     buy_count: int | None = SQLField(default=None, description="Number of buy ratings")
     hold_count: int | None = SQLField(default=None, description="Number of hold ratings")
+    sell_count: int | None = SQLField(default=None, description="Number of sell ratings")
+    strong_sell_count: int | None = SQLField(
+        default=None, description="Number of strong sell ratings"
+    )
 
     # Price Context (from price_context section)
     latest_price: float | None = SQLField(default=None, description="Latest price at snapshot date")
