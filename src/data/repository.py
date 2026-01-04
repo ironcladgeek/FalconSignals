@@ -2832,10 +2832,77 @@ class FundamentalSnapshotRepository:
                 # Get or create ticker
                 ticker_obj = get_or_create_ticker(session, ticker)
 
+                # Create a copy of fundamental_data without the description field (to reduce storage size)
+                data_to_store = fundamental_data.copy()
+                if (
+                    "company_info" in data_to_store
+                    and "description" in data_to_store["company_info"]
+                ):
+                    data_to_store = json.loads(json.dumps(data_to_store))  # Deep copy
+                    data_to_store["company_info"].pop("description", None)
+
                 # Extract flattened metrics from fundamental_data
                 company_info = fundamental_data.get("company_info", {})
                 analyst_data = fundamental_data.get("analyst_data", {})
                 price_context = fundamental_data.get("price_context", {})
+                metrics = fundamental_data.get("metrics", {})
+                valuation = metrics.get("valuation", {})
+                profitability = metrics.get("profitability", {})
+                financial_health = metrics.get("financial_health", {})
+                growth = metrics.get("growth", {})
+
+                # Calculate market cap with fallback (company_info first)
+                market_cap = (
+                    company_info.get("market_cap")
+                    or valuation.get("market_cap")
+                    or (
+                        company_info.get("shares_outstanding") * price_context.get("latest_price")
+                        if company_info.get("shares_outstanding")
+                        and price_context.get("latest_price")
+                        else None
+                    )
+                )
+
+                # Extract metrics with fallback (company_info first, then nested metrics)
+                pe_ratio = (
+                    company_info.get("pe_ratio")
+                    or company_info.get("trailing_pe")
+                    or valuation.get("trailing_pe")
+                )
+                forward_pe = company_info.get("forward_pe") or valuation.get("forward_pe")
+                peg_ratio = company_info.get("peg_ratio") or valuation.get("peg_ratio")
+                price_to_book = company_info.get("price_to_book") or valuation.get("price_to_book")
+                price_to_sales = company_info.get("price_to_sales") or valuation.get(
+                    "price_to_sales"
+                )
+                ev_to_revenue = company_info.get("ev_to_revenue") or valuation.get(
+                    "enterprise_to_revenue"
+                )
+                ev_to_ebitda = company_info.get("ev_to_ebitda") or valuation.get(
+                    "enterprise_to_ebitda"
+                )
+
+                profit_margin = company_info.get("profit_margin") or profitability.get(
+                    "profit_margin"
+                )
+                operating_margin = company_info.get("operating_margin") or profitability.get(
+                    "operating_margin"
+                )
+                return_on_equity = company_info.get("return_on_equity") or profitability.get(
+                    "return_on_equity"
+                )
+                return_on_assets = (
+                    company_info.get("return_on_assets")
+                    or profitability.get("return_on_assets")
+                    or financial_health.get("return_on_assets")
+                )
+
+                quarterly_earnings_growth_yoy = company_info.get(
+                    "quarterly_earnings_growth_yoy"
+                ) or growth.get("earnings_quarterly_growth")
+                quarterly_revenue_growth_yoy = company_info.get(
+                    "quarterly_revenue_growth_yoy"
+                ) or growth.get("revenue_growth")
 
                 # Check if snapshot already exists (upsert pattern)
                 existing = session.exec(
@@ -2847,26 +2914,22 @@ class FundamentalSnapshotRepository:
 
                 if existing:
                     # Update existing snapshot
-                    existing.data_json = json.dumps(fundamental_data)
-                    existing.market_cap = company_info.get("market_cap")
-                    existing.pe_ratio = company_info.get("pe_ratio")
-                    existing.forward_pe = company_info.get("forward_pe")
-                    existing.peg_ratio = company_info.get("peg_ratio")
-                    existing.price_to_book = company_info.get("price_to_book")
-                    existing.price_to_sales = company_info.get("price_to_sales")
-                    existing.ev_to_revenue = company_info.get("ev_to_revenue")
-                    existing.ev_to_ebitda = company_info.get("ev_to_ebitda")
-                    existing.profit_margin = company_info.get("profit_margin")
-                    existing.operating_margin = company_info.get("operating_margin")
-                    existing.return_on_equity = company_info.get("return_on_equity")
-                    existing.return_on_assets = company_info.get("return_on_assets")
-                    existing.quarterly_earnings_growth_yoy = company_info.get(
-                        "quarterly_earnings_growth_yoy"
-                    )
-                    existing.quarterly_revenue_growth_yoy = company_info.get(
-                        "quarterly_revenue_growth_yoy"
-                    )
-                    existing.analyst_target_price = company_info.get("analyst_target_price")
+                    existing.data_json = json.dumps(data_to_store)
+                    existing.market_cap = market_cap
+                    existing.pe_ratio = pe_ratio
+                    existing.forward_pe = forward_pe
+                    existing.peg_ratio = peg_ratio
+                    existing.price_to_book = price_to_book
+                    existing.price_to_sales = price_to_sales
+                    existing.ev_to_revenue = ev_to_revenue
+                    existing.ev_to_ebitda = ev_to_ebitda
+                    existing.profit_margin = profit_margin
+                    existing.operating_margin = operating_margin
+                    existing.return_on_equity = return_on_equity
+                    existing.return_on_assets = return_on_assets
+                    existing.quarterly_earnings_growth_yoy = quarterly_earnings_growth_yoy
+                    existing.quarterly_revenue_growth_yoy = quarterly_revenue_growth_yoy
+                    existing.analyst_target_price = analyst_data.get("analyst_target_price")
                     existing.total_analysts = analyst_data.get("total_analysts")
                     existing.strong_buy_count = analyst_data.get("strong_buy")
                     existing.buy_count = analyst_data.get("buy")
@@ -2884,30 +2947,26 @@ class FundamentalSnapshotRepository:
                     snapshot = FundamentalSnapshot(
                         ticker_id=ticker_obj.id,
                         snapshot_date=snapshot_date,
-                        data_json=json.dumps(fundamental_data),
+                        data_json=json.dumps(data_to_store),
                         # Valuation metrics
-                        market_cap=company_info.get("market_cap"),
-                        pe_ratio=company_info.get("pe_ratio"),
-                        forward_pe=company_info.get("forward_pe"),
-                        peg_ratio=company_info.get("peg_ratio"),
-                        price_to_book=company_info.get("price_to_book"),
-                        price_to_sales=company_info.get("price_to_sales"),
-                        ev_to_revenue=company_info.get("ev_to_revenue"),
-                        ev_to_ebitda=company_info.get("ev_to_ebitda"),
+                        market_cap=market_cap,
+                        pe_ratio=pe_ratio,
+                        forward_pe=forward_pe,
+                        peg_ratio=peg_ratio,
+                        price_to_book=price_to_book,
+                        price_to_sales=price_to_sales,
+                        ev_to_revenue=ev_to_revenue,
+                        ev_to_ebitda=ev_to_ebitda,
                         # Profitability metrics
-                        profit_margin=company_info.get("profit_margin"),
-                        operating_margin=company_info.get("operating_margin"),
-                        return_on_equity=company_info.get("return_on_equity"),
-                        return_on_assets=company_info.get("return_on_assets"),
+                        profit_margin=profit_margin,
+                        operating_margin=operating_margin,
+                        return_on_equity=return_on_equity,
+                        return_on_assets=return_on_assets,
                         # Growth metrics
-                        quarterly_earnings_growth_yoy=company_info.get(
-                            "quarterly_earnings_growth_yoy"
-                        ),
-                        quarterly_revenue_growth_yoy=company_info.get(
-                            "quarterly_revenue_growth_yoy"
-                        ),
+                        quarterly_earnings_growth_yoy=quarterly_earnings_growth_yoy,
+                        quarterly_revenue_growth_yoy=quarterly_revenue_growth_yoy,
                         # Analyst data
-                        analyst_target_price=company_info.get("analyst_target_price"),
+                        analyst_target_price=analyst_data.get("analyst_target_price"),
                         total_analysts=analyst_data.get("total_analysts"),
                         strong_buy_count=analyst_data.get("strong_buy"),
                         buy_count=analyst_data.get("buy"),
