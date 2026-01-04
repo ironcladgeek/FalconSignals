@@ -719,8 +719,23 @@ class FinancialDataFetcherTool(BaseTool):
             Dictionary with change_percent and trend
         """
         try:
-            # Get last 30 days of price data using period parameter
-            prices = self.price_provider.get_stock_prices(ticker, period="30d")
+            # Determine date range based on historical_date
+            if self.historical_date:
+                # Historical mode: Get 30 days ending at historical_date
+                from datetime import timedelta
+
+                end_date = self.historical_date
+                start_date = end_date - timedelta(days=30)
+                logger.debug(
+                    f"Fetching historical price context for {ticker} "
+                    f"from {start_date} to {end_date}"
+                )
+                prices = self.price_provider.get_stock_prices(
+                    ticker, start_date=start_date, end_date=end_date
+                )
+            else:
+                # Current mode: Get last 30 days from today
+                prices = self.price_provider.get_stock_prices(ticker, period="30d")
 
             if len(prices) < 2:
                 return {"change_percent": 0, "trend": "neutral"}
@@ -757,6 +772,15 @@ class FinancialDataFetcherTool(BaseTool):
         Returns:
             Dictionary with valuation, profitability, financial health, and growth metrics
         """
+        # Skip current yfinance metrics in historical mode
+        # Historical data is already provided by get_historical_company_info()
+        if self.historical_date:
+            logger.debug(
+                f"Skipping current yfinance metrics for {ticker} in historical mode "
+                f"(historical_date={self.historical_date})"
+            )
+            return {}
+
         try:
             import yfinance as yf
 
