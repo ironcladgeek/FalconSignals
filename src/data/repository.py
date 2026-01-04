@@ -2934,6 +2934,8 @@ class FundamentalSnapshotRepository:
                     existing.strong_buy_count = analyst_data.get("strong_buy")
                     existing.buy_count = analyst_data.get("buy")
                     existing.hold_count = analyst_data.get("hold")
+                    existing.sell_count = analyst_data.get("sell")
+                    existing.strong_sell_count = analyst_data.get("strong_sell")
                     existing.latest_price = price_context.get("latest_price")
                     existing.price_change_percent = price_context.get("change_percent")
                     existing.price_trend = price_context.get("trend")
@@ -2971,6 +2973,8 @@ class FundamentalSnapshotRepository:
                         strong_buy_count=analyst_data.get("strong_buy"),
                         buy_count=analyst_data.get("buy"),
                         hold_count=analyst_data.get("hold"),
+                        sell_count=analyst_data.get("sell"),
+                        strong_sell_count=analyst_data.get("strong_sell"),
                         # Price context
                         latest_price=price_context.get("latest_price"),
                         price_change_percent=price_context.get("change_percent"),
