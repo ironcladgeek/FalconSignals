@@ -1,6 +1,6 @@
 """Yahoo Finance data provider implementation."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import yfinance as yf
@@ -568,8 +568,6 @@ class YahooFinanceProvider(DataProvider):
 
                 # Fetch historical price from yfinance for the quarter-end date
                 # Try to get price within ±5 days to handle weekends/holidays
-                from datetime import timedelta
-
                 start_date = quarter_end_date - timedelta(days=5)
                 end_date = quarter_end_date + timedelta(days=5)
 
