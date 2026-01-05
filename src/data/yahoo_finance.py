@@ -1,12 +1,11 @@
 """Yahoo Finance data provider implementation."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import yfinance as yf
 
 from src.data.models import InstrumentType, Market, StockPrice
-from src.data.price_manager import PriceDataManager
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.errors import RateLimitException
 from src.utils.logging import get_logger
@@ -407,6 +406,22 @@ class YahooFinanceProvider(DataProvider):
                     company_info["book_value"] = round(book_value_per_share, 2)
                     company_info["shares_outstanding"] = float(shares_outstanding)
 
+                # Additional balance sheet metrics for enterprise value and ROA
+                total_assets = bs.get("Total Assets", None)
+                if total_assets:
+                    company_info["total_assets"] = float(total_assets)
+
+                total_debt = bs.get("Total Debt", None)
+                if total_debt:
+                    company_info["total_debt"] = float(total_debt)
+
+                # Cash (try multiple field names)
+                cash = bs.get("Cash Cash Equivalents And Short Term Investments", None)
+                if cash is None:
+                    cash = bs.get("Cash And Cash Equivalents", None)
+                if cash:
+                    company_info["cash_and_equivalents"] = float(cash)
+
             # Income statement metrics (TTM from last 4 quarters)
             # CRITICAL: Calculate TTM (Trailing Twelve Months) by summing last 4 quarters
             # This matches how Yahoo Finance calculates historical fundamentals
@@ -467,6 +482,59 @@ class YahooFinanceProvider(DataProvider):
                             ttm_net_income / float(total_equity), 3
                         )
 
+                    # ROA (Return on Assets)
+                    if "total_assets" in company_info and company_info["total_assets"] > 0:
+                        company_info["return_on_assets"] = round(
+                            ttm_net_income / company_info["total_assets"], 3
+                        )
+
+                    # Calculate YoY growth rates (compare current quarter to same quarter last year)
+                    if len(quarters_for_ttm) >= 1:
+                        current_quarter = quarters_for_ttm[0]
+                        current_quarter_data = quarterly_financials[current_quarter]
+
+                        # Find year-ago quarter (approximately 4 quarters back)
+                        year_ago_quarters = [
+                            col
+                            for col in quarterly_financials.columns
+                            if col.date() < current_quarter.date()
+                        ]
+                        if len(year_ago_quarters) >= 4:
+                            year_ago_quarter = year_ago_quarters[3]  # 4 quarters back
+                            year_ago_data = quarterly_financials[year_ago_quarter]
+
+                            # Quarterly revenue growth YoY
+                            current_rev = current_quarter_data.get("Total Revenue", None)
+                            year_ago_rev = year_ago_data.get("Total Revenue", None)
+                            if current_rev and year_ago_rev and year_ago_rev > 0:
+                                quarterly_revenue_growth = (
+                                    float(current_rev) - float(year_ago_rev)
+                                ) / float(year_ago_rev)
+                                company_info["quarterly_revenue_growth_yoy"] = round(
+                                    quarterly_revenue_growth, 3
+                                )
+
+                            # Quarterly earnings growth YoY
+                            current_ni = current_quarter_data.get("Net Income", None)
+                            if current_ni is None:
+                                current_ni = current_quarter_data.get(
+                                    "Net Income From Continuing Operation Net Minority Interest",
+                                    None,
+                                )
+                            year_ago_ni = year_ago_data.get("Net Income", None)
+                            if year_ago_ni is None:
+                                year_ago_ni = year_ago_data.get(
+                                    "Net Income From Continuing Operation Net Minority Interest",
+                                    None,
+                                )
+                            if current_ni and year_ago_ni and year_ago_ni > 0:
+                                quarterly_earnings_growth = (
+                                    float(current_ni) - float(year_ago_ni)
+                                ) / float(year_ago_ni)
+                                company_info["quarterly_earnings_growth_yoy"] = round(
+                                    quarterly_earnings_growth, 3
+                                )
+
                     net_income = ttm_net_income  # For later use
                     total_revenue = ttm_revenue
                 else:
@@ -496,17 +564,39 @@ class YahooFinanceProvider(DataProvider):
             try:
                 # Verify selected_quarter_date is not None (should be guaranteed by earlier check)
                 assert selected_quarter_date is not None, "selected_quarter_date must be set"
-                pm = PriceDataManager()
-                # Use quarter-end date for price lookup, not analysis date
                 quarter_end_date = selected_quarter_date
-                price_at_date = pm.get_price_at_date(ticker, quarter_end_date)
 
-                if price_at_date:
-                    historical_price = price_at_date["close"]
-                    logger.debug(
-                        f"Found quarter-end price for {ticker} on {quarter_end_date}: ${historical_price}"
-                    )
+                # Fetch historical price from yfinance for the quarter-end date
+                # Try to get price within ±5 days to handle weekends/holidays
+                start_date = quarter_end_date - timedelta(days=5)
+                end_date = quarter_end_date + timedelta(days=5)
 
+                hist_prices = tick.history(start=start_date, end=end_date)
+
+                historical_price = None
+                if not hist_prices.empty:
+                    # Try to find exact date match first
+                    for idx in hist_prices.index:
+                        price_date = idx.date()
+                        if price_date == quarter_end_date:
+                            historical_price = hist_prices.loc[idx, "Close"]
+                            logger.debug(
+                                f"Found exact quarter-end price for {ticker} on {quarter_end_date}: ${historical_price:.2f}"
+                            )
+                            break
+
+                    # If no exact match, use closest date before or on quarter_end_date
+                    if historical_price is None:
+                        closest_prices = hist_prices[hist_prices.index.date <= quarter_end_date]
+                        if not closest_prices.empty:
+                            historical_price = closest_prices["Close"].iloc[-1]
+                            actual_date = closest_prices.index[-1].date()
+                            logger.info(
+                                f"Using closest available price for {ticker}: ${historical_price:.2f} "
+                                f"from {actual_date} (target: {quarter_end_date})"
+                            )
+
+                if historical_price:
                     # Calculate valuation metrics using historical price
                     if "eps" in company_info and company_info["eps"]:
                         company_info["pe_ratio"] = round(historical_price / company_info["eps"], 2)
@@ -535,10 +625,52 @@ class YahooFinanceProvider(DataProvider):
                         company_info["market_cap"] = (
                             historical_price * company_info["shares_outstanding"]
                         )
+
+                    # Enterprise Value = Market Cap + Total Debt - Cash
+                    if "market_cap" in company_info:
+                        enterprise_value = company_info["market_cap"]
+                        if "total_debt" in company_info:
+                            enterprise_value += company_info["total_debt"]
+                        if "cash_and_equivalents" in company_info:
+                            enterprise_value -= company_info["cash_and_equivalents"]
+
+                        company_info["enterprise_value"] = enterprise_value
+
+                        # EV/Revenue
+                        if "revenue_ttm" in company_info and company_info["revenue_ttm"] > 0:
+                            company_info["ev_to_revenue"] = round(
+                                enterprise_value / company_info["revenue_ttm"], 2
+                            )
+
+                        # EV/EBITDA
+                        if "ebitda" in company_info and company_info["ebitda"] > 0:
+                            company_info["ev_to_ebitda"] = round(
+                                enterprise_value / company_info["ebitda"], 2
+                            )
+
+                    # PEG Ratio = P/E / Earnings Growth Rate
+                    # Use quarterly earnings growth as proxy for annual growth
+                    if (
+                        "pe_ratio" in company_info
+                        and "quarterly_earnings_growth_yoy" in company_info
+                    ):
+                        earnings_growth_pct = (
+                            company_info["quarterly_earnings_growth_yoy"] * 100
+                        )  # Convert to percentage
+                        if earnings_growth_pct > 0:
+                            company_info["peg_ratio"] = round(
+                                company_info["pe_ratio"] / earnings_growth_pct, 2
+                            )
+
                 else:
-                    logger.warning(f"No quarter-end price found for {ticker} on {quarter_end_date}")
+                    logger.warning(
+                        f"No historical price found for {ticker} around {quarter_end_date}. "
+                        f"Valuation ratios (P/E, P/B, P/S) will not be calculated."
+                    )
             except Exception as e:
-                logger.warning(f"Could not fetch quarter-end price for {ticker}: {e}")
+                logger.warning(
+                    f"Could not fetch historical price for {ticker} on {quarter_end_date}: {e}"
+                )
 
             # Add metadata
             company_info["data_source"] = f"Yahoo Finance (Quarterly) - Q{selected_quarter_date}"
