@@ -406,6 +406,22 @@ class YahooFinanceProvider(DataProvider):
                     company_info["book_value"] = round(book_value_per_share, 2)
                     company_info["shares_outstanding"] = float(shares_outstanding)
 
+                # Additional balance sheet metrics for enterprise value and ROA
+                total_assets = bs.get("Total Assets", None)
+                if total_assets:
+                    company_info["total_assets"] = float(total_assets)
+
+                total_debt = bs.get("Total Debt", None)
+                if total_debt:
+                    company_info["total_debt"] = float(total_debt)
+
+                # Cash (try multiple field names)
+                cash = bs.get("Cash Cash Equivalents And Short Term Investments", None)
+                if cash is None:
+                    cash = bs.get("Cash And Cash Equivalents", None)
+                if cash:
+                    company_info["cash_and_equivalents"] = float(cash)
+
             # Income statement metrics (TTM from last 4 quarters)
             # CRITICAL: Calculate TTM (Trailing Twelve Months) by summing last 4 quarters
             # This matches how Yahoo Finance calculates historical fundamentals
@@ -465,6 +481,59 @@ class YahooFinanceProvider(DataProvider):
                         company_info["return_on_equity"] = round(
                             ttm_net_income / float(total_equity), 3
                         )
+
+                    # ROA (Return on Assets)
+                    if "total_assets" in company_info and company_info["total_assets"] > 0:
+                        company_info["return_on_assets"] = round(
+                            ttm_net_income / company_info["total_assets"], 3
+                        )
+
+                    # Calculate YoY growth rates (compare current quarter to same quarter last year)
+                    if len(quarters_for_ttm) >= 1:
+                        current_quarter = quarters_for_ttm[0]
+                        current_quarter_data = quarterly_financials[current_quarter]
+
+                        # Find year-ago quarter (approximately 4 quarters back)
+                        year_ago_quarters = [
+                            col
+                            for col in quarterly_financials.columns
+                            if col.date() < current_quarter.date()
+                        ]
+                        if len(year_ago_quarters) >= 4:
+                            year_ago_quarter = year_ago_quarters[3]  # 4 quarters back
+                            year_ago_data = quarterly_financials[year_ago_quarter]
+
+                            # Quarterly revenue growth YoY
+                            current_rev = current_quarter_data.get("Total Revenue", None)
+                            year_ago_rev = year_ago_data.get("Total Revenue", None)
+                            if current_rev and year_ago_rev and year_ago_rev > 0:
+                                quarterly_revenue_growth = (
+                                    float(current_rev) - float(year_ago_rev)
+                                ) / float(year_ago_rev)
+                                company_info["quarterly_revenue_growth_yoy"] = round(
+                                    quarterly_revenue_growth, 3
+                                )
+
+                            # Quarterly earnings growth YoY
+                            current_ni = current_quarter_data.get("Net Income", None)
+                            if current_ni is None:
+                                current_ni = current_quarter_data.get(
+                                    "Net Income From Continuing Operation Net Minority Interest",
+                                    None,
+                                )
+                            year_ago_ni = year_ago_data.get("Net Income", None)
+                            if year_ago_ni is None:
+                                year_ago_ni = year_ago_data.get(
+                                    "Net Income From Continuing Operation Net Minority Interest",
+                                    None,
+                                )
+                            if current_ni and year_ago_ni and year_ago_ni > 0:
+                                quarterly_earnings_growth = (
+                                    float(current_ni) - float(year_ago_ni)
+                                ) / float(year_ago_ni)
+                                company_info["quarterly_earnings_growth_yoy"] = round(
+                                    quarterly_earnings_growth, 3
+                                )
 
                     net_income = ttm_net_income  # For later use
                     total_revenue = ttm_revenue
@@ -558,6 +627,43 @@ class YahooFinanceProvider(DataProvider):
                         company_info["market_cap"] = (
                             historical_price * company_info["shares_outstanding"]
                         )
+
+                    # Enterprise Value = Market Cap + Total Debt - Cash
+                    if "market_cap" in company_info:
+                        enterprise_value = company_info["market_cap"]
+                        if "total_debt" in company_info:
+                            enterprise_value += company_info["total_debt"]
+                        if "cash_and_equivalents" in company_info:
+                            enterprise_value -= company_info["cash_and_equivalents"]
+
+                        company_info["enterprise_value"] = enterprise_value
+
+                        # EV/Revenue
+                        if "revenue_ttm" in company_info and company_info["revenue_ttm"] > 0:
+                            company_info["ev_to_revenue"] = round(
+                                enterprise_value / company_info["revenue_ttm"], 2
+                            )
+
+                        # EV/EBITDA
+                        if "ebitda" in company_info and company_info["ebitda"] > 0:
+                            company_info["ev_to_ebitda"] = round(
+                                enterprise_value / company_info["ebitda"], 2
+                            )
+
+                    # PEG Ratio = P/E / Earnings Growth Rate
+                    # Use quarterly earnings growth as proxy for annual growth
+                    if (
+                        "pe_ratio" in company_info
+                        and "quarterly_earnings_growth_yoy" in company_info
+                    ):
+                        earnings_growth_pct = (
+                            company_info["quarterly_earnings_growth_yoy"] * 100
+                        )  # Convert to percentage
+                        if earnings_growth_pct > 0:
+                            company_info["peg_ratio"] = round(
+                                company_info["pe_ratio"] / earnings_growth_pct, 2
+                            )
+
                 else:
                     logger.warning(
                         f"No historical price found for {ticker} around {quarter_end_date}. "
