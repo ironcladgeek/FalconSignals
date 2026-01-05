@@ -222,10 +222,8 @@ class TestYahooFinanceProvider:
             provider.get_latest_price("INVALID")
 
     @patch("src.data.yahoo_finance.yf.Ticker")
-    @patch("src.data.yahoo_finance.PriceDataManager")
     def test_get_historical_company_info_success(
         self,
-        mock_price_manager_class,
         mock_ticker_class,
         provider,
         mock_ticker_data,
@@ -237,11 +235,17 @@ class TestYahooFinanceProvider:
         mock_ticker = mock_ticker_data
         mock_ticker.quarterly_financials = mock_quarterly_financials
         mock_ticker.quarterly_balance_sheet = mock_quarterly_balance_sheet
-        mock_ticker_class.return_value = mock_ticker
 
-        mock_pm = MagicMock()
-        mock_pm.get_price_at_date.return_value = {"close": 180.0}
-        mock_price_manager_class.return_value = mock_pm
+        # Mock historical price data
+        mock_hist_prices = pd.DataFrame(
+            {
+                "Close": [180.0],
+            },
+            index=[pd.Timestamp("2025-06-30")],
+        )
+        mock_ticker.history = MagicMock(return_value=mock_hist_prices)
+
+        mock_ticker_class.return_value = mock_ticker
 
         # Test
         as_of_date = datetime(2025, 9, 4)
@@ -294,10 +298,8 @@ class TestYahooFinanceProvider:
         assert result["data_source"] == "Yahoo Finance (Current)"
 
     @patch("src.data.yahoo_finance.yf.Ticker")
-    @patch("src.data.yahoo_finance.PriceDataManager")
     def test_get_historical_company_info_insufficient_quarters(
         self,
-        mock_price_manager_class,
         mock_ticker_class,
         provider,
         mock_ticker_data,
@@ -329,11 +331,17 @@ class TestYahooFinanceProvider:
         mock_ticker = mock_ticker_data
         mock_ticker.quarterly_financials = quarterly_financials
         mock_ticker.quarterly_balance_sheet = quarterly_balance_sheet
-        mock_ticker_class.return_value = mock_ticker
 
-        mock_pm = MagicMock()
-        mock_pm.get_price_at_date.return_value = {"close": 180.0}
-        mock_price_manager_class.return_value = mock_pm
+        # Mock historical price data
+        mock_hist_prices = pd.DataFrame(
+            {
+                "Close": [180.0],
+            },
+            index=[pd.Timestamp("2025-06-30")],
+        )
+        mock_ticker.history = MagicMock(return_value=mock_hist_prices)
+
+        mock_ticker_class.return_value = mock_ticker
 
         as_of_date = datetime(2025, 9, 4)
         result = provider.get_historical_company_info("AAPL", as_of_date)
@@ -343,10 +351,8 @@ class TestYahooFinanceProvider:
         assert result["revenue_ttm"] == 95000000000  # Single quarter
 
     @patch("src.data.yahoo_finance.yf.Ticker")
-    @patch("src.data.yahoo_finance.PriceDataManager")
     def test_get_historical_company_info_no_price_data(
         self,
-        mock_price_manager_class,
         mock_ticker_class,
         provider,
         mock_ticker_data,
@@ -357,11 +363,12 @@ class TestYahooFinanceProvider:
         mock_ticker = mock_ticker_data
         mock_ticker.quarterly_financials = mock_quarterly_financials
         mock_ticker.quarterly_balance_sheet = mock_quarterly_balance_sheet
-        mock_ticker_class.return_value = mock_ticker
 
-        mock_pm = MagicMock()
-        mock_pm.get_price_at_date.return_value = None  # No price data
-        mock_price_manager_class.return_value = mock_pm
+        # Mock empty historical price data (no price available)
+        mock_hist_prices = pd.DataFrame()  # Empty DataFrame
+        mock_ticker.history = MagicMock(return_value=mock_hist_prices)
+
+        mock_ticker_class.return_value = mock_ticker
 
         as_of_date = datetime(2025, 9, 4)
         result = provider.get_historical_company_info("AAPL", as_of_date)
@@ -429,10 +436,8 @@ class TestYahooFinanceProvider:
         assert result is None
 
     @patch("src.data.yahoo_finance.yf.Ticker")
-    @patch("src.data.yahoo_finance.PriceDataManager")
     def test_get_historical_company_info_alternative_equity_fields(
         self,
-        mock_price_manager_class,
         mock_ticker_class,
         provider,
         mock_ticker_data,
@@ -453,11 +458,17 @@ class TestYahooFinanceProvider:
         mock_ticker = mock_ticker_data
         mock_ticker.quarterly_financials = mock_quarterly_financials
         mock_ticker.quarterly_balance_sheet = quarterly_balance_sheet
-        mock_ticker_class.return_value = mock_ticker
 
-        mock_pm = MagicMock()
-        mock_pm.get_price_at_date.return_value = {"close": 180.0}
-        mock_price_manager_class.return_value = mock_pm
+        # Mock historical price data
+        mock_hist_prices = pd.DataFrame(
+            {
+                "Close": [180.0],
+            },
+            index=[pd.Timestamp("2025-06-30")],
+        )
+        mock_ticker.history = MagicMock(return_value=mock_hist_prices)
+
+        mock_ticker_class.return_value = mock_ticker
 
         as_of_date = datetime(2025, 9, 4)
         result = provider.get_historical_company_info("AAPL", as_of_date)
@@ -466,10 +477,8 @@ class TestYahooFinanceProvider:
         assert "return_on_equity" in result
 
     @patch("src.data.yahoo_finance.yf.Ticker")
-    @patch("src.data.yahoo_finance.PriceDataManager")
     def test_get_historical_company_info_alternative_net_income_field(
         self,
-        mock_price_manager_class,
         mock_ticker_class,
         provider,
         mock_ticker_data,
@@ -507,11 +516,17 @@ class TestYahooFinanceProvider:
         mock_ticker = mock_ticker_data
         mock_ticker.quarterly_financials = quarterly_financials
         mock_ticker.quarterly_balance_sheet = mock_quarterly_balance_sheet
-        mock_ticker_class.return_value = mock_ticker
 
-        mock_pm = MagicMock()
-        mock_pm.get_price_at_date.return_value = {"close": 180.0}
-        mock_price_manager_class.return_value = mock_pm
+        # Mock historical price data
+        mock_hist_prices = pd.DataFrame(
+            {
+                "Close": [180.0],
+            },
+            index=[pd.Timestamp("2025-06-30")],
+        )
+        mock_ticker.history = MagicMock(return_value=mock_hist_prices)
+
+        mock_ticker_class.return_value = mock_ticker
 
         as_of_date = datetime(2025, 9, 4)
         result = provider.get_historical_company_info("AAPL", as_of_date)

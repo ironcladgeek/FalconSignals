@@ -6,7 +6,6 @@ import pandas as pd
 import yfinance as yf
 
 from src.data.models import InstrumentType, Market, StockPrice
-from src.data.price_manager import PriceDataManager
 from src.data.providers import DataProvider, DataProviderFactory
 from src.utils.errors import RateLimitException
 from src.utils.logging import get_logger
@@ -496,17 +495,41 @@ class YahooFinanceProvider(DataProvider):
             try:
                 # Verify selected_quarter_date is not None (should be guaranteed by earlier check)
                 assert selected_quarter_date is not None, "selected_quarter_date must be set"
-                pm = PriceDataManager()
-                # Use quarter-end date for price lookup, not analysis date
                 quarter_end_date = selected_quarter_date
-                price_at_date = pm.get_price_at_date(ticker, quarter_end_date)
 
-                if price_at_date:
-                    historical_price = price_at_date["close"]
-                    logger.debug(
-                        f"Found quarter-end price for {ticker} on {quarter_end_date}: ${historical_price}"
-                    )
+                # Fetch historical price from yfinance for the quarter-end date
+                # Try to get price within ±5 days to handle weekends/holidays
+                from datetime import timedelta
 
+                start_date = quarter_end_date - timedelta(days=5)
+                end_date = quarter_end_date + timedelta(days=5)
+
+                hist_prices = tick.history(start=start_date, end=end_date)
+
+                historical_price = None
+                if not hist_prices.empty:
+                    # Try to find exact date match first
+                    for idx in hist_prices.index:
+                        price_date = idx.date()
+                        if price_date == quarter_end_date:
+                            historical_price = hist_prices.loc[idx, "Close"]
+                            logger.debug(
+                                f"Found exact quarter-end price for {ticker} on {quarter_end_date}: ${historical_price:.2f}"
+                            )
+                            break
+
+                    # If no exact match, use closest date before or on quarter_end_date
+                    if historical_price is None:
+                        closest_prices = hist_prices[hist_prices.index.date <= quarter_end_date]
+                        if not closest_prices.empty:
+                            historical_price = closest_prices["Close"].iloc[-1]
+                            actual_date = closest_prices.index[-1].date()
+                            logger.info(
+                                f"Using closest available price for {ticker}: ${historical_price:.2f} "
+                                f"from {actual_date} (target: {quarter_end_date})"
+                            )
+
+                if historical_price:
                     # Calculate valuation metrics using historical price
                     if "eps" in company_info and company_info["eps"]:
                         company_info["pe_ratio"] = round(historical_price / company_info["eps"], 2)
@@ -536,9 +559,14 @@ class YahooFinanceProvider(DataProvider):
                             historical_price * company_info["shares_outstanding"]
                         )
                 else:
-                    logger.warning(f"No quarter-end price found for {ticker} on {quarter_end_date}")
+                    logger.warning(
+                        f"No historical price found for {ticker} around {quarter_end_date}. "
+                        f"Valuation ratios (P/E, P/B, P/S) will not be calculated."
+                    )
             except Exception as e:
-                logger.warning(f"Could not fetch quarter-end price for {ticker}: {e}")
+                logger.warning(
+                    f"Could not fetch historical price for {ticker} on {quarter_end_date}: {e}"
+                )
 
             # Add metadata
             company_info["data_source"] = f"Yahoo Finance (Quarterly) - Q{selected_quarter_date}"
